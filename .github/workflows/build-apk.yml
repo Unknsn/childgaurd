@@ -26,8 +26,9 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
       - name: Prepare Environment Files
         run: |
@@ -52,16 +53,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: latest
-          name: "SafeBand Latest APK Build"
+          tag_name: v1.0.0
+          name: "SafeBand v1.0.0 (Debug APK)"
           body: |
             ### SafeBand (ChildGuard) Android APK
             - **Branch**: main
             - **Commit**: ${{ github.sha }}
             - **File**: `app-debug.apk`
 
-            Download `app-debug.apk` directly to your Android device to install and test SafeBand.
-          prerelease: true
+            Download `app-debug.apk` directly to your Android phone to install SafeBand.
+          prerelease: false
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
