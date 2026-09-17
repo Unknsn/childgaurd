@@ -16,6 +16,7 @@ import com.example.engine.RiskEngine
 import com.example.model.AlertFlag
 import com.example.model.AppMode
 import com.example.model.BleBeaconPayload
+import com.example.model.ChildBioProfile
 import com.example.model.RiskLevel
 import com.example.model.SafeZone
 import com.example.service.AlertNotifier
@@ -79,6 +80,18 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    val childBioProfile: StateFlow<ChildBioProfile> = repository.childBioProfile.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ChildBioProfile()
+    )
+
+    fun updateChildBioProfile(profile: ChildBioProfile) {
+        viewModelScope.launch {
+            repository.saveChildBioProfile(profile)
+        }
+    }
 
     // Child Mode State
     private val _activeFlags = MutableStateFlow<Set<AlertFlag>>(emptySet())
@@ -574,20 +587,33 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     fun createEmergencySmsIntent(
         context: Context,
         contactPhoneNumber: String,
-        payload: BleBeaconPayload
+        payload: BleBeaconPayload,
+        bioProfile: ChildBioProfile = childBioProfile.value
     ): Intent {
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         val timeStr = timeFormat.format(Date(payload.timestamp))
         val coordsStr = if (payload.latitude != null && payload.longitude != null) {
             "Lat: %.5f, Lon: %.5f".format(payload.latitude, payload.longitude)
         } else {
-            "Safe Zone Area"
+            "Safe Zone Vicinity"
         }
 
         val body = """
-            🚨 SAFEBAND ALERT: Child Device ${payload.deviceId} reported ${payload.riskLevel.title} at $timeStr.
-            Location: $coordsStr.
-            Please check on the child or dispatch assistance immediately.
+            🚨 SAFEBAND EMERGENCY ALERT 🚨
+            Child: ${bioProfile.childName} (Age: ${bioProfile.age})
+            Alert Status: ${payload.riskLevel.title} at $timeStr
+            Device ID: ${payload.deviceId}
+            Coordinates: $coordsStr
+
+            📋 CRITICAL MEDICAL & BIO DATA:
+            • Blood Type: ${bioProfile.bloodType}
+            • Primary Guardian Phone: ${bioProfile.primaryParentPhone}
+            • Secondary Phone: ${bioProfile.secondaryContactPhone}
+            • Medical Conditions: ${bioProfile.medicalConditions}
+            • Known Allergies: ${bioProfile.allergies}
+            • Emergency Instructions: ${bioProfile.emergencyNotes}
+
+            Please check on the child or dispatch medical assistance immediately!
         """.trimIndent()
 
         return Intent(Intent.ACTION_SENDTO).apply {

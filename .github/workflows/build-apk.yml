@@ -59,8 +59,8 @@ jobs:
             echo "tag=$TAG" >> $GITHUB_OUTPUT
             echo "title=SafeBand $TAG" >> $GITHUB_OUTPUT
           else
-            echo "tag=v1.0.1" >> $GITHUB_OUTPUT
-            echo "title=SafeBand v1.0.1 - Parent Alert Bugfix" >> $GITHUB_OUTPUT
+            echo "tag=v1.0.2" >> $GITHUB_OUTPUT
+            echo "title=SafeBand v1.0.2 - Child Bio Data & Medical Profile" >> $GITHUB_OUTPUT
           fi
 
       - name: Create or Update GitHub Release with APK
@@ -72,17 +72,17 @@ jobs:
           body: |
             ## 🛡️ SafeBand (ChildGuard) Release - ${{ steps.release_info.outputs.tag }}
 
-            ### 🚀 Highlights & Bug Fixes:
-            - **Parent Alert Continuous Sound Bug Fixed**: 
-              - Fixed an issue where the parent alarm kept ringing and re-triggering repeatedly even after tapping dismiss or silence.
-              - Added incident acknowledgment state (`_isParentAlertSilenced`) so repeated incoming BLE packets from an active incident update coordinates in the background without restarting the siren.
-            - **Active Child Cancellation Broadcast**:
-              - When child cancels SOS or safe-zone departure, child broadcasts a brief `NORMAL` beacon.
-              - Parent device instantly receives this and clears the siren and alert dialog automatically.
-            - **Watchdog Timeout**:
-              - Added a 7-second watchdog timer in Parent mode to automatically shut off the alert if the child device goes out of range or stops broadcasting.
-            - **Parent Monitor Banner**:
-              - Added a "Siren silenced • Beacon active" banner with a "View Details" button on the Parent Monitor tab.
+            ### 🚀 New Features & Enhancements:
+            - **Child Bio Data & Medical Container in Emergency Alerts**:
+              - Added a dedicated, prominent Child Bio Data container in the emergency alert sheet.
+              - Displays child identity, blood group badge (e.g. `🩸 O+`), primary parent phone number with click-to-call button, secondary contact, known medical conditions, allergies, and emergency notes.
+              - In-place **"Edit Child Bio & Medical Data"** dialog allows instant editing directly on the alert screen.
+            - **Medical & Bio Details in SOS SMS Alerts**:
+              - Emergency dispatch SMS now includes blood type, parent phone, medical conditions, allergies, and instructions alongside live GPS coordinates and device ID.
+            - **Settings Bio Profile Management**:
+              - Added complete Child Bio & Medical Profile management inside the Settings screen with instant local persistence.
+            - **Parent Alert Continuous Sound Bug Fixed (v1.0.1)**:
+              - Verified silence retention across continuous BLE packets, 7-second watchdog, and child cancellation broadcast.
 
             ---
             ### 📱 Download & Install:

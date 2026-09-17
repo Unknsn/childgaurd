@@ -1,6 +1,6 @@
-package com.example.ui.screens
-
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -86,6 +86,7 @@ fun ParentHomeScreen(
     val isAlertSilenced by viewModel.isParentAlertSilenced.collectAsState()
     val elapsedSeconds by viewModel.alertDurationSeconds.collectAsState()
     val contacts by viewModel.allContacts.collectAsState()
+    val childBioProfile by viewModel.childBioProfile.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
     val safeZone by viewModel.safeZone.collectAsState()
 
@@ -222,10 +223,20 @@ fun ParentHomeScreen(
             payload = lastBeacon!!,
             elapsedSeconds = elapsedSeconds,
             contacts = contacts,
+            childBioProfile = childBioProfile,
             onDismiss = { viewModel.dismissParentAlert() },
             onNotifyContact = { contact ->
-                val intent = viewModel.createEmergencySmsIntent(context, contact.phoneNumber, lastBeacon!!)
+                val intent = viewModel.createEmergencySmsIntent(context, contact.phoneNumber, lastBeacon!!, childBioProfile)
                 context.startActivity(intent)
+            },
+            onCallPhone = { phone ->
+                try {
+                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.replace(" ", "")}"))
+                    context.startActivity(dialIntent)
+                } catch (_: Exception) {}
+            },
+            onUpdateBioProfile = { updated ->
+                viewModel.updateChildBioProfile(updated)
             }
         )
     }

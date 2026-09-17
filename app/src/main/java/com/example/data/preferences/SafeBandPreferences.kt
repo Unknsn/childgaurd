@@ -25,6 +25,16 @@ class SafeBandPreferences(private val context: Context) {
         private val KEY_SAFE_ZONE_LON = doublePreferencesKey("safe_zone_lon")
         private val KEY_SAFE_ZONE_RADIUS = floatPreferencesKey("safe_zone_radius")
         private val KEY_SAFE_ZONE_NAME = stringPreferencesKey("safe_zone_name")
+
+        // Child Bio & Medical Data Keys
+        private val KEY_BIO_CHILD_NAME = stringPreferencesKey("bio_child_name")
+        private val KEY_BIO_AGE = stringPreferencesKey("bio_age")
+        private val KEY_BIO_BLOOD_TYPE = stringPreferencesKey("bio_blood_type")
+        private val KEY_BIO_PRIMARY_PHONE = stringPreferencesKey("bio_primary_phone")
+        private val KEY_BIO_SECONDARY_PHONE = stringPreferencesKey("bio_secondary_phone")
+        private val KEY_BIO_MEDICAL = stringPreferencesKey("bio_medical_conditions")
+        private val KEY_BIO_ALLERGIES = stringPreferencesKey("bio_allergies")
+        private val KEY_BIO_NOTES = stringPreferencesKey("bio_emergency_notes")
     }
 
     val appMode: Flow<AppMode> = context.dataStore.data.map { preferences ->
@@ -52,6 +62,19 @@ class SafeBandPreferences(private val context: Context) {
         )
     }
 
+    val childBioProfile: Flow<com.example.model.ChildBioProfile> = context.dataStore.data.map { preferences ->
+        com.example.model.ChildBioProfile(
+            childName = preferences[KEY_BIO_CHILD_NAME] ?: "Leo",
+            age = preferences[KEY_BIO_AGE] ?: "8",
+            bloodType = preferences[KEY_BIO_BLOOD_TYPE] ?: "O+",
+            primaryParentPhone = preferences[KEY_BIO_PRIMARY_PHONE] ?: "+1 (555) 019-2834",
+            secondaryContactPhone = preferences[KEY_BIO_SECONDARY_PHONE] ?: "+1 (555) 014-9821",
+            medicalConditions = preferences[KEY_BIO_MEDICAL] ?: "Asthma (Carries Inhaler)",
+            allergies = preferences[KEY_BIO_ALLERGIES] ?: "Severe Peanut & Penicillin Allergy",
+            emergencyNotes = preferences[KEY_BIO_NOTES] ?: "Wears medical ID band. In emergency call parents immediately."
+        )
+    }
+
     suspend fun setAppMode(mode: AppMode) {
         context.dataStore.edit { preferences ->
             preferences[KEY_APP_MODE] = mode.name
@@ -70,6 +93,19 @@ class SafeBandPreferences(private val context: Context) {
             preferences[KEY_SAFE_ZONE_LON] = zone.longitude
             preferences[KEY_SAFE_ZONE_RADIUS] = zone.radiusMeters
             preferences[KEY_SAFE_ZONE_NAME] = zone.name
+        }
+    }
+
+    suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_BIO_CHILD_NAME] = profile.childName
+            preferences[KEY_BIO_AGE] = profile.age
+            preferences[KEY_BIO_BLOOD_TYPE] = profile.bloodType
+            preferences[KEY_BIO_PRIMARY_PHONE] = profile.primaryParentPhone
+            preferences[KEY_BIO_SECONDARY_PHONE] = profile.secondaryContactPhone
+            preferences[KEY_BIO_MEDICAL] = profile.medicalConditions
+            preferences[KEY_BIO_ALLERGIES] = profile.allergies
+            preferences[KEY_BIO_NOTES] = profile.emergencyNotes
         }
     }
 }

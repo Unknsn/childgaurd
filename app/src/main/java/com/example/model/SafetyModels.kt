@@ -76,3 +76,14 @@ data class BleBeaconPayload(
     val latitude: Double? = null,
     val longitude: Double? = null
 )
+
+data class ChildBioProfile(
+    val childName: String = "Leo",
+    val age: String = "8",
+    val bloodType: String = "O+",
+    val primaryParentPhone: String = "+1 (555) 019-2834",
+    val secondaryContactPhone: String = "+1 (555) 014-9821",
+    val medicalConditions: String = "Asthma (Carries Inhaler)",
+    val allergies: String = "Severe Peanut & Penicillin Allergy",
+    val emergencyNotes: String = "Wears medical ID band. In emergency call parents immediately."
+)

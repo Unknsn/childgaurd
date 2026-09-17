@@ -74,4 +74,24 @@ class RiskEngineTest {
         assertEquals("SB-NORM", decoded?.deviceId)
         assertEquals(RiskLevel.NORMAL, decoded?.riskLevel)
     }
+
+    @Test
+    fun testChildBioProfileDefaultValuesAndDataModel() {
+        val profile = com.example.model.ChildBioProfile(
+            childName = "Emma",
+            age = "7",
+            bloodType = "B+",
+            primaryParentPhone = "+15551234",
+            secondaryContactPhone = "+15555678",
+            medicalConditions = "Type 1 Diabetes",
+            allergies = "Latex",
+            emergencyNotes = "Check glucose levels"
+        )
+        assertEquals("Emma", profile.childName)
+        assertEquals("7", profile.age)
+        assertEquals("B+", profile.bloodType)
+        assertEquals("+15551234", profile.primaryParentPhone)
+        assertEquals("Type 1 Diabetes", profile.medicalConditions)
+        assertEquals("Latex", profile.allergies)
+    }
 }

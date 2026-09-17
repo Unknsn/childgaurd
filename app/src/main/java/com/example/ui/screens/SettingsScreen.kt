@@ -17,7 +17,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AppMode
 import com.example.model.RiskLevel
 import com.example.ui.SafeBandViewModel
+import com.example.ui.components.EditChildBioDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,8 +66,10 @@ fun SettingsScreen(
 ) {
     val currentMode by viewModel.appMode.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
+    val bioProfile by viewModel.childBioProfile.collectAsState()
     var deviceIdInput by remember(deviceId) { mutableStateOf(deviceId) }
     var idSavedMessage by remember { mutableStateOf(false) }
+    var showEditBioDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -237,6 +242,109 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Child Bio & Medical Data Profile Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("child_bio_settings_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.MedicalServices,
+                                contentDescription = null,
+                                tint = Color(0xFFDC2626),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Child Bio & Medical Profile",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFDC2626)
+                        ) {
+                            Text(
+                                text = "🩸 ${bioProfile.bloodType}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Displayed in the emergency alert sheet during incidents and attached to SMS alerts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Bio Details Summary
+                    Text(
+                        text = "Child: ${bioProfile.childName} (Age: ${bioProfile.age})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Parent Phone: ${bioProfile.primaryParentPhone}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (bioProfile.secondaryContactPhone.isNotBlank()) {
+                        Text(
+                            text = "Secondary Phone: ${bioProfile.secondaryContactPhone}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "Conditions: ${bioProfile.medicalConditions}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Allergies: ${bioProfile.allergies}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = { showEditBioDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_bio_profile_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Edit Child Bio & Medical Profile", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Siren & Vibrator Test Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -347,6 +455,17 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(28.dp))
+        }
+
+        if (showEditBioDialog) {
+            EditChildBioDialog(
+                initialProfile = bioProfile,
+                onDismiss = { showEditBioDialog = false },
+                onSave = { updated ->
+                    showEditBioDialog = false
+                    viewModel.updateChildBioProfile(updated)
+                }
+            )
         }
     }
 }

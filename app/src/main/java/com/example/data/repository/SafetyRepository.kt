@@ -19,6 +19,7 @@ class SafetyRepository(
     val appMode: Flow<AppMode> = preferences.appMode
     val deviceId: Flow<String> = preferences.deviceId
     val safeZone: Flow<SafeZone> = preferences.safeZone
+    val childBioProfile: Flow<com.example.model.ChildBioProfile> = preferences.childBioProfile
 
     suspend fun logEvent(
         flagType: String,
@@ -64,5 +65,9 @@ class SafetyRepository(
 
     suspend fun saveSafeZone(zone: SafeZone) {
         preferences.saveSafeZone(zone)
+    }
+
+    suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
+        preferences.saveChildBioProfile(profile)
     }
 }
