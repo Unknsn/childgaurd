@@ -10,14 +10,26 @@
 
 ---
 
+## 📱 Download & Install APK
+
+Directly install the latest pre-compiled Android APK on any Android 7.0+ (API 24+) smartphone:
+
+👉 **[Download SafeBand v1.0.2 Debug APK (Direct .apk)](https://github.com/Unknsn/childgaurd/releases/download/v1.0.2/app-debug.apk)**
+
+> Or visit the **[v1.0.2 GitHub Release Page](https://github.com/Unknsn/childgaurd/releases/tag/v1.0.2)** to view release notes and checksums.
+
+---
+
 ## 📌 Key Highlights
 
-- **📡 Zero-Cloud Peer-to-Peer Protocol**: Operates purely over Bluetooth Low Energy (BLE) advertisements and local GPS/accelerometer sensors.
+- **🩺 Child Bio Data & Medical Profile Container**: During any emergency alert (SOS beacon or boundary departure), an interactive bio data card displays the child's identity, blood group badge (e.g. `🩸 O+`), primary and secondary parents' phone numbers, medical conditions, known allergies, and instructions, with a 1-tap direct call button.
+- **💬 Medical & Bio Data in SOS SMS Dispatches**: Emergency dispatch messages automatically compile the child's complete medical profile alongside real-time GPS coordinates.
+- **📡 Zero-Cloud Peer-to-Peer Protocol**: Operates purely over Bluetooth Low Energy (BLE) advertisements and local GPS/accelerometer sensors without internet or cloud backends.
 - **🧠 Multi-Tier On-Device Risk Engine**: Dynamically calculates risk levels (`NORMAL`, `LOW`, `WARNING/MEDIUM`, `EMERGENCY/HIGH`) from sensor anomalies to minimize false alarms.
 - **⏱️ False-Alarm Mitigation**: Features a 10-second countdown cancellation window before broadcasting medium/high risk warnings (with instant bypass for manual SOS).
 - **📍 Real-Time Safe Zone Geofencing**: Computes boundary distances with dynamic circular safe zones and an interactive Compose visual canvas.
-- **🚨 Multi-Modal Alerting**: Escalates alerts with graduated haptic vibration waveforms (`VibrationEffect`) and audible pulse tones (`ToneGenerator`).
-- **🔒 Privacy-Preserving by Design**: All safety event logs and contact data are persisted locally using **Room Database** and encrypted DataStore; no user tracking or telemetry.
+- **🚨 Multi-Modal Alerting & Verified Silence Retention**: Escalates alerts with graduated haptic vibration waveforms and audible tones, with reliable silence retention and automatic watchdog timeout.
+- **🔒 Privacy-Preserving by Design**: All safety event logs, bio data, and contact data are persisted locally using **Room Database** and encrypted DataStore; no user tracking or telemetry.
 
 ---
 
