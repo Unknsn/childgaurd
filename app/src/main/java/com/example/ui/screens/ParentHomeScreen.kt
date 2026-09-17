@@ -83,6 +83,7 @@ fun ParentHomeScreen(
     val isScanning by viewModel.bleManager.isScanning.collectAsState()
     val lastBeacon by viewModel.incomingAlert.collectAsState()
     val isAlertActive by viewModel.isParentAlertActive.collectAsState()
+    val isAlertSilenced by viewModel.isParentAlertSilenced.collectAsState()
     val elapsedSeconds by viewModel.alertDurationSeconds.collectAsState()
     val contacts by viewModel.allContacts.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
@@ -205,7 +206,8 @@ fun ParentHomeScreen(
                     isScanning = isScanning,
                     pulseAlpha = pulseAlpha,
                     deviceId = deviceId,
-                    lastBeacon = lastBeacon
+                    lastBeacon = lastBeacon,
+                    isSilenced = isAlertSilenced
                 )
                 1 -> SafeZoneConfigScreen(viewModel = viewModel)
                 2 -> AlertHistoryScreen(viewModel = viewModel)
@@ -235,7 +237,8 @@ fun ParentMonitorTab(
     isScanning: Boolean,
     pulseAlpha: Float,
     deviceId: String,
-    lastBeacon: com.example.model.BleBeaconPayload?
+    lastBeacon: com.example.model.BleBeaconPayload?,
+    isSilenced: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -355,6 +358,39 @@ fun ParentMonitorTab(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+
+                    if (isSilenced && (lastBeacon.riskLevel == RiskLevel.HIGH || lastBeacon.riskLevel == RiskLevel.MEDIUM)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFEF3C7)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Siren silenced • Beacon active",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF92400E)
+                                )
+                                Button(
+                                    onClick = { viewModel.reopenAlertSheet() },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFD97706),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Text("View Details", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Text(
                         text = "No anomalous beacons received recently. System is calm and monitoring in background.",

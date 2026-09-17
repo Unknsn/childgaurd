@@ -60,4 +60,18 @@ class RiskEngineTest {
         assertEquals(lat, decodedPayload?.latitude ?: 0.0, 0.0001)
         assertEquals(lon, decodedPayload?.longitude ?: 0.0, 0.0001)
     }
+
+    @Test
+    fun testNormalRiskBeaconEncodingAndDecoding() {
+        val encodedBytes = BleSafetyManager.encodePayload(
+            deviceId = "SB-NORM",
+            riskLevel = RiskLevel.NORMAL,
+            lat = 37.77,
+            lon = -122.41
+        )
+        val decoded = BleSafetyManager.decodePayload(encodedBytes)
+        assertNotNull(decoded)
+        assertEquals("SB-NORM", decoded?.deviceId)
+        assertEquals(RiskLevel.NORMAL, decoded?.riskLevel)
+    }
 }

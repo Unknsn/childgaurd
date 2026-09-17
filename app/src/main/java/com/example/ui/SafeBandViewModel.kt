@@ -102,9 +102,17 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     private val _isParentAlertActive = MutableStateFlow(false)
     val isParentAlertActive: StateFlow<Boolean> = _isParentAlertActive.asStateFlow()
 
+    private val _isParentAlertSilenced = MutableStateFlow(false)
+    val isParentAlertSilenced: StateFlow<Boolean> = _isParentAlertSilenced.asStateFlow()
+
     private val _alertDurationSeconds = MutableStateFlow(0L)
     val alertDurationSeconds: StateFlow<Long> = _alertDurationSeconds.asStateFlow()
     private var alertTimerJob: Job? = null
+
+    private var activeAlertRiskLevel: RiskLevel? = null
+    private var beaconWatchdogJob: Job? = null
+    private var lastLoggedIncidentTime = 0L
+    private var cancellationAdvertisingJob: Job? = null
 
     init {
         // Collect motion detector anomaly
@@ -185,36 +193,118 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     fun stopParentScanning() {
         bleManager.stopScanning()
+        beaconWatchdogJob?.cancel()
+        beaconWatchdogJob = null
         dismissParentAlert()
+        _isParentAlertSilenced.value = false
     }
 
     private fun onBeaconReceived(payload: BleBeaconPayload) {
+        // Always store latest beacon so parent UI displays latest telemetry
+        _incomingAlert.value = payload
+
+        // 1. Normal or Low Risk Beacon -> Child cancelled emergency or returned to safe state
+        if (payload.riskLevel == RiskLevel.NORMAL || payload.riskLevel == RiskLevel.LOW) {
+            beaconWatchdogJob?.cancel()
+            beaconWatchdogJob = null
+
+            if (_isParentAlertActive.value || _isParentAlertSilenced.value) {
+                _isParentAlertActive.value = false
+                _isParentAlertSilenced.value = false
+                activeAlertRiskLevel = null
+                alertNotifier.stopAlert()
+                alertTimerJob?.cancel()
+                alertTimerJob = null
+
+                viewModelScope.launch {
+                    repository.logEvent(
+                        flagType = "BLE_BEACON_RESOLVED",
+                        riskLevel = payload.riskLevel.name,
+                        outcome = "CANCELLED_BY_CHILD",
+                        deviceId = payload.deviceId,
+                        details = "Child device broadcasted safe/normal status. Alert dismissed."
+                    )
+                }
+            }
+            return
+        }
+
+        // 2. Emergency / Warning Beacon (MEDIUM or HIGH)
         if (payload.riskLevel == RiskLevel.MEDIUM || payload.riskLevel == RiskLevel.HIGH) {
-            _incomingAlert.value = payload
-            _isParentAlertActive.value = true
+            // Keep watchdog alive: if no packets received for 7 seconds, emergency has ceased
+            resetBeaconWatchdog(payload.deviceId)
 
-            // Trigger sound & vibration
-            alertNotifier.startAlert(payload.riskLevel)
-
-            // Start elapsed time timer
-            alertTimerJob?.cancel()
-            _alertDurationSeconds.value = 0L
-            alertTimerJob = viewModelScope.launch {
-                val startMs = System.currentTimeMillis()
-                while (true) {
-                    delay(1000L)
-                    _alertDurationSeconds.value = (System.currentTimeMillis() - startMs) / 1000L
+            // If the parent already acknowledged/silenced this incident:
+            if (_isParentAlertSilenced.value) {
+                // Check if risk escalated (e.g. from MEDIUM to HIGH)
+                val currentRisk = activeAlertRiskLevel
+                if (currentRisk != null && payload.riskLevel.ordinal > currentRisk.ordinal) {
+                    // Critical escalation breaks through silence
+                    _isParentAlertSilenced.value = false
+                } else {
+                    // Retain silence: do NOT restart siren, do NOT re-pop dismissed dialog
+                    return
                 }
             }
 
-            // Log event in Room
-            viewModelScope.launch {
+            val isNewIncident = !_isParentAlertActive.value
+            val riskChanged = activeAlertRiskLevel != payload.riskLevel
+
+            _isParentAlertActive.value = true
+            activeAlertRiskLevel = payload.riskLevel
+
+            // Start or escalate siren & vibration ONLY on a new incident or risk escalation
+            if (isNewIncident || riskChanged) {
+                alertNotifier.startAlert(payload.riskLevel)
+            }
+
+            // Start elapsed time timer ONLY if not already running
+            if (alertTimerJob == null || !alertTimerJob!!.isActive) {
+                _alertDurationSeconds.value = 0L
+                alertTimerJob = viewModelScope.launch {
+                    val startMs = System.currentTimeMillis()
+                    while (true) {
+                        delay(1000L)
+                        _alertDurationSeconds.value = (System.currentTimeMillis() - startMs) / 1000L
+                    }
+                }
+            }
+
+            // Rate-limit database logging to once every 15s or on risk changes
+            val now = System.currentTimeMillis()
+            if (isNewIncident || riskChanged || (now - lastLoggedIncidentTime > 15000L)) {
+                lastLoggedIncidentTime = now
+                viewModelScope.launch {
+                    repository.logEvent(
+                        flagType = "BLE_BEACON_RECEIVED",
+                        riskLevel = payload.riskLevel.name,
+                        outcome = "ALERT_RECEIVED",
+                        deviceId = payload.deviceId,
+                        details = "Risk ${payload.riskLevel.title} broadcast received. Lat: ${payload.latitude ?: 0.0}, Lon: ${payload.longitude ?: 0.0}"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun resetBeaconWatchdog(deviceId: String) {
+        beaconWatchdogJob?.cancel()
+        beaconWatchdogJob = viewModelScope.launch {
+            delay(7000L) // 7 seconds of no emergency packets
+            if (_isParentAlertActive.value || _isParentAlertSilenced.value) {
+                _isParentAlertActive.value = false
+                _isParentAlertSilenced.value = false
+                activeAlertRiskLevel = null
+                alertNotifier.stopAlert()
+                alertTimerJob?.cancel()
+                alertTimerJob = null
+
                 repository.logEvent(
-                    flagType = "BLE_BEACON_RECEIVED",
-                    riskLevel = payload.riskLevel.name,
-                    outcome = "ALERT_RECEIVED",
-                    deviceId = payload.deviceId,
-                    details = "Risk ${payload.riskLevel.title} broadcast received. Lat: ${payload.latitude ?: 0.0}, Lon: ${payload.longitude ?: 0.0}"
+                    flagType = "BLE_BEACON_TIMEOUT",
+                    riskLevel = RiskLevel.NORMAL.name,
+                    outcome = "ALERT_RESOLVED_AUTO",
+                    deviceId = deviceId,
+                    details = "Emergency broadcast ended. Alert automatically cleared."
                 )
             }
         }
@@ -222,15 +312,26 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     fun dismissParentAlert() {
         _isParentAlertActive.value = false
+        _isParentAlertSilenced.value = true
         alertNotifier.stopAlert()
         alertTimerJob?.cancel()
         alertTimerJob = null
+    }
+
+    fun reopenAlertSheet() {
+        if (_incomingAlert.value != null &&
+            (_incomingAlert.value!!.riskLevel == RiskLevel.MEDIUM || _incomingAlert.value!!.riskLevel == RiskLevel.HIGH)
+        ) {
+            _isParentAlertActive.value = true
+            _isParentAlertSilenced.value = false
+        }
     }
 
     /**
      * Simulate incoming emergency for single-device parent testing / evaluation.
      */
     fun simulateIncomingEmergency(riskLevel: RiskLevel = RiskLevel.HIGH) {
+        _isParentAlertSilenced.value = false
         val payload = BleBeaconPayload(
             deviceId = "SB-DEMO",
             riskLevel = riskLevel,
@@ -243,8 +344,20 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private fun broadcastCancellationBriefly() {
+        cancellationAdvertisingJob?.cancel()
+        startBleAdvertising(RiskLevel.NORMAL)
+        cancellationAdvertisingJob = viewModelScope.launch {
+            delay(4000L) // Broadcast NORMAL for 4 seconds so parent immediately clears
+            if (!RiskEngine.shouldBroadcastBle(_currentRiskLevel.value)) {
+                bleManager.stopAdvertising()
+            }
+        }
+    }
+
     // Flag & Risk Management for Child Mode
     fun triggerManualSos() {
+        cancellationAdvertisingJob?.cancel()
         val flags = _activeFlags.value + AlertFlag.MANUAL_SOS
         _activeFlags.value = flags
         val newRisk = RiskEngine.calculateRisk(flags)
@@ -272,7 +385,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         _currentRiskLevel.value = newRisk
 
         if (!RiskEngine.shouldBroadcastBle(newRisk)) {
-            bleManager.stopAdvertising()
+            broadcastCancellationBriefly()
         }
 
         viewModelScope.launch {
@@ -308,7 +421,11 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 // Downgrade
                 _currentRiskLevel.value = evaluatedRisk
                 if (!RiskEngine.shouldBroadcastBle(evaluatedRisk)) {
-                    bleManager.stopAdvertising()
+                    if (bleManager.isAdvertising.value) {
+                        broadcastCancellationBriefly()
+                    } else {
+                        bleManager.stopAdvertising()
+                    }
                 }
                 cancelCountdown()
             } else {
@@ -328,6 +445,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun startConfirmationCountdown(targetRisk: RiskLevel, triggerFlag: AlertFlag) {
+        cancellationAdvertisingJob?.cancel()
         countdownJob?.cancel()
         _isCountingDown.value = true
         _countdownRemainingSeconds.value = 10
@@ -368,7 +486,11 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         val newRisk = RiskEngine.calculateRisk(flags)
         _currentRiskLevel.value = newRisk
         if (!RiskEngine.shouldBroadcastBle(newRisk)) {
-            bleManager.stopAdvertising()
+            if (bleManager.isAdvertising.value) {
+                broadcastCancellationBriefly()
+            } else {
+                bleManager.stopAdvertising()
+            }
         }
 
         viewModelScope.launch {
