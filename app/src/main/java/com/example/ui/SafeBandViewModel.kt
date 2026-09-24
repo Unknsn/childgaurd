@@ -17,10 +17,12 @@ import com.example.model.AlertFlag
 import com.example.model.AppMode
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
+import com.example.model.GeoAddress
 import com.example.model.RiskLevel
 import com.example.model.SafeZone
 import com.example.service.AlertNotifier
 import com.example.service.BleSafetyManager
+import com.example.service.LocationAddressResolver
 import com.example.service.LocationSafetyHelper
 import com.example.service.MotionAnomalyDetector
 import kotlinx.coroutines.Job
@@ -112,6 +114,23 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     private val _incomingAlert = MutableStateFlow<BleBeaconPayload?>(null)
     val incomingAlert: StateFlow<BleBeaconPayload?> = _incomingAlert.asStateFlow()
 
+    // Incoming Child Details & Contacts from alerting child device
+    private val _incomingChildProfile = MutableStateFlow<ChildBioProfile?>(null)
+    val incomingChildProfile: StateFlow<ChildBioProfile?> = _incomingChildProfile.asStateFlow()
+
+    private val _incomingChildContacts = MutableStateFlow<List<TrustedContact>>(emptyList())
+    val incomingChildContacts: StateFlow<List<TrustedContact>> = _incomingChildContacts.asStateFlow()
+
+    // Resolved Physical Addresses (Street, Area, City, State, PIN code)
+    private val _childAddress = MutableStateFlow<GeoAddress?>(null)
+    val childAddress: StateFlow<GeoAddress?> = _childAddress.asStateFlow()
+
+    private val _incomingAlertAddress = MutableStateFlow<GeoAddress?>(null)
+    val incomingAlertAddress: StateFlow<GeoAddress?> = _incomingAlertAddress.asStateFlow()
+
+    private val _safeZoneAddress = MutableStateFlow<GeoAddress?>(null)
+    val safeZoneAddress: StateFlow<GeoAddress?> = _safeZoneAddress.asStateFlow()
+
     private val _isParentAlertActive = MutableStateFlow(false)
     val isParentAlertActive: StateFlow<Boolean> = _isParentAlertActive.asStateFlow()
 
@@ -128,6 +147,29 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     private var cancellationAdvertisingJob: Job? = null
 
     init {
+        // Seed default emergency services (Police 112, Childline India 1098)
+        viewModelScope.launch {
+            repository.seedDefaultEmergencyServicesIfNecessary()
+        }
+
+        // Continually resolve Safe Zone physical address
+        viewModelScope.launch {
+            safeZone.collect { sz ->
+                val addr = LocationAddressResolver.resolveAddress(getApplication(), sz.latitude, sz.longitude)
+                _safeZoneAddress.value = addr
+            }
+        }
+
+        // Continually resolve Child location address
+        viewModelScope.launch {
+            locationHelper.currentLocation.collect { loc ->
+                if (loc != null) {
+                    val addr = LocationAddressResolver.resolveAddress(getApplication(), loc.latitude, loc.longitude)
+                    _childAddress.value = addr
+                }
+            }
+        }
+
         // Collect motion detector anomaly
         viewModelScope.launch {
             motionDetector.isAnomalyActive.collect { isAnomaly ->
@@ -215,6 +257,22 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     private fun onBeaconReceived(payload: BleBeaconPayload) {
         // Always store latest beacon so parent UI displays latest telemetry
         _incomingAlert.value = payload
+
+        // Update incoming child bio profile and contacts from the alerting child node
+        if (payload.childBioProfile != null) {
+            _incomingChildProfile.value = payload.childBioProfile
+        }
+        if (payload.emergencyContacts.isNotEmpty()) {
+            _incomingChildContacts.value = payload.emergencyContacts
+        }
+
+        // Asynchronously resolve physical address for incoming beacon
+        if (payload.latitude != null && payload.longitude != null) {
+            viewModelScope.launch {
+                val addr = LocationAddressResolver.resolveAddress(getApplication(), payload.latitude, payload.longitude)
+                _incomingAlertAddress.value = addr
+            }
+        }
 
         // 1. Normal or Low Risk Beacon -> Child cancelled emergency or returned to safe state
         if (payload.riskLevel == RiskLevel.NORMAL || payload.riskLevel == RiskLevel.LOW) {
@@ -342,16 +400,49 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Simulate incoming emergency for single-device parent testing / evaluation.
+     * Generates alerting child data (Aarav Sharma) with emergency contacts (Father, Mother, Police 112, Childline 1098).
      */
     fun simulateIncomingEmergency(riskLevel: RiskLevel = RiskLevel.HIGH) {
         _isParentAlertSilenced.value = false
+        val simLat = safeZone.value.latitude + 0.005
+        val simLon = safeZone.value.longitude + 0.005
+
+        val simulatedChild = ChildBioProfile(
+            childName = "Aarav Sharma",
+            age = "9",
+            bloodType = "B+",
+            primaryParentPhone = "+91 98765 43210",
+            secondaryContactPhone = "+91 98111 22334",
+            medicalConditions = "Asthma (Carries Salbutamol Inhaler)",
+            allergies = "Severe Peanut Allergy",
+            emergencyNotes = "Wearing SafeBand ID. In emergency, call parent or 112 immediately."
+        )
+
+        val simulatedContacts = listOf(
+            TrustedContact(id = 101, name = "Rajesh Sharma (Father)", phoneNumber = "+91 98765 43210", relationship = "Father"),
+            TrustedContact(id = 102, name = "Sunita Sharma (Mother)", phoneNumber = "+91 98111 22334", relationship = "Mother"),
+            TrustedContact(id = 103, name = "Police / National Emergency", phoneNumber = "112", relationship = "Emergency Hotline"),
+            TrustedContact(id = 104, name = "Childline India", phoneNumber = "1098", relationship = "Child Care Helpline")
+        )
+
+        _incomingChildProfile.value = simulatedChild
+        _incomingChildContacts.value = simulatedContacts
+
         val payload = BleBeaconPayload(
-            deviceId = "SB-DEMO",
+            deviceId = "SB-CHLD",
             riskLevel = riskLevel,
             timestamp = System.currentTimeMillis(),
-            latitude = safeZone.value.latitude + 0.005,
-            longitude = safeZone.value.longitude + 0.005
+            latitude = simLat,
+            longitude = simLon,
+            childBioProfile = simulatedChild,
+            emergencyContacts = simulatedContacts
         )
+
+        viewModelScope.launch {
+            val addr = LocationAddressResolver.resolveAddress(getApplication(), simLat, simLon)
+            _incomingAlertAddress.value = addr
+        }
+
         bleManager.injectSimulatedBeacon(payload) { p ->
             onBeaconReceived(p)
         }
@@ -529,7 +620,9 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             deviceId = deviceId.value,
             riskLevel = riskLevel,
             lat = loc?.latitude ?: safeZone.value.latitude,
-            lon = loc?.longitude ?: safeZone.value.longitude
+            lon = loc?.longitude ?: safeZone.value.longitude,
+            childBioProfile = childBioProfile.value,
+            contacts = allContacts.value
         )
     }
 
@@ -582,13 +675,15 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Creates an ACTION_SENDTO SMS Intent with pre-filled details.
-     * Does NOT silently send SMS; opens SMS app for user review & send.
+     * Includes physical address (Street, Area, City, State, PIN code),
+     * coordinates, Google Maps link, child medical info, and Indian emergency numbers.
      */
     fun createEmergencySmsIntent(
         context: Context,
         contactPhoneNumber: String,
         payload: BleBeaconPayload,
-        bioProfile: ChildBioProfile = childBioProfile.value
+        bioProfile: ChildBioProfile? = incomingChildProfile.value ?: payload.childBioProfile ?: childBioProfile.value,
+        address: GeoAddress? = incomingAlertAddress.value ?: payload.address ?: childAddress.value
     ): Intent {
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         val timeStr = timeFormat.format(Date(payload.timestamp))
@@ -597,23 +692,44 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         } else {
             "Safe Zone Vicinity"
         }
+        val mapsLink = if (payload.latitude != null && payload.longitude != null) {
+            "https://maps.google.com/?q=%.5f,%.5f".format(payload.latitude, payload.longitude)
+        } else ""
+
+        val addressSection = if (address != null && address.formattedSummary().isNotBlank()) {
+            """
+            📍 PHYSICAL ADDRESS:
+            ${address.formattedSummary()}
+            """.trimIndent()
+        } else {
+            "📍 AREA: Near Safe Zone Vicinity"
+        }
+
+        val profile = bioProfile ?: ChildBioProfile()
 
         val body = """
             🚨 SAFEBAND EMERGENCY ALERT 🚨
-            Child: ${bioProfile.childName} (Age: ${bioProfile.age})
+            Child: ${profile.childName} (Age: ${profile.age})
             Alert Status: ${payload.riskLevel.title} at $timeStr
             Device ID: ${payload.deviceId}
+
+            $addressSection
             Coordinates: $coordsStr
+            ${if (mapsLink.isNotBlank()) "Maps Link: $mapsLink" else ""}
 
             📋 CRITICAL MEDICAL & BIO DATA:
-            • Blood Type: ${bioProfile.bloodType}
-            • Primary Guardian Phone: ${bioProfile.primaryParentPhone}
-            • Secondary Phone: ${bioProfile.secondaryContactPhone}
-            • Medical Conditions: ${bioProfile.medicalConditions}
-            • Known Allergies: ${bioProfile.allergies}
-            • Emergency Instructions: ${bioProfile.emergencyNotes}
+            • Blood Type: ${profile.bloodType}
+            • Primary Guardian Phone: ${profile.primaryParentPhone}
+            • Secondary Phone: ${profile.secondaryContactPhone}
+            • Medical Conditions: ${profile.medicalConditions}
+            • Known Allergies: ${profile.allergies}
+            • Emergency Instructions: ${profile.emergencyNotes}
 
-            Please check on the child or dispatch medical assistance immediately!
+            🚨 EMERGENCY HELPLINES (INDIA):
+            • Police / National Emergency: 112
+            • Childline India (Child Care): 1098
+
+            Please check on the child or dispatch assistance immediately!
         """.trimIndent()
 
         return Intent(Intent.ACTION_SENDTO).apply {

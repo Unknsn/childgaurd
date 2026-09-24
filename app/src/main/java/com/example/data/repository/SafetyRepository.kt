@@ -70,4 +70,26 @@ class SafetyRepository(
     suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
         preferences.saveChildBioProfile(profile)
     }
+
+    suspend fun seedDefaultEmergencyServicesIfNecessary() {
+        val existing = contactDao.getContactsSnapshot()
+        if (existing.none { it.phoneNumber == "112" }) {
+            contactDao.insertContact(
+                TrustedContact(
+                    name = "Police / National Emergency",
+                    phoneNumber = "112",
+                    relationship = "Emergency (Police/Fire/Ambulance)"
+                )
+            )
+        }
+        if (existing.none { it.phoneNumber == "1098" }) {
+            contactDao.insertContact(
+                TrustedContact(
+                    name = "Childline India (Child Protection)",
+                    phoneNumber = "1098",
+                    relationship = "24x7 Child Care Helpline"
+                )
+            )
+        }
+    }
 }

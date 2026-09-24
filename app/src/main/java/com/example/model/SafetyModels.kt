@@ -69,21 +69,49 @@ data class SafeZone(
     val name: String = "Designated Safe Zone"
 )
 
+data class GeoAddress(
+    val fullAddress: String,
+    val street: String = "",
+    val area: String = "",
+    val city: String = "",
+    val state: String = "",
+    val pinCode: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0
+) {
+    fun formattedSummary(): String {
+        val parts = mutableListOf<String>()
+        if (street.isNotBlank()) parts.add(street)
+        if (area.isNotBlank()) parts.add(area)
+        if (city.isNotBlank()) parts.add(city)
+        if (state.isNotBlank()) parts.add(state)
+        val text = parts.joinToString(", ")
+        return if (pinCode.isNotBlank()) {
+            if (text.isNotBlank()) "$text - $pinCode" else pinCode
+        } else {
+            text.ifEmpty { fullAddress }
+        }
+    }
+}
+
 data class BleBeaconPayload(
     val deviceId: String,
     val riskLevel: RiskLevel,
     val timestamp: Long,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val childBioProfile: ChildBioProfile? = null,
+    val emergencyContacts: List<com.example.data.local.TrustedContact> = emptyList(),
+    val address: GeoAddress? = null
 )
 
 data class ChildBioProfile(
-    val childName: String = "Leo",
+    val childName: String = "Aarav",
     val age: String = "8",
     val bloodType: String = "O+",
-    val primaryParentPhone: String = "+1 (555) 019-2834",
-    val secondaryContactPhone: String = "+1 (555) 014-9821",
+    val primaryParentPhone: String = "+91 98765 43210",
+    val secondaryContactPhone: String = "+91 98111 22334",
     val medicalConditions: String = "Asthma (Carries Inhaler)",
-    val allergies: String = "Severe Peanut & Penicillin Allergy",
-    val emergencyNotes: String = "Wears medical ID band. In emergency call parents immediately."
+    val allergies: String = "Severe Peanut Allergy",
+    val emergencyNotes: String = "Wears medical ID band. In emergency call parents or 112 immediately."
 )

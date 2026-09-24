@@ -89,6 +89,9 @@ fun ParentHomeScreen(
     val elapsedSeconds by viewModel.alertDurationSeconds.collectAsState()
     val contacts by viewModel.allContacts.collectAsState()
     val childBioProfile by viewModel.childBioProfile.collectAsState()
+    val incomingBio by viewModel.incomingChildProfile.collectAsState()
+    val incomingContacts by viewModel.incomingChildContacts.collectAsState()
+    val incomingAddress by viewModel.incomingAlertAddress.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
     val safeZone by viewModel.safeZone.collectAsState()
 
@@ -221,14 +224,28 @@ fun ParentHomeScreen(
 
     // Full-Screen Emergency Alert Sheet on receiving beacon
     if (isAlertActive && lastBeacon != null) {
+        val activeBio = incomingBio ?: lastBeacon!!.childBioProfile ?: com.example.model.ChildBioProfile(
+            childName = "Child (${lastBeacon!!.deviceId})",
+            primaryParentPhone = ""
+        )
+        val activeContacts = if (incomingContacts.isNotEmpty()) incomingContacts else contacts
+        val activeAddress = incomingAddress ?: lastBeacon!!.address
+
         EmergencyAlertSheet(
             payload = lastBeacon!!,
             elapsedSeconds = elapsedSeconds,
-            contacts = contacts,
-            childBioProfile = childBioProfile,
+            contacts = activeContacts,
+            childBioProfile = activeBio,
+            resolvedAddress = activeAddress,
             onDismiss = { viewModel.dismissParentAlert() },
             onNotifyContact = { contact ->
-                val intent = viewModel.createEmergencySmsIntent(context, contact.phoneNumber, lastBeacon!!, childBioProfile)
+                val intent = viewModel.createEmergencySmsIntent(
+                    context = context,
+                    contactPhoneNumber = contact.phoneNumber,
+                    payload = lastBeacon!!,
+                    bioProfile = activeBio,
+                    address = activeAddress
+                )
                 context.startActivity(intent)
             },
             onCallPhone = { phone ->

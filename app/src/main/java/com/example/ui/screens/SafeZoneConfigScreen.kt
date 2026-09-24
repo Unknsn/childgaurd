@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.SafeZone
 import com.example.ui.SafeBandViewModel
-import com.example.ui.components.SafeZoneCanvas
+import com.example.ui.components.SafeZoneMapView
 
 @Composable
 fun SafeZoneConfigScreen(
@@ -58,6 +58,7 @@ fun SafeZoneConfigScreen(
     val isChildOutside by viewModel.locationHelper.isOutsideSafeZone.collectAsState()
     val childDistance by viewModel.locationHelper.distanceToSafeZoneMeters.collectAsState()
     val deviceLocation by viewModel.locationHelper.currentLocation.collectAsState()
+    val safeZoneAddress by viewModel.safeZoneAddress.collectAsState()
 
     var nameInput by remember(currentSafeZone) { mutableStateOf(currentSafeZone.name) }
     var latInput by remember(currentSafeZone) { mutableStateOf(currentSafeZone.latitude.toString()) }
@@ -97,12 +98,12 @@ fun SafeZoneConfigScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    text = "Geofence Safe Zone",
+                    text = "Geofence Safe Zone Map",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "No Maps SDK required • Canvas radar perimeter",
+                    text = "Interactive OpenStreetMap • Live boundary & street addresses",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -111,11 +112,23 @@ fun SafeZoneConfigScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Custom Canvas Visualizer
-        SafeZoneCanvas(
+        // Real Interactive OpenStreetMap Safe Zone View
+        SafeZoneMapView(
             safeZone = previewZone,
+            childLat = deviceLocation?.latitude,
+            childLon = deviceLocation?.longitude,
             isChildOutside = isChildOutside,
-            distanceMeters = childDistance
+            resolvedAddress = safeZoneAddress,
+            onMapLocationSelected = { lat, lon ->
+                latInput = "%.5f".format(java.util.Locale.US, lat)
+                lonInput = "%.5f".format(java.util.Locale.US, lon)
+            },
+            onUseCurrentLocation = {
+                deviceLocation?.let { loc ->
+                    latInput = "%.5f".format(java.util.Locale.US, loc.latitude)
+                    lonInput = "%.5f".format(java.util.Locale.US, loc.longitude)
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(20.dp))

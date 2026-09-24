@@ -1,7 +1,8 @@
 package com.example.ui.components
 
 import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -33,8 +34,11 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,7 +57,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +71,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.data.local.TrustedContact
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
+import com.example.model.GeoAddress
 import com.example.model.RiskLevel
 
 @Composable
@@ -75,14 +79,22 @@ fun EmergencyAlertSheet(
     payload: BleBeaconPayload,
     elapsedSeconds: Long,
     contacts: List<TrustedContact>,
-    childBioProfile: ChildBioProfile = ChildBioProfile(),
+    childBioProfile: ChildBioProfile? = payload.childBioProfile,
+    resolvedAddress: GeoAddress? = payload.address,
     onDismiss: () -> Unit,
     onNotifyContact: (TrustedContact) -> Unit,
     onCallPhone: (String) -> Unit = {},
     onUpdateBioProfile: (ChildBioProfile) -> Unit = {}
 ) {
+    val context = LocalContext.current
     var showEditBioDialog by remember { mutableStateOf(false) }
     val isEmergency = payload.riskLevel == RiskLevel.HIGH
+
+    // Use alerting child's profile or default labeled with child device ID
+    val activeBio = childBioProfile ?: payload.childBioProfile ?: ChildBioProfile(
+        childName = "Child (${payload.deviceId})",
+        primaryParentPhone = ""
+    )
 
     val infiniteTransition = rememberInfiniteTransition(label = "EmergencyPulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -115,7 +127,7 @@ fun EmergencyAlertSheet(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp)
+                    .padding(20.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -151,7 +163,7 @@ fun EmergencyAlertSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Pulsing Warning Icon
                 Surface(
@@ -159,7 +171,7 @@ fun EmergencyAlertSheet(
                     color = accentColor,
                     shadowElevation = 12.dp,
                     modifier = Modifier
-                        .size((110 * pulseScale).dp)
+                        .size((100 * pulseScale).dp)
                         .border(4.dp, Color.White.copy(alpha = 0.7f), CircleShape)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -167,117 +179,121 @@ fun EmergencyAlertSheet(
                             imageVector = Icons.Default.Warning,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(64.dp)
+                            modifier = Modifier.size(56.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Alert Title & Risk Level
                 Text(
                     text = if (isEmergency) "CRITICAL EMERGENCY" else "SAFETY WARNING",
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 0.5.sp,
                     textAlign = TextAlign.Center
                 )
 
                 Text(
-                    text = "Broadcast received from child wearable / phone",
+                    text = if (isEmergency) {
+                        "Incoming SOS / Danger beacon from child node ${payload.deviceId}"
+                    } else {
+                        "Potential boundary or motion anomaly from child node ${payload.deviceId}"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.85f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                // Telemetry Card: Device ID, Time Ago, Coords
+                // 1. PHYSICAL LOCATION & ADDRESS CONTAINER
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("emergency_location_address_card"),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x22FFFFFF))
+                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp)
-                    ) {
-                        // Device ID Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Device Identifier",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.7f)
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(20.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = payload.deviceId,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color.White
+                                text = "INCIDENT PHYSICAL ADDRESS & LOCATION",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF38BDF8),
+                                letterSpacing = 1.sp
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        // Elapsed Time Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Beacon Freshness",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                            val elapsedText = if (elapsedSeconds < 5) "Just now" else "${elapsedSeconds}s ago"
-                            Text(
-                                text = elapsedText,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (elapsedSeconds < 15) Color(0xFF34D399) else Color(0xFFFBBF24)
-                            )
+                        // Street, Area, City, State, Pin Code
+                        val addressText = resolvedAddress?.formattedSummary() ?: "Resolving physical address..."
+                        Text(
+                            text = addressText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Lat, Lon and freshness
+                        val locCoords = if (payload.latitude != null && payload.longitude != null) {
+                            "Coordinates: %.5f° N, %.5f° E".format(payload.latitude, payload.longitude)
+                        } else {
+                            "Near Designated Safe Zone Vicinity"
                         }
+                        val elapsedText = if (elapsedSeconds < 5) "Just now" else "${elapsedSeconds}s ago"
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "$locCoords • Freshness: $elapsedText",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color.White.copy(alpha = 0.75f)
+                        )
 
-                        // Location Coordinates
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Last Reported Position",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                            val locText = if (payload.latitude != null && payload.longitude != null) {
-                                "%.4f, %.4f".format(payload.latitude, payload.longitude)
-                            } else {
-                                "Safe Zone Vicinity"
+                        if (payload.latitude != null && payload.longitude != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    try {
+                                        val geoUri = Uri.parse("geo:${payload.latitude},${payload.longitude}?q=${payload.latitude},${payload.longitude}(Child+Emergency+Location)")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                                        context.startActivity(mapIntent)
+                                    } catch (_: Exception) {}
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF0284C7),
+                                    contentColor = Color.White
+                                ),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Open Location in Maps & Navigation", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             }
-                            Text(
-                                text = locText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color.White
-                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Child Emergency Medical & Bio Data Container
+                // 2. ALERTING CHILD BIO DATA CONTAINER
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -306,8 +322,8 @@ fun EmergencyAlertSheet(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "CHILD EMERGENCY BIO DATA",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    text = "ALERTING CHILD BIO & MEDICAL DATA",
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White,
                                     letterSpacing = 1.sp
@@ -319,7 +335,7 @@ fun EmergencyAlertSheet(
                                 color = Color(0xFFDC2626)
                             ) {
                                 Text(
-                                    text = "🩸 ${childBioProfile.bloodType}",
+                                    text = "🩸 ${activeBio.bloodType}",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White,
@@ -337,12 +353,12 @@ fun EmergencyAlertSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Child Name",
+                                text = "Child Identity",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.7f)
                             )
                             Text(
-                                text = "${childBioProfile.childName} (Age ${childBioProfile.age})",
+                                text = "${activeBio.childName} (Age ${activeBio.age})",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -351,7 +367,7 @@ fun EmergencyAlertSheet(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Primary Parent Phone with Call Button
+                        // Primary Parent Phone with 1-Tap Direct Call
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -359,12 +375,12 @@ fun EmergencyAlertSheet(
                         ) {
                             Column {
                                 Text(
-                                    text = "Primary Parent Phone",
+                                    text = "Child's Primary Parent",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.7f)
                                 )
                                 Text(
-                                    text = childBioProfile.primaryParentPhone,
+                                    text = activeBio.primaryParentPhone.ifEmpty { "Not Provided" },
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace,
@@ -372,9 +388,9 @@ fun EmergencyAlertSheet(
                                 )
                             }
 
-                            if (childBioProfile.primaryParentPhone.isNotBlank()) {
+                            if (activeBio.primaryParentPhone.isNotBlank()) {
                                 Button(
-                                    onClick = { onCallPhone(childBioProfile.primaryParentPhone) },
+                                    onClick = { onCallPhone(activeBio.primaryParentPhone) },
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color(0xFF10B981),
@@ -389,7 +405,7 @@ fun EmergencyAlertSheet(
                             }
                         }
 
-                        if (childBioProfile.secondaryContactPhone.isNotBlank()) {
+                        if (activeBio.secondaryContactPhone.isNotBlank()) {
                             Spacer(modifier = Modifier.height(10.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -397,16 +413,25 @@ fun EmergencyAlertSheet(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Secondary Phone",
+                                    text = "Secondary Contact",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.7f)
                                 )
-                                Text(
-                                    text = childBioProfile.secondaryContactPhone,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = activeBio.secondaryContactPhone,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color.White.copy(alpha = 0.9f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    IconButton(
+                                        onClick = { onCallPhone(activeBio.secondaryContactPhone) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(16.dp))
+                                    }
+                                }
                             }
                         }
 
@@ -426,7 +451,7 @@ fun EmergencyAlertSheet(
                                     color = Color(0xFFFCA5A5)
                                 )
                                 Text(
-                                    text = childBioProfile.medicalConditions,
+                                    text = activeBio.medicalConditions,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = Color.White,
@@ -451,7 +476,7 @@ fun EmergencyAlertSheet(
                                     color = Color(0xFFFDE68A)
                                 )
                                 Text(
-                                    text = childBioProfile.allergies,
+                                    text = activeBio.allergies,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = Color.White,
@@ -460,7 +485,7 @@ fun EmergencyAlertSheet(
                             }
                         }
 
-                        if (childBioProfile.emergencyNotes.isNotBlank()) {
+                        if (activeBio.emergencyNotes.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
@@ -475,7 +500,7 @@ fun EmergencyAlertSheet(
                                         color = Color.White.copy(alpha = 0.8f)
                                     )
                                     Text(
-                                        text = childBioProfile.emergencyNotes,
+                                        text = activeBio.emergencyNotes,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color.White.copy(alpha = 0.9f),
                                         modifier = Modifier.padding(top = 2.dp)
@@ -486,7 +511,7 @@ fun EmergencyAlertSheet(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // In-place Quick Edit Bio Profile button
+                        // Quick Edit Bio Profile button
                         OutlinedButton(
                             onClick = { showEditBioDialog = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -496,17 +521,85 @@ fun EmergencyAlertSheet(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Edit Child Bio & Medical Data", style = MaterialTheme.typography.labelMedium)
+                            Text("Edit Alerting Child Bio & Medical Data", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // High Risk: Notify Trusted Contacts Action
+                // 3. IMMEDIATE EMERGENCY HELPLINES (INDIA)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("national_emergency_helplines_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
+                    border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = Color(0xFFFB7185),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "🚨 NATIONAL EMERGENCY SERVICES (INDIA)",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFFB7185),
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Call Police / 112
+                            Button(
+                                onClick = { onCallPhone("112") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFE11D48),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Police: 112", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            // Call Childline / 1098
+                            Button(
+                                onClick = { onCallPhone("1098") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFD97706),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Childline: 1098", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4. NOTIFY CHILD'S EMERGENCY CONTACTS
                 if (isEmergency) {
                     Text(
-                        text = "NOTIFY TRUSTED GUARDIANS / CONTACTS",
+                        text = "EMERGENCY CONTACTS RECEIVED FROM CHILD",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = 0.8f),
@@ -518,45 +611,62 @@ fun EmergencyAlertSheet(
 
                     if (contacts.isNotEmpty()) {
                         contacts.forEach { contact ->
-                            Button(
-                                onClick = { onNotifyContact(contact) },
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(56.dp)
-                                    .padding(vertical = 4.dp)
-                                    .testTag("notify_contact_${contact.id}"),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF38BDF8),
-                                    contentColor = Color(0xFF0F172A)
-                                )
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF))
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Send SOS SMS to ${contact.name}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = contact.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "${contact.relationship} • ${contact.phoneNumber}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color.White.copy(alpha = 0.75f)
+                                        )
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        // Call Button
+                                        Button(
+                                            onClick = { onCallPhone(contact.phoneNumber) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Call", style = MaterialTheme.typography.labelSmall)
+                                        }
+
+                                        // SMS Alert Button
+                                        Button(
+                                            onClick = { onNotifyContact(contact) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color(0xFF0F172A)),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("SMS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0x33000000),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "No trusted contacts configured. Add contacts in the Contacts tab.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(12.dp),
-                                textAlign = TextAlign.Center
-                            )
                         }
                     }
 
@@ -595,7 +705,7 @@ fun EmergencyAlertSheet(
 
         if (showEditBioDialog) {
             EditChildBioDialog(
-                initialProfile = childBioProfile,
+                initialProfile = activeBio,
                 onDismiss = { showEditBioDialog = false },
                 onSave = { updated ->
                     showEditBioDialog = false

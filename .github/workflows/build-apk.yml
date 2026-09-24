@@ -59,8 +59,8 @@ jobs:
             echo "tag=$TAG" >> $GITHUB_OUTPUT
             echo "title=SafeBand $TAG" >> $GITHUB_OUTPUT
           else
-            echo "tag=v1.0.2" >> $GITHUB_OUTPUT
-            echo "title=SafeBand v1.0.2 - Child Bio Data & Medical Profile" >> $GITHUB_OUTPUT
+            echo "tag=v1.0.3" >> $GITHUB_OUTPUT
+            echo "title=SafeBand v1.0.3 - Real Maps, Physical Addresses & Alerting Child Sync" >> $GITHUB_OUTPUT
           fi
 
       - name: Create or Update GitHub Release with APK
@@ -73,16 +73,18 @@ jobs:
             ## 🛡️ SafeBand (ChildGuard) Release - ${{ steps.release_info.outputs.tag }}
 
             ### 🚀 New Features & Enhancements:
-            - **Child Bio Data & Medical Container in Emergency Alerts**:
-              - Added a dedicated, prominent Child Bio Data container in the emergency alert sheet.
-              - Displays child identity, blood group badge (e.g. `🩸 O+`), primary parent phone number with click-to-call button, secondary contact, known medical conditions, allergies, and emergency notes.
-              - In-place **"Edit Child Bio & Medical Data"** dialog allows instant editing directly on the alert screen.
-            - **Medical & Bio Details in SOS SMS Alerts**:
-              - Emergency dispatch SMS now includes blood type, parent phone, medical conditions, allergies, and instructions alongside live GPS coordinates and device ID.
-            - **Settings Bio Profile Management**:
-              - Added complete Child Bio & Medical Profile management inside the Settings screen with instant local persistence.
-            - **Parent Alert Continuous Sound Bug Fixed (v1.0.1)**:
-              - Verified silence retention across continuous BLE packets, 7-second watchdog, and child cancellation broadcast.
+            - **Alerting Child's Profile Sent to Nearby Parent Node**:
+              - The emergency alert sheet on the receiving Parent device now displays the **child's details who issued the alert** (name, age, blood group badge, primary parent phone, medical conditions, allergies), NEVER the parent device's own child data.
+              - Multi-packet BLE broadcast protocol continuously transmits the alerting child's identity, parent contact, medical conditions, and emergency contacts peer-to-peer offline.
+            - **Full Physical Address Reverse Geocoding**:
+              - Automatically resolves and displays detailed physical addresses (**Street, Area/Locality, City, State, and PIN code**) alongside exact GPS coordinates in the emergency alert sheet, safe zone banner, and incident history.
+              - Pre-composed emergency dispatch SMS now includes full physical address and a direct Google Maps navigation link.
+            - **Interactive Real Street Map in Safe Zone (OpenStreetMap / Leaflet)**:
+              - Replaced radar canvas rings with a real interactive street map powered by Leaflet and OpenStreetMap.
+              - Shows real-world streets, roads, residential areas, safe zone circular geofence boundary, safe zone center pin, live child location pin, street/satellite layer toggle, and 1-tap map repositioning.
+            - **Indian Emergency Services (112 & 1098)**:
+              - Pre-seeded **National Emergency & Police (`112`)** and **Childline India (`1098`)** into emergency contacts.
+              - Added dedicated 1-tap call action buttons for Police (112) and Childline (1098) directly inside the emergency alert screen.
 
             ---
             ### 📱 Download & Install:

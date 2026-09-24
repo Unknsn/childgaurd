@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
 
+    <!-- Network Permissions for Map Tiles and Reverse Geocoding Address Resolution -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- System and Notification Permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />

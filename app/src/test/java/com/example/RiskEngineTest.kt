@@ -94,4 +94,59 @@ class RiskEngineTest {
         assertEquals("Type 1 Diabetes", profile.medicalConditions)
         assertEquals("Latex", profile.allergies)
     }
+
+    @Test
+    fun testGeoAddressFormattedSummary() {
+        val geo = com.example.model.GeoAddress(
+            fullAddress = "12 MG Road, Koramangala, Bengaluru, Karnataka 560034",
+            street = "12 MG Road",
+            area = "Koramangala",
+            city = "Bengaluru",
+            state = "Karnataka",
+            pinCode = "560034",
+            latitude = 12.9352,
+            longitude = 77.6245
+        )
+        val summary = geo.formattedSummary()
+        assertTrue(summary.contains("MG Road"))
+        assertTrue(summary.contains("Koramangala"))
+        assertTrue(summary.contains("Bengaluru"))
+        assertTrue(summary.contains("560034"))
+    }
+
+    @Test
+    fun testMultiPacketBleEncodingAndDecoding() {
+        val deviceId = "SB-TEST"
+        val bio = com.example.model.ChildBioProfile(
+            childName = "Rohan",
+            age = "9",
+            bloodType = "O+",
+            primaryParentPhone = "+919876543210"
+        )
+
+        // 1. Bio Core
+        val coreBytes = BleSafetyManager.encodeBioCorePayload(deviceId, bio)
+        assertTrue(coreBytes.size <= 24)
+        val decodedCore = BleSafetyManager.decodePacket(coreBytes) as? BleSafetyManager.Companion.DecodedPacket.BioCore
+        assertNotNull(decodedCore)
+        assertEquals("SB-TEST", decodedCore?.deviceId)
+        assertEquals("O+", decodedCore?.bloodType)
+        assertEquals("9", decodedCore?.age)
+        assertEquals("Rohan", decodedCore?.childName)
+
+        // 2. Bio Phone
+        val phoneBytes = BleSafetyManager.encodeBioPhonePayload(deviceId, bio.primaryParentPhone)
+        assertTrue(phoneBytes.size <= 24)
+        val decodedPhone = BleSafetyManager.decodePacket(phoneBytes) as? BleSafetyManager.Companion.DecodedPacket.BioPhone
+        assertNotNull(decodedPhone)
+        assertEquals("SB-TEST", decodedPhone?.deviceId)
+        assertEquals("+919876543210", decodedPhone?.phone)
+
+        // 3. Emergency Contact
+        val contactBytes = BleSafetyManager.encodeContactPayload(deviceId, "112")
+        assertTrue(contactBytes.size <= 24)
+        val decodedContact = BleSafetyManager.decodePacket(contactBytes) as? BleSafetyManager.Companion.DecodedPacket.EmergencyContact
+        assertNotNull(decodedContact)
+        assertEquals("112", decodedContact?.phone)
+    }
 }

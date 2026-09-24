@@ -23,6 +23,9 @@ interface TrustedContactDao {
     @Query("SELECT * FROM trusted_contacts ORDER BY name ASC")
     fun getAllContacts(): Flow<List<TrustedContact>>
 
+    @Query("SELECT * FROM trusted_contacts")
+    suspend fun getContactsSnapshot(): List<TrustedContact>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertContact(contact: TrustedContact): Long
 
