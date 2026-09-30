@@ -14,23 +14,25 @@
 
 Directly install the latest pre-compiled Android APK on any Android 7.0+ (API 24+) smartphone:
 
-👉 **[Download SafeBand v1.0.3 Debug APK (Direct .apk)](https://github.com/Unknsn/childgaurd/releases/download/v1.0.3/app-debug.apk)**
+👉 **[Download SafeBand v1.1.0 Debug APK (Direct .apk)](https://github.com/Unknsn/childgaurd/releases/download/v1.1.0/app-debug.apk)**
 
-> Or visit the **[v1.0.3 GitHub Release Page](https://github.com/Unknsn/childgaurd/releases/tag/v1.0.3)** to view release notes and checksums.
+> Or visit the **[v1.1.0 GitHub Release Page](https://github.com/Unknsn/childgaurd/releases/tag/v1.1.0)** to view release notes and checksums.
 
 ---
 
-## 📌 Key Highlights
+## 📌 Key Highlights (v1.1.0 Release)
 
-- **👶 Alerting Child's Identity & Emergency Contacts Sent to Parents**: When a child triggers an alert, the nearby parent node receives the **alerting child's bio data** (name, age, blood group badge, primary parent phone, medical conditions, allergies, notes) and child's emergency contacts peer-to-peer offline over BLE. The parent sees the alerting child's data, never their own device's child data.
-- **🗺️ Interactive Real Street Map in Safe Zone (OpenStreetMap / Leaflet)**: Real interactive street map replaces simple canvas dots and rings. Shows real streets, roads, residential areas, safe zone circular perimeter, center pin, live child marker, and tap-to-set repositioning.
+- **🛡️ Authoritative Incident Lifecycle Engine**: Refactored fragmented alert flags into an authoritative `SafetyIncident` and `IncidentStage` state machine (`NONE` ➔ `WARNING` ➔ `CONFIRMATION_PENDING` ➔ `CONFIRMED` ➔ `BROADCASTING` ➔ `ACTIVE` ➔ `SILENCED` ➔ `CANCELLED` ➔ `RESOLVED`). Parents can silence sirens without accidentally erasing active incidents, and child cancellations only resolve matching incidents.
+- **👨‍👩‍👧 Reassurance-First Parent Dashboard**: Replaced raw technical scanner logs with a parent-first answering card (*"Is my child safe?"*), showing child name, verified physical address, safe-zone status, recent activity timeline, and 1-tap quick actions (Call, Safe Zone Map, 112 SOS).
+- **👶 Calm Child Experience**: Simple, reassuring status cards (Safe / Check Required / Help Requested) with large tactile circular SOS panic button, 10s false-alarm confirmation window, and demo controls cleanly cordoned off into an expandable drawer.
+- **📋 Interactive Alert History with Severity Filters**: Full event log with interactive modal dialogs for incident audit details, filter chips (`ALL`, `EMERGENCY`, `WARNING`, `RESOLVED`), and back navigation.
+- **👶 Alerting Child's Identity & Emergency Contacts Sent to Parents**: When a child triggers an alert, the nearby parent node receives the **alerting child's bio data** (name, age, blood group badge, primary parent phone, medical conditions, allergies, notes) and child's emergency contacts peer-to-peer offline over BLE.
+- **🗺️ Interactive Real Street Map in Safe Zone (OpenStreetMap / Leaflet)**: Real interactive street map with safe zone perimeter, center pin, live child marker, tap-to-set repositioning, and clean WebView lifecycle disposal on release.
 - **📍 Detailed Physical Address Resolution**: Automatically reverse geocodes coordinates to display **Street, Area/Locality, City, State, and PIN code** in emergency alerts, SMS dispatches, safe zone banners, and incident history.
 - **🚨 Indian Emergency Services (Police 112 & Childline 1098)**: Pre-seeded National Emergency (112) and Childline India (1098) with 1-tap direct call buttons built into the emergency screen.
-- **💬 Medical & Bio Data in SOS SMS Dispatches**: Emergency dispatch messages automatically compile the child's complete medical profile, street address, and direct Google Maps navigation link.
-- **📡 Zero-Cloud Peer-to-Peer Protocol**: Operates purely over Bluetooth Low Energy (BLE) advertisements and local GPS/accelerometer sensors without internet or cloud backends.
+- **📡 Thread-Safe BLE Protocol**: Multi-packet rotation cadence stabilized to 1500ms, buffer capacities expanded to 24 bytes, null-byte padding stripped, and scan caches synchronized against concurrent IPC binder threads.
 - **🧠 Multi-Tier On-Device Risk Engine**: Dynamically calculates risk levels (`NORMAL`, `LOW`, `WARNING/MEDIUM`, `EMERGENCY/HIGH`) from sensor anomalies to minimize false alarms.
-- **⏱️ False-Alarm Mitigation**: Features a 10-second countdown cancellation window before broadcasting medium/high risk warnings (with instant bypass for manual SOS).
-- **🔒 Privacy-Preserving by Design**: All safety event logs, bio data, and contact data are persisted locally using **Room Database** and encrypted DataStore; no user tracking or telemetry.
+- **🔒 Privacy-Preserving by Design**: All safety event logs, bio data, and contact data are persisted locally using **Room Database** and encrypted DataStore; zero user tracking or telemetry.
 
 ---
 

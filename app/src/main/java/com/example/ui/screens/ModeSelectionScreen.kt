@@ -19,6 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Card
@@ -61,6 +64,8 @@ fun ModeSelectionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
             // App Logo
             Surface(
                 shape = CircleShape,
@@ -78,7 +83,7 @@ fun ModeSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
                 text = "SafeBand",
@@ -89,35 +94,60 @@ fun ModeSelectionScreen(
             )
 
             Text(
-                text = "Child Safety Early-Warning Prototype",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF94A3B8),
+                text = "Child safety, without constant tracking.",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF38BDF8),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Peer-to-peer early-warning wearable system protecting children while preserving privacy.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF94A3B8),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 6.dp, start = 12.dp, end = 12.dp)
+            )
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0x2238BDF8)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 3 Core Product Pillars
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0x221E293B)),
+                border = BorderStroke(1.dp, Color(0xFF334155))
             ) {
-                Text(
-                    text = "Local-Only • Direct BLE • Zero Internet Dependency",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF38BDF8),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PillarRow(
+                        icon = Icons.Default.Lock,
+                        title = "100% Offline & Private",
+                        description = "Direct peer-to-peer Bluetooth. No cloud surveillance or central tracking."
+                    )
+                    PillarRow(
+                        icon = Icons.Default.LocationOn,
+                        title = "Safe-Zone Geofencing",
+                        description = "OpenStreetMap boundary monitoring alerts guardians if child leaves zone."
+                    )
+                    PillarRow(
+                        icon = Icons.Default.NotificationsActive,
+                        title = "Emergency Siren & Bio Sync",
+                        description = "Instant loud siren escalation, blood type, and Indian 112/1098 helplines."
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "SELECT DEVICE ROLE",
+                text = "SELECT DEVICE ROLE TO GET STARTED",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF64748B),
+                color = Color(0xFF94A3B8),
                 letterSpacing = 1.2.sp,
                 modifier = Modifier.align(Alignment.Start)
             )
@@ -132,7 +162,7 @@ fun ModeSelectionScreen(
                     .testTag("select_child_mode_card"),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                border = BorderStroke(1.5.dp, Color(0xFF334155))
+                border = BorderStroke(1.5.dp, Color(0xFF059669).copy(alpha = 0.6f))
             ) {
                 Row(
                     modifier = Modifier
@@ -143,7 +173,7 @@ fun ModeSelectionScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color(0xFF10B981).copy(alpha = 0.2f),
-                        modifier = Modifier.size(52.dp)
+                        modifier = Modifier.size(54.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -159,13 +189,13 @@ fun ModeSelectionScreen(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Child Device",
+                            text = "Child Device (Wearable Band)",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "Acts as wearable prototype. Monitors accelerometer, detects safe zone exits, provides SOS button, and broadcasts BLE warning beacon.",
+                            text = "Simulates wearable band. Monitors motion anomaly sensors, tracks safe zone boundary, and provides one-tap SOS emergency trigger.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF94A3B8),
                             modifier = Modifier.padding(top = 4.dp)
@@ -174,7 +204,7 @@ fun ModeSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Parent / Guardian Card
             Card(
@@ -184,7 +214,7 @@ fun ModeSelectionScreen(
                     .testTag("select_parent_mode_card"),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                border = BorderStroke(1.5.dp, Color(0xFF334155))
+                border = BorderStroke(1.5.dp, Color(0xFF0284C7).copy(alpha = 0.6f))
             ) {
                 Row(
                     modifier = Modifier
@@ -195,7 +225,7 @@ fun ModeSelectionScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color(0xFF3B82F6).copy(alpha = 0.2f),
-                        modifier = Modifier.size(52.dp)
+                        modifier = Modifier.size(54.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -211,13 +241,13 @@ fun ModeSelectionScreen(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Parent / Guardian",
+                            text = "Parent / Guardian Node",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "Monitors child device. Continuously scans for BLE beacons, triggers loud siren alert on emergency, configures safe zone radar, and dispatches SMS alerts.",
+                            text = "Monitors child band. Continuously scans for BLE broadcasts, triggers siren on emergency, resolves physical address, and manages safe zone perimeter.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF94A3B8),
                             modifier = Modifier.padding(top = 4.dp)
@@ -226,13 +256,57 @@ fun ModeSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "You can change this role anytime in Settings.",
+                text = "You can switch between Child and Parent roles anytime in Settings.",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF64748B),
                 textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun PillarRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String
+) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = Color(0x3338BDF8),
+            modifier = Modifier.size(28.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFF38BDF8),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF94A3B8),
+                fontSize = 11.sp
             )
         }
     }

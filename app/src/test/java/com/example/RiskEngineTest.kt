@@ -149,4 +149,56 @@ class RiskEngineTest {
         assertNotNull(decodedContact)
         assertEquals("112", decodedContact?.phone)
     }
+
+    @Test
+    fun testSafetyIncidentLifecycleTransitions() {
+        val incident = com.example.model.SafetyIncident(
+            incidentId = "INC-101",
+            deviceId = "SB-8041",
+            stage = com.example.model.IncidentStage.ACTIVE,
+            riskLevel = RiskLevel.HIGH
+        )
+        assertTrue(incident.isEmergencyActive)
+        assertTrue(incident.isSirenAudible)
+
+        // Parent silences audio
+        val silenced = incident.copy(stage = com.example.model.IncidentStage.SILENCED)
+        assertTrue(silenced.isEmergencyActive) // Incident is still active
+        org.junit.Assert.assertFalse(silenced.isSirenAudible) // But siren is muted
+
+        // Incident resolved
+        val resolved = silenced.copy(
+            stage = com.example.model.IncidentStage.RESOLVED,
+            resolutionReason = "Emergency broadcast ended"
+        )
+        org.junit.Assert.assertFalse(resolved.isEmergencyActive)
+        org.junit.Assert.assertFalse(resolved.isSirenAudible)
+        assertEquals("Emergency broadcast ended", resolved.resolutionReason)
+    }
+
+    @Test
+    fun testMultiDeviceBleIsolation() {
+        val dev1 = "SB-DEV1"
+        val dev2 = "SB-DEV2"
+
+        val bio1 = com.example.model.ChildBioProfile(childName = "Child One", bloodType = "A+")
+        val bio2 = com.example.model.ChildBioProfile(childName = "Child Two", bloodType = "B+")
+
+        val p1 = BleSafetyManager.encodeBioCorePayload(dev1, bio1)
+        val p2 = BleSafetyManager.encodeBioCorePayload(dev2, bio2)
+
+        val dec1 = BleSafetyManager.decodePacket(p1) as? BleSafetyManager.Companion.DecodedPacket.BioCore
+        val dec2 = BleSafetyManager.decodePacket(p2) as? BleSafetyManager.Companion.DecodedPacket.BioCore
+
+        assertNotNull(dec1)
+        assertNotNull(dec2)
+        assertEquals(dev1, dec1?.deviceId)
+        assertEquals("Child One", dec1?.childName)
+        assertEquals("A+", dec1?.bloodType)
+
+        assertEquals(dev2, dec2?.deviceId)
+        assertEquals("Child Two", dec2?.childName)
+        assertEquals("B+", dec2?.bloodType)
+    }
 }
+

@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.safeband.xqmt"
     minSdk = 24
     targetSdk = 36
-    versionCode = 4
-    versionName = "1.0.3"
+    versionCode = 5
+    versionName = "1.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -43,8 +43,8 @@ android {
     debug { }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
   buildFeatures {
     compose = true
@@ -55,6 +55,10 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+}
+
+kotlin {
+  jvmToolchain(21)
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

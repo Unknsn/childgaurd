@@ -92,4 +92,18 @@ class SafetyRepository(
             )
         }
     }
+
+    suspend fun seedInitialGuardianIfEmpty() {
+        val existing = contactDao.getContactsSnapshot()
+        val hasGuardian = existing.any { it.phoneNumber != "112" && it.phoneNumber != "1098" }
+        if (!hasGuardian) {
+            contactDao.insertContact(
+                TrustedContact(
+                    name = "Mom / Dad (Primary Guardian)",
+                    phoneNumber = "+91 98765 43210",
+                    relationship = "Primary Guardian"
+                )
+            )
+        }
+    }
 }

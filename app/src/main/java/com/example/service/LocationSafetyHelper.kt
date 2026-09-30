@@ -37,9 +37,12 @@ class LocationSafetyHelper(private val context: Context) {
         }
     }
 
+    private var currentSafeZone: SafeZone = SafeZone()
+
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             _currentLocation.value = location
+            evaluateSafeZone(location, currentSafeZone)
         }
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
@@ -54,6 +57,7 @@ class LocationSafetyHelper(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun startLocationUpdates(safeZone: SafeZone) {
+        currentSafeZone = safeZone
         // Try fused client last location
         try {
             fusedClient?.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)

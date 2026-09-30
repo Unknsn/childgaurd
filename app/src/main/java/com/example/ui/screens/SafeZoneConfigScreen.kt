@@ -200,8 +200,8 @@ fun SafeZoneConfigScreen(
                 OutlinedButton(
                     onClick = {
                         deviceLocation?.let { loc ->
-                            latInput = "%.5f".format(loc.latitude)
-                            lonInput = "%.5f".format(loc.longitude)
+                            latInput = "%.5f".format(java.util.Locale.US, loc.latitude)
+                            lonInput = "%.5f".format(java.util.Locale.US, loc.longitude)
                         } ?: run {
                             // Default to San Francisco if GPS not yet fixed
                             latInput = "37.77490"

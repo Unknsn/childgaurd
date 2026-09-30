@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,26 +14,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,21 +59,47 @@ import java.util.Locale
 @Composable
 fun AlertHistoryScreen(
     viewModel: SafeBandViewModel,
+    onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val events by viewModel.allEvents.collectAsState()
+    var selectedFilter by remember { mutableStateOf("ALL") }
+    var selectedEventForDetails by remember { mutableStateOf<SafetyEvent?>(null) }
+
+    val filteredEvents = remember(events, selectedFilter) {
+        when (selectedFilter) {
+            "EMERGENCY" -> events.filter { it.riskLevel == "HIGH" }
+            "WARNING" -> events.filter { it.riskLevel == "MEDIUM" }
+            "RESOLVED" -> events.filter { it.outcome.contains("CANCELLED") || it.outcome.contains("RESOLVED") || it.riskLevel == "NORMAL" }
+            else -> events
+        }
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Top Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onNavigateBack != null) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.testTag("history_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
                 Icon(
                     imageVector = Icons.Default.History,
                     contentDescription = null,
@@ -101,9 +135,37 @@ fun AlertHistoryScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        if (events.isEmpty()) {
+        // Filter Chips
+        if (events.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val filters = listOf("ALL", "EMERGENCY", "WARNING", "RESOLVED")
+                items(filters) { filter ->
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = {
+                            Text(
+                                text = filter,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        if (filteredEvents.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -130,12 +192,15 @@ fun AlertHistoryScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "No Safety Incidents Recorded",
+                        text = if (events.isEmpty()) "No Safety Incidents Recorded" else "No matching events found",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Anomalies, safe zone exits, manual SOS triggers, and BLE beacon receptions will appear here automatically.",
+                        text = if (events.isEmpty())
+                            "Sensor anomalies, safe zone exits, manual SOS triggers, and BLE beacon transmissions will appear here automatically."
+                        else
+                            "Try selecting a different filter above.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -150,16 +215,95 @@ fun AlertHistoryScreen(
                     .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(events, key = { it.id }) { event ->
-                    SafetyEventItem(event = event)
+                items(filteredEvents, key = { it.id }) { event ->
+                    SafetyEventItem(
+                        event = event,
+                        onClick = { selectedEventForDetails = event }
+                    )
                 }
             }
         }
     }
+
+    // Event Details Dialog
+    selectedEventForDetails?.let { event ->
+        AlertDialog(
+            onDismissRequest = { selectedEventForDetails = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Incident Audit Details", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                val timeFormat = SimpleDateFormat("EEEE, MMM dd, yyyy 'at' HH:mm:ss", Locale.getDefault())
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Trigger: ${event.flagType}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Severity: ${event.riskLevel}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = when (event.riskLevel) {
+                            "HIGH" -> Color(0xFFDC2626)
+                            "MEDIUM" -> Color(0xFFD97706)
+                            else -> Color(0xFF059669)
+                        }
+                    )
+                    Text(
+                        text = "Device ID: ${event.deviceId}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Outcome: ${event.outcome.replace("_", " ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Timestamp: ${timeFormat.format(Date(event.timestamp))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (event.details.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = event.details,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { selectedEventForDetails = null }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun SafetyEventItem(event: SafetyEvent) {
+fun SafetyEventItem(
+    event: SafetyEvent,
+    onClick: () -> Unit = {}
+) {
     val isEmergency = event.riskLevel == "HIGH"
     val isWarning = event.riskLevel == "MEDIUM"
 
@@ -176,6 +320,7 @@ fun SafetyEventItem(event: SafetyEvent) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .testTag("event_item_${event.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(

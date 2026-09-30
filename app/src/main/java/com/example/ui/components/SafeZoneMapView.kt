@@ -205,6 +205,11 @@ fun SafeZoneMapView(
                     update = { view ->
                         webViewRef = view
                     },
+                    onRelease = { view ->
+                        view.stopLoading()
+                        view.destroy()
+                        webViewRef = null
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
 

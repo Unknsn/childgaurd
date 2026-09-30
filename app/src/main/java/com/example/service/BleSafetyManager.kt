@@ -116,7 +116,7 @@ class BleSafetyManager(private val context: Context) {
             deviceId: String,
             phoneNumber: String?
         ): ByteArray {
-            val buffer = ByteBuffer.allocate(22)
+            val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
 
@@ -124,10 +124,10 @@ class BleSafetyManager(private val context: Context) {
             buffer.put(idBytes)
             buffer.put(TYPE_BIO_PHONE)
 
-            val digitsOnly = (phoneNumber ?: "").filter { it.isDigit() || it == '+' }.take(12)
+            val digitsOnly = (phoneNumber ?: "").filter { it.isDigit() || it == '+' }.take(14)
             val phoneBytes = digitsOnly.toByteArray(Charsets.US_ASCII)
-            val phonePadded = ByteArray(12)
-            System.arraycopy(phoneBytes, 0, phonePadded, 0, minOf(phoneBytes.size, 12))
+            val phonePadded = ByteArray(14)
+            System.arraycopy(phoneBytes, 0, phonePadded, 0, minOf(phoneBytes.size, 14))
             buffer.put(phonePadded)
 
             return buffer.array()
@@ -137,7 +137,7 @@ class BleSafetyManager(private val context: Context) {
             deviceId: String,
             medicalInfo: String?
         ): ByteArray {
-            val buffer = ByteBuffer.allocate(22)
+            val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
 
@@ -145,9 +145,9 @@ class BleSafetyManager(private val context: Context) {
             buffer.put(idBytes)
             buffer.put(TYPE_BIO_MEDICAL)
 
-            val medBytes = (medicalInfo ?: "").take(12).toByteArray(Charsets.US_ASCII)
-            val medPadded = ByteArray(12)
-            System.arraycopy(medBytes, 0, medPadded, 0, minOf(medBytes.size, 12))
+            val medBytes = (medicalInfo ?: "").take(14).toByteArray(Charsets.US_ASCII)
+            val medPadded = ByteArray(14)
+            System.arraycopy(medBytes, 0, medPadded, 0, minOf(medBytes.size, 14))
             buffer.put(medPadded)
 
             return buffer.array()
@@ -157,7 +157,7 @@ class BleSafetyManager(private val context: Context) {
             deviceId: String,
             contactPhone: String?
         ): ByteArray {
-            val buffer = ByteBuffer.allocate(22)
+            val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
 
@@ -165,10 +165,10 @@ class BleSafetyManager(private val context: Context) {
             buffer.put(idBytes)
             buffer.put(TYPE_EMERGENCY_CONTACT)
 
-            val digitsOnly = (contactPhone ?: "").filter { it.isDigit() || it == '+' }.take(12)
+            val digitsOnly = (contactPhone ?: "").filter { it.isDigit() || it == '+' }.take(14)
             val bytes = digitsOnly.toByteArray(Charsets.US_ASCII)
-            val padded = ByteArray(12)
-            System.arraycopy(bytes, 0, padded, 0, minOf(bytes.size, 12))
+            val padded = ByteArray(14)
+            System.arraycopy(bytes, 0, padded, 0, minOf(bytes.size, 14))
             buffer.put(padded)
 
             return buffer.array()
@@ -216,7 +216,7 @@ class BleSafetyManager(private val context: Context) {
 
                 val idBytes = ByteArray(7)
                 buffer.get(idBytes)
-                val deviceId = String(idBytes, Charsets.US_ASCII).trim()
+                val deviceId = String(idBytes, Charsets.US_ASCII).takeWhile { it != '\u0000' }.trim()
 
                 val typeOrRisk = buffer.get()
 
@@ -228,25 +228,25 @@ class BleSafetyManager(private val context: Context) {
                         val age = if (ageByte > 0) ageByte.toString() else "8"
                         val nameBytes = ByteArray(minOf(buffer.remaining(), 10))
                         buffer.get(nameBytes)
-                        val name = String(nameBytes, Charsets.UTF_8).trim().filter { it.isLetterOrDigit() || it == ' ' }
+                        val name = String(nameBytes, Charsets.UTF_8).takeWhile { it != '\u0000' }.trim().filter { it.isLetterOrDigit() || it == ' ' }
                         DecodedPacket.BioCore(deviceId, bloodType, age, name.ifEmpty { "Child" })
                     }
                     TYPE_BIO_PHONE -> {
                         val phoneBytes = ByteArray(buffer.remaining())
                         buffer.get(phoneBytes)
-                        val phone = String(phoneBytes, Charsets.US_ASCII).trim()
+                        val phone = String(phoneBytes, Charsets.US_ASCII).takeWhile { it != '\u0000' }.trim()
                         DecodedPacket.BioPhone(deviceId, phone)
                     }
                     TYPE_BIO_MEDICAL -> {
                         val medBytes = ByteArray(buffer.remaining())
                         buffer.get(medBytes)
-                        val med = String(medBytes, Charsets.US_ASCII).trim()
+                        val med = String(medBytes, Charsets.US_ASCII).takeWhile { it != '\u0000' }.trim()
                         DecodedPacket.BioMedical(deviceId, med)
                     }
                     TYPE_EMERGENCY_CONTACT -> {
                         val contactBytes = ByteArray(buffer.remaining())
                         buffer.get(contactBytes)
-                        val phone = String(contactBytes, Charsets.US_ASCII).trim()
+                        val phone = String(contactBytes, Charsets.US_ASCII).takeWhile { it != '\u0000' }.trim()
                         DecodedPacket.EmergencyContact(deviceId, phone)
                     }
                     else -> {
@@ -299,26 +299,34 @@ class BleSafetyManager(private val context: Context) {
 
     private class AggregatedChildData(
         val deviceId: String,
-        var riskLevel: RiskLevel = RiskLevel.NORMAL,
-        var timestamp: Long = System.currentTimeMillis(),
-        var latitude: Double? = null,
-        var longitude: Double? = null,
-        var childName: String = "",
-        var age: String = "",
-        var bloodType: String = "",
-        var primaryParentPhone: String = "",
-        var medicalConditions: String = "",
-        var allergies: String = "",
-        val emergencyContacts: MutableList<TrustedContact> = mutableListOf()
+        @Volatile var riskLevel: RiskLevel = RiskLevel.NORMAL,
+        @Volatile var timestamp: Long = System.currentTimeMillis(),
+        @Volatile var latitude: Double? = null,
+        @Volatile var longitude: Double? = null,
+        @Volatile var childName: String = "",
+        @Volatile var age: String = "",
+        @Volatile var bloodType: String = "",
+        @Volatile var primaryParentPhone: String = "",
+        @Volatile var medicalConditions: String = "",
+        @Volatile var allergies: String = "",
+        private val _emergencyContacts: MutableList<TrustedContact> = mutableListOf()
     ) {
-        fun toPayload(): BleBeaconPayload {
+        private val lock = Any()
+
+        fun addContactIfAbsent(contact: TrustedContact) = synchronized(lock) {
+            if (_emergencyContacts.none { it.phoneNumber == contact.phoneNumber }) {
+                _emergencyContacts.add(contact)
+            }
+        }
+        fun toPayload(): BleBeaconPayload = synchronized(lock) {
+            val contactsCopy = _emergencyContacts.toList()
             val bio = if (childName.isNotBlank() || primaryParentPhone.isNotBlank() || bloodType.isNotBlank()) {
                 ChildBioProfile(
                     childName = childName.ifEmpty { "Child ($deviceId)" },
                     age = age.ifEmpty { "8" },
                     bloodType = bloodType.ifEmpty { "O+" },
                     primaryParentPhone = primaryParentPhone,
-                    secondaryContactPhone = emergencyContacts.firstOrNull { it.phoneNumber != primaryParentPhone }?.phoneNumber ?: "",
+                    secondaryContactPhone = contactsCopy.firstOrNull { it.phoneNumber != primaryParentPhone }?.phoneNumber ?: "",
                     medicalConditions = medicalConditions.ifEmpty { "None Reported" },
                     allergies = allergies.ifEmpty { "None Reported" },
                     emergencyNotes = "Transmitted live via SafeBand BLE from child node $deviceId"
@@ -332,7 +340,7 @@ class BleSafetyManager(private val context: Context) {
                 latitude = latitude,
                 longitude = longitude,
                 childBioProfile = bio,
-                emergencyContacts = emergencyContacts.toList()
+                emergencyContacts = contactsCopy
             )
         }
     }
@@ -465,7 +473,7 @@ class BleSafetyManager(private val context: Context) {
 
             var idx = 0
             while (isActive && _isAdvertising.value && supplementalPayloads.isNotEmpty()) {
-                delay(600L)
+                delay(1500L)
                 if (!isActive || !_isAdvertising.value) break
 
                 val extraPayload = supplementalPayloads[idx % supplementalPayloads.size]
@@ -618,8 +626,8 @@ class BleSafetyManager(private val context: Context) {
                 if (decoded.medicalInfo.isNotBlank()) aggregated.medicalConditions = decoded.medicalInfo
             }
             is DecodedPacket.EmergencyContact -> {
-                if (decoded.phone.isNotBlank() && aggregated.emergencyContacts.none { it.phoneNumber == decoded.phone }) {
-                    aggregated.emergencyContacts.add(
+                if (decoded.phone.isNotBlank()) {
+                    aggregated.addContactIfAbsent(
                         TrustedContact(
                             name = "Child's Contact",
                             phoneNumber = decoded.phone,

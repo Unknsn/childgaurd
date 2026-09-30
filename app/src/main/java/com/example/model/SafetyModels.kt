@@ -62,6 +62,45 @@ enum class AppMode {
     PARENT
 }
 
+enum class IncidentStage(val displayName: String) {
+    NONE("Normal"),
+    WARNING("Anomaly Warning"),
+    CONFIRMATION_PENDING("Confirmation Countdown"),
+    CONFIRMED("Emergency Confirmed"),
+    BROADCASTING("Beacon Broadcasting"),
+    ACTIVE("Alert Active"),
+    SILENCED("Alert Silenced"),
+    CANCELLED("Alert Cancelled"),
+    RESOLVED("Incident Resolved")
+}
+
+data class SafetyIncident(
+    val incidentId: String = "",
+    val deviceId: String = "",
+    val stage: IncidentStage = IncidentStage.NONE,
+    val riskLevel: RiskLevel = RiskLevel.NORMAL,
+    val triggerFlags: Set<AlertFlag> = emptySet(),
+    val startTimestamp: Long = System.currentTimeMillis(),
+    val lastUpdatedTimestamp: Long = System.currentTimeMillis(),
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val address: GeoAddress? = null,
+    val childBioProfile: ChildBioProfile? = null,
+    val emergencyContacts: List<com.example.data.local.TrustedContact> = emptyList(),
+    val resolutionReason: String? = null
+) {
+    val isEmergencyActive: Boolean
+        get() = stage in setOf(
+            IncidentStage.CONFIRMED,
+            IncidentStage.BROADCASTING,
+            IncidentStage.ACTIVE,
+            IncidentStage.SILENCED
+        )
+
+    val isSirenAudible: Boolean
+        get() = stage == IncidentStage.ACTIVE && (riskLevel == RiskLevel.HIGH || riskLevel == RiskLevel.MEDIUM)
+}
+
 data class SafeZone(
     val latitude: Double = 37.7749,
     val longitude: Double = -122.4194,

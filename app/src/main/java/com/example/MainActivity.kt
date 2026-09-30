@@ -116,6 +116,12 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
         }
     }
 
+    if (currentDestination != AppDestination.HOME) {
+        androidx.activity.compose.BackHandler {
+            currentDestination = AppDestination.HOME
+        }
+    }
+
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
@@ -142,6 +148,7 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                     destination == AppDestination.HISTORY -> {
                         AlertHistoryScreen(
                             viewModel = viewModel,
+                            onNavigateBack = { currentDestination = AppDestination.HOME },
                             modifier = Modifier.padding(innerPadding)
                         )
                     }
