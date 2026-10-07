@@ -78,13 +78,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Wifi
+import com.example.model.BatteryState
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
+import com.example.model.ConnectivityTier
 import com.example.model.GeoAddress
 import com.example.model.GeofenceState
 import com.example.model.LocationConfidence
+import com.example.model.OperatingMode
 import com.example.model.RiskLevel
 import com.example.model.RouteState
+import com.example.model.ScenarioId
+import com.example.model.ScenarioStatus
 import com.example.model.TrustedRoute
 import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
@@ -309,6 +323,10 @@ fun ParentMonitorTab(
     val distanceToBoundary by viewModel.distanceToBoundary.collectAsState()
     val routeState by viewModel.routeState.collectAsState()
     val trustedRoute by viewModel.trustedRoute.collectAsState()
+    val batteryInfo by viewModel.batteryInfo.collectAsState()
+    val connectivityStatus by viewModel.connectivityStatus.collectAsState()
+    val scenarioStatus by viewModel.scenarioRunner.scenarioStatus.collectAsState()
+    var selectedScenario by remember { mutableStateOf(ScenarioId.SAFE_ZONE_EXIT) }
 
     Column(
         modifier = Modifier
@@ -412,6 +430,117 @@ fun ParentMonitorTab(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Child Device Telemetry: Battery & Connectivity (Batch F: Phase 15 & 16)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val batColor = when (batteryInfo.batteryState) {
+                        BatteryState.NORMAL -> Color(0xFF10B981)
+                        BatteryState.LOW -> Color(0xFFF59E0B)
+                        BatteryState.CRITICAL -> Color(0xFFEF4444)
+                    }
+                    val batBg = when (batteryInfo.batteryState) {
+                        BatteryState.NORMAL -> Color(0xFFECFDF5)
+                        BatteryState.LOW -> Color(0xFFFFFBEB)
+                        BatteryState.CRITICAL -> Color(0xFFFEF2F2)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = batBg,
+                        border = BorderStroke(1.dp, batColor.copy(alpha = 0.35f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (batteryInfo.isCharging) Icons.Default.BatteryChargingFull else if (batteryInfo.batteryState == BatteryState.CRITICAL) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
+                                contentDescription = "Child Band Battery",
+                                tint = batColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "${batteryInfo.percentage ?: "--"}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = batColor
+                                )
+                                Text(
+                                    text = if (batteryInfo.operatingMode == OperatingMode.POWER_SAVING) "Power Saving" else batteryInfo.batteryState.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    val connColor = when (connectivityStatus.tier) {
+                        ConnectivityTier.ONLINE -> Color(0xFF10B981)
+                        ConnectivityTier.NEARBY -> Color(0xFF2563EB)
+                        ConnectivityTier.RELAYED -> Color(0xFF9333EA)
+                        ConnectivityTier.OFFLINE -> Color(0xFFF59E0B)
+                        ConnectivityTier.UNKNOWN -> Color.Gray
+                    }
+                    val connBg = when (connectivityStatus.tier) {
+                        ConnectivityTier.ONLINE -> Color(0xFFECFDF5)
+                        ConnectivityTier.NEARBY -> Color(0xFFEFF6FF)
+                        ConnectivityTier.RELAYED -> Color(0xFFFAF5FF)
+                        ConnectivityTier.OFFLINE -> Color(0xFFFFFBEB)
+                        ConnectivityTier.UNKNOWN -> Color(0xFFF3F4F6)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = connBg,
+                        border = BorderStroke(1.dp, connColor.copy(alpha = 0.35f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when (connectivityStatus.tier) {
+                                    ConnectivityTier.ONLINE -> Icons.Default.CloudDone
+                                    ConnectivityTier.NEARBY -> Icons.Default.Radar
+                                    ConnectivityTier.RELAYED -> Icons.Default.Wifi
+                                    else -> Icons.Default.CloudOff
+                                },
+                                contentDescription = "Child Band Connectivity",
+                                tint = connColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = connectivityStatus.tier.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = connColor
+                                )
+                                Text(
+                                    text = when (connectivityStatus.tier) {
+                                        ConnectivityTier.ONLINE -> "Internet OK"
+                                        ConnectivityTier.NEARBY -> "Direct BLE"
+                                        ConnectivityTier.RELAYED -> "Mesh Relay"
+                                        ConnectivityTier.OFFLINE -> "BLE Only"
+                                        ConnectivityTier.UNKNOWN -> "Scanning"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -752,48 +881,202 @@ fun ParentMonitorTab(
 
                 AnimatedVisibility(visible = isDemoExpanded) {
                     Column {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        Text(
-                            text = "Simulate an incoming BLE beacon from a child node (Aarav Sharma) with full address, medical data, and siren on this device:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF7F1D1D)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFFEF2F2),
+                            border = BorderStroke(1.dp, Color(0xFFFCA5A5))
+                        ) {
+                            Text(
+                                text = "⚠️ EVALUATION MODE: Deterministic simulation for developer/evaluator audit. Isolated from live emergency services, external sirens, calls, and SMS.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF991B1B),
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        // Scenario Execution Status Banner
+                        val statusBg = when {
+                            scenarioStatus.isRunning -> Color(0xFFFEF3C7)
+                            scenarioStatus.isCompleted -> Color(0xFFECFDF5)
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        }
+                        val statusTextColor = when {
+                            scenarioStatus.isRunning -> Color(0xFFB45309)
+                            scenarioStatus.isCompleted -> Color(0xFF047857)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = statusBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = when {
+                                        scenarioStatus.isRunning -> "RUNNING: ${scenarioStatus.activeScenarioId?.displayName ?: ""} • ${scenarioStatus.currentStepDescription}"
+                                        scenarioStatus.isCompleted -> "COMPLETED: ${scenarioStatus.activeScenarioId?.displayName ?: ""}"
+                                        else -> "IDLE (Baseline Clean State)"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = statusTextColor
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "SELECT DETERMINISTIC SCENARIO (PHASE 17):",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF7F1D1D),
+                            letterSpacing = 0.5.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Scenario Selector Chips
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ScenarioId.values().forEach { id ->
+                                val isSelected = selectedScenario == id
+                                val expectedRisk = when (id) {
+                                    ScenarioId.NORMAL_DAY -> RiskLevel.NORMAL
+                                    ScenarioId.SAFE_ZONE_EXIT -> RiskLevel.HIGH
+                                    ScenarioId.MOTION_ANOMALY -> RiskLevel.HIGH
+                                    ScenarioId.TAMPER_MOVEMENT -> RiskLevel.HIGH
+                                    ScenarioId.OFFLINE_EMERGENCY -> RiskLevel.HIGH
+                                    ScenarioId.MULTI_RELAY_EMERGENCY -> RiskLevel.HIGH
+                                    ScenarioId.MANUAL_SOS -> RiskLevel.CRITICAL
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) Color(0xFFFEE2E2) else MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        if (isSelected) 1.5.dp else 1.dp,
+                                        if (isSelected) Color(0xFFDC2626) else MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedScenario = id }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = id.displayName,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) Color(0xFF991B1B) else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = id.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = expectedRisk.containerColor
+                                        ) {
+                                            Text(
+                                                text = expectedRisk.title,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = expectedRisk.primaryColor,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Scenario Run & Reset Action Buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Button(
-                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.MEDIUM) },
+                                onClick = { viewModel.runScenario(selectedScenario) },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("simulate_warning_beacon_button"),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFF59E0B),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text("Simulate Warning", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                            }
-
-                            Button(
-                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.HIGH) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("simulate_emergency_beacon_button"),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                                    .testTag("run_scenario_button"),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFFDC2626),
                                     contentColor = Color.White
                                 )
                             ) {
-                                Text("Simulate Emergency", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("RUN SCENARIO", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.resetScenario() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("reset_scenario_button"),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = Color(0xFF7F1D1D)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFFCA5A5))
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("RESET", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Instant Manual Beacon Test Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.MEDIUM) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("simulate_warning_beacon_button"),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Quick Warning", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.HIGH) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("simulate_emergency_beacon_button"),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Quick Emergency", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
                         }
                     }

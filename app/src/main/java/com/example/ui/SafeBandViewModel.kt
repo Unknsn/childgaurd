@@ -27,18 +27,34 @@ import com.example.model.SafetyIncident
 import com.example.model.SafetyNode
 import com.example.model.SyncStatus
 import com.example.model.TrustedRoute
+import com.example.model.BatteryInfo
+import com.example.model.BatteryState
+import com.example.model.ConnectivityStatus
+import com.example.model.ConnectivityTier
+import com.example.model.IncidentObservation
+import com.example.model.IncidentReplayState
+import com.example.model.LocationConfidence
+import com.example.model.OperatingMode
+import com.example.model.ReplayStep
+import com.example.model.ScenarioId
+import com.example.model.ScenarioStatus
+import com.example.model.TimelineItem
 import com.example.model.VerifiedLocation
 import com.example.service.AlertNotifier
+import com.example.service.BatterySafetyManager
 import com.example.service.BleSafetyManager
+import com.example.service.ConnectivitySafetyManager
 import com.example.service.LocationAddressResolver
 import com.example.service.LocationSafetyHelper
 import com.example.service.MotionAnomalyDetector
+import com.example.engine.EvaluationScenarioRunner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -59,6 +75,11 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val motionDetector = MotionAnomalyDetector(application, viewModelScope)
     val locationHelper = LocationSafetyHelper(application)
     val alertNotifier = AlertNotifier(application, viewModelScope)
+    val batteryManager = BatterySafetyManager(application)
+    val connectivityManager = ConnectivitySafetyManager(application)
+
+    val batteryInfo: StateFlow<BatteryInfo> = batteryManager.batteryInfo
+    val connectivityStatus: StateFlow<ConnectivityStatus> = connectivityManager.connectivityStatus
 
     // Persistent state
     val appMode: StateFlow<AppMode> = repository.appMode.stateIn(
@@ -184,7 +205,89 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val nearbyNodes: StateFlow<Map<String, BleBeaconPayload>> = _nearbyNodes.asStateFlow()
     val discoveredSafetyNodes: StateFlow<Map<String, SafetyNode>> = bleManager.discoveredSafetyNodes
 
+    // Batch E: Event Timeline V2 Items Flow
+    val timelineItems: StateFlow<List<TimelineItem>> = repository.allEvents.map { events ->
+        buildTimelineItems(events)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Batch E: Selected Incident Detail (Phase 13)
+    private val _selectedIncidentDetail = MutableStateFlow<SafetyIncident?>(null)
+    val selectedIncidentDetail: StateFlow<SafetyIncident?> = _selectedIncidentDetail.asStateFlow()
+
+    // Batch E: Incident Replay Engine (Phase 14)
+    private val _replayState = MutableStateFlow(IncidentReplayState())
+    val replayState: StateFlow<IncidentReplayState> = _replayState.asStateFlow()
+    private var replayJob: Job? = null
+
+    // Batch G: Developer / Evaluation Scenario Runner (Phase 17)
+    val scenarioRunner = EvaluationScenarioRunner(
+        onSimulateLocation = { lat, lon, gState, rState ->
+            locationHelper.simulateGeofenceState(gState)
+            locationHelper.simulateRouteState(rState)
+            locationHelper.simulateVerifiedLocation(
+                VerifiedLocation(
+                    latitude = lat,
+                    longitude = lon,
+                    source = "SIMULATION",
+                    accuracyMeters = 8f,
+                    confidence = LocationConfidence.HIGH,
+                    isSimulation = true
+                )
+            )
+        },
+        onSimulateRisk = { risk, flags, isSos ->
+            if (isSos) {
+                triggerManualSos()
+            } else {
+                _activeFlags.value = flags
+                _currentRiskLevel.value = risk
+                if (risk == RiskLevel.MEDIUM || risk == RiskLevel.HIGH || risk == RiskLevel.CRITICAL) {
+                    _childIncident.value = _childIncident.value.copy(
+                        stage = IncidentStage.ACTIVE,
+                        riskLevel = risk,
+                        isSimulation = true
+                    )
+                    simulateIncomingEmergency(risk)
+                }
+            }
+        },
+        onSimulateBeacon = { payload ->
+            bleManager.injectSimulatedBeacon(payload) { received ->
+                onBeaconReceived(received)
+            }
+        },
+        onResetState = {
+            _activeFlags.value = emptySet()
+            _currentRiskLevel.value = RiskLevel.NORMAL
+            locationHelper.simulateGeofenceState(GeofenceState.SAFE)
+            locationHelper.simulateRouteState(RouteState.ON_ROUTE)
+            _isParentAlertActive.value = false
+            _isParentAlertSilenced.value = false
+            _incomingAlert.value = null
+            alertNotifier.stopAlert()
+        }
+    )
+
     init {
+        // Evaluate connectivity on peer node updates
+        viewModelScope.launch {
+            discoveredSafetyNodes.collect { nodes ->
+                val now = System.currentTimeMillis()
+                val direct = nodes.values.any { it.isNearby && (now - it.lastSeenTimestamp < 30_000L) }
+                val relayed = nodes.values.any { it.connectionState == com.example.model.NodeConnectionState.RELAYED && (now - it.lastSeenTimestamp < 30_000L) }
+                val lastSeen = nodes.values.maxOfOrNull { it.lastSeenTimestamp } ?: 0L
+                connectivityManager.evaluateConnectivity(
+                    hasNearbyPeerDirect = direct,
+                    hasRelayedPeerEvidence = relayed,
+                    lastSeenPeerTimestamp = lastSeen,
+                    isBleAdvertising = bleManager.isAdvertising.value
+                )
+            }
+        }
         // Seed default emergency services (Police 112, Childline India 1098)
         viewModelScope.launch {
             repository.seedDefaultEmergencyServicesIfNecessary()
@@ -390,9 +493,22 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        // 2. Emergency / Warning Beacon (MEDIUM or HIGH)
-        if (payload.riskLevel == RiskLevel.MEDIUM || payload.riskLevel == RiskLevel.HIGH) {
+        // 2. Emergency / Warning Beacon (MEDIUM, HIGH, or CRITICAL)
+        if (payload.riskLevel == RiskLevel.MEDIUM || payload.riskLevel == RiskLevel.HIGH || payload.riskLevel == RiskLevel.CRITICAL) {
             resetBeaconWatchdog(payload.deviceId)
+
+            val now = System.currentTimeMillis()
+            val obsId = if (payload.ephemeralId.isNotBlank()) "${payload.ephemeralId}-${payload.timestamp}" else "${payload.deviceId}-${payload.timestamp}"
+            val sourceNode = payload.ephemeralId.ifEmpty { payload.deviceId }
+            val newObs = IncidentObservation(
+                observationId = obsId,
+                sourceNodeId = sourceNode,
+                timestamp = now,
+                riskLevel = payload.riskLevel,
+                hopCount = payload.hopCount,
+                rssi = -70,
+                syncStatus = if (payload.hopCount > 0) SyncStatus.RELAYED else SyncStatus.LOCAL_ONLY
+            )
 
             // If the parent already acknowledged/silenced this incident:
             if (_isParentAlertSilenced.value) {
@@ -400,13 +516,23 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 if (currentRisk != null && payload.riskLevel.ordinal > currentRisk.ordinal) {
                     _isParentAlertSilenced.value = false
                 } else {
-                    _parentIncident.value = _parentIncident.value.copy(
-                        lastUpdatedTimestamp = System.currentTimeMillis(),
-                        latitude = payload.latitude,
-                        longitude = payload.longitude,
-                        address = _incomingAlertAddress.value,
-                        childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value,
-                        emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }
+                    val currentInc = _parentIncident.value
+                    val updatedObs = if (currentInc.observations.none { it.observationId == obsId }) {
+                        currentInc.observations + newObs
+                    } else currentInc.observations
+                    val updatedSources = (currentInc.sourceNodes + sourceNode).distinct()
+
+                    _parentIncident.value = currentInc.copy(
+                        lastUpdatedTimestamp = now,
+                        latitude = payload.latitude ?: currentInc.latitude,
+                        longitude = payload.longitude ?: currentInc.longitude,
+                        address = _incomingAlertAddress.value ?: currentInc.address,
+                        childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value ?: currentInc.childBioProfile,
+                        emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }.ifEmpty { currentInc.emergencyContacts },
+                        observations = updatedObs,
+                        observationCount = updatedObs.size,
+                        sourceNodes = updatedSources,
+                        maxHopCount = maxOf(currentInc.maxHopCount, payload.hopCount)
                     )
                     return
                 }
@@ -418,18 +544,51 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             _isParentAlertActive.value = true
             activeAlertRiskLevel = payload.riskLevel
 
+            val currentInc = _parentIncident.value
+            val isSameActiveIncident = !isNewIncident &&
+                (currentInc.deviceId == payload.deviceId || currentInc.deviceId == payload.ephemeralId || currentInc.incidentId.contains(payload.deviceId)) &&
+                (now - currentInc.startTimestamp < 900_000L)
+
+            val updatedObservations = if (isSameActiveIncident) {
+                if (currentInc.observations.none { it.observationId == obsId }) {
+                    currentInc.observations + newObs
+                } else currentInc.observations
+            } else {
+                listOf(newObs)
+            }
+
+            val updatedSourceNodes = (if (isSameActiveIncident) currentInc.sourceNodes else emptyList())
+                .toMutableSet()
+                .apply { add(sourceNode) }
+                .toList()
+
+            val highestRisk = if (isSameActiveIncident) {
+                if (payload.riskLevel.ordinal > currentInc.riskLevel.ordinal) payload.riskLevel else currentInc.riskLevel
+            } else {
+                payload.riskLevel
+            }
+
+            val incidentId = if (isSameActiveIncident) currentInc.incidentId else "INC-${payload.deviceId}-${payload.timestamp}"
+
             _parentIncident.value = SafetyIncident(
-                incidentId = "${payload.deviceId}-${payload.timestamp}",
+                incidentId = incidentId,
                 deviceId = payload.deviceId,
                 stage = IncidentStage.ACTIVE,
-                riskLevel = payload.riskLevel,
-                startTimestamp = if (isNewIncident) payload.timestamp else _parentIncident.value.startTimestamp,
-                lastUpdatedTimestamp = System.currentTimeMillis(),
-                latitude = payload.latitude,
-                longitude = payload.longitude,
-                address = _incomingAlertAddress.value,
-                childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value,
-                emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }
+                riskLevel = highestRisk,
+                startTimestamp = if (isSameActiveIncident) currentInc.startTimestamp else payload.timestamp,
+                lastUpdatedTimestamp = now,
+                latitude = payload.latitude ?: currentInc.latitude,
+                longitude = payload.longitude ?: currentInc.longitude,
+                verifiedLocation = locationHelper.verifiedLocation.value ?: currentInc.verifiedLocation,
+                address = _incomingAlertAddress.value ?: currentInc.address,
+                childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value ?: currentInc.childBioProfile,
+                emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }.ifEmpty { currentInc.emergencyContacts },
+                isSimulation = payload.isSimulation,
+                observations = updatedObservations,
+                observationCount = updatedObservations.size,
+                sourceNodes = updatedSourceNodes,
+                maxHopCount = maxOf(if (isSameActiveIncident) currentInc.maxHopCount else 0, payload.hopCount),
+                syncStatus = if (payload.hopCount > 0) SyncStatus.RELAYED else SyncStatus.LOCAL_ONLY
             )
 
             // Start or escalate siren & vibration ONLY on a new incident or risk escalation
@@ -450,7 +609,6 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             }
 
             // Rate-limit database logging to once every 15s or on risk changes
-            val now = System.currentTimeMillis()
             if (isNewIncident || riskChanged || (now - lastLoggedIncidentTime > 15000L)) {
                 lastLoggedIncidentTime = now
                 viewModelScope.launch {
@@ -460,8 +618,9 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                         outcome = "ALERT_RECEIVED",
                         deviceId = payload.deviceId,
                         details = "Risk ${payload.riskLevel.title} broadcast received. Lat: ${payload.latitude ?: 0.0}, Lon: ${payload.longitude ?: 0.0}",
-                        syncStatus = SyncStatus.RELAYED,
-                        observationId = "${payload.deviceId}-${payload.timestamp}"
+                        syncStatus = if (payload.hopCount > 0) SyncStatus.RELAYED else SyncStatus.LOCAL_ONLY,
+                        observationId = obsId,
+                        hopCount = payload.hopCount
                     )
                 }
             }
@@ -1047,6 +1206,187 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // =========================================================================
+    // Batch E: Incident Detail (Phase 13)
+    // =========================================================================
+
+    fun viewIncidentDetail(incident: SafetyIncident) {
+        _selectedIncidentDetail.value = incident
+    }
+
+    fun closeIncidentDetail() {
+        _selectedIncidentDetail.value = null
+    }
+
+    // =========================================================================
+    // Batch E: Incident Replay Engine (Phase 14)
+    // =========================================================================
+
+    val replaySteps: List<ReplayStep> = DEFAULT_REPLAY_STEPS
+
+    fun startIncidentReplay(incident: SafetyIncident? = null) {
+        replayJob?.cancel()
+        _replayState.value = IncidentReplayState(
+            isPlaying = true,
+            currentStepIndex = 0,
+            totalSteps = replaySteps.size,
+            currentStep = replaySteps[0],
+            isCompleted = false
+        )
+        replayJob = viewModelScope.launch {
+            for (i in 0 until replaySteps.size) {
+                _replayState.value = _replayState.value.copy(
+                    isPlaying = true,
+                    currentStepIndex = i,
+                    currentStep = replaySteps[i]
+                )
+                delay(1200L)
+            }
+            _replayState.value = _replayState.value.copy(
+                isPlaying = false,
+                isCompleted = true
+            )
+        }
+    }
+
+    fun pauseIncidentReplay() {
+        replayJob?.cancel()
+        _replayState.value = _replayState.value.copy(isPlaying = false)
+    }
+
+    fun resumeIncidentReplay() {
+        val currentIndex = _replayState.value.currentStepIndex
+        if (currentIndex >= replaySteps.size - 1) {
+            startIncidentReplay()
+            return
+        }
+        replayJob?.cancel()
+        replayJob = viewModelScope.launch {
+            _replayState.value = _replayState.value.copy(isPlaying = true)
+            for (i in (currentIndex + 1) until replaySteps.size) {
+                _replayState.value = _replayState.value.copy(
+                    currentStepIndex = i,
+                    currentStep = replaySteps[i]
+                )
+                delay(1200L)
+            }
+            _replayState.value = _replayState.value.copy(
+                isPlaying = false,
+                isCompleted = true
+            )
+        }
+    }
+
+    fun stepForwardIncidentReplay() {
+        val nextIndex = (_replayState.value.currentStepIndex + 1).coerceAtMost(replaySteps.size - 1)
+        _replayState.value = _replayState.value.copy(
+            isPlaying = false,
+            currentStepIndex = nextIndex,
+            currentStep = replaySteps[nextIndex],
+            isCompleted = (nextIndex == replaySteps.size - 1)
+        )
+    }
+
+    fun resetIncidentReplay() {
+        replayJob?.cancel()
+        _replayState.value = IncidentReplayState(
+            totalSteps = replaySteps.size,
+            currentStep = replaySteps[0]
+        )
+    }
+
+    // =========================================================================
+    // Batch G: Scenario Execution Controls (Phase 17)
+    // =========================================================================
+
+    fun runScenario(scenarioId: ScenarioId) {
+        scenarioRunner.runScenario(scenarioId, viewModelScope)
+    }
+
+    fun resetScenario() {
+        scenarioRunner.resetScenario()
+    }
+
+    // =========================================================================
+    // Pure Helper: Event Timeline V2 Builder (Phase 12)
+    // =========================================================================
+
+    companion object {
+        val DEFAULT_REPLAY_STEPS: List<ReplayStep> = listOf(
+            ReplayStep(0, "1. Home Departure", "Child departing home waypoint within designated safe zone", GeofenceState.SAFE, RouteState.ON_ROUTE, RiskLevel.NORMAL, IncidentStage.NONE, 37.7749, -122.4194),
+            ReplayStep(1, "2. Bus Stop Transit", "Child transit along designated corridor passing bus stop", GeofenceState.SAFE, RouteState.ON_ROUTE, RiskLevel.NORMAL, IncidentStage.NONE, 37.7760, -122.4194),
+            ReplayStep(2, "3. School Area Arrival", "Approaching perimeter boundary edge near school", GeofenceState.APPROACHING, RouteState.APPROACHING_EDGE, RiskLevel.LOW, IncidentStage.NONE, 37.7780, -122.4194),
+            ReplayStep(3, "4. Boundary Breach", "Route corridor deviation detected heading outside perimeter", GeofenceState.EXIT_PENDING, RouteState.ROUTE_DEVIATION, RiskLevel.MEDIUM, IncidentStage.CONFIRMATION_PENDING, 37.7790, -122.4180),
+            ReplayStep(4, "5. Grace Period Elapsed", "15s confirmation window elapsed, safe zone exit confirmed", GeofenceState.OUTSIDE, RouteState.ROUTE_DEVIATION, RiskLevel.HIGH, IncidentStage.CONFIRMED, 37.7800, -122.4170),
+            ReplayStep(5, "6. Beacon Broadcasting", "Wearer node begins emergency beacon broadcasting", GeofenceState.OUTSIDE, RouteState.ROUTE_DEVIATION, RiskLevel.HIGH, IncidentStage.BROADCASTING, 37.7805, -122.4165),
+            ReplayStep(6, "7. Peer Relay 1 (Phone A)", "Observed and forwarded by peer relay Phone A (Hop 1)", GeofenceState.OUTSIDE, RouteState.ROUTE_DEVIATION, RiskLevel.HIGH, IncidentStage.ACTIVE, 37.7810, -122.4160, SyncStatus.RELAYED, 2),
+            ReplayStep(7, "8. Guardian Escalation", "Guardian device receives alert, siren activates", GeofenceState.OUTSIDE, RouteState.ROUTE_DEVIATION, RiskLevel.CRITICAL, IncidentStage.ACTIVE, 37.7812, -122.4158, SyncStatus.ACKNOWLEDGED, 3),
+            ReplayStep(8, "9. Return to Route", "Child re-enters designated route corridor perimeter", GeofenceState.REENTERED, RouteState.ON_ROUTE, RiskLevel.LOW, IncidentStage.ACTIVE, 37.7770, -122.4190, SyncStatus.SYNCED, 3),
+            ReplayStep(9, "10. Incident Resolved", "Child safely inside safe zone, marked resolved", GeofenceState.SAFE, RouteState.ON_ROUTE, RiskLevel.NORMAL, IncidentStage.RESOLVED, 37.7750, -122.4194, SyncStatus.SYNCED, 3)
+        )
+
+        fun buildTimelineItems(events: List<SafetyEvent>): List<TimelineItem> {
+            if (events.isEmpty()) return emptyList()
+
+            val mapped = events.sortedByDescending { it.timestamp }.map { event ->
+                val risk = try {
+                    RiskLevel.valueOf(event.riskLevel)
+                } catch (_: Exception) {
+                    RiskLevel.NORMAL
+                }
+                val sync = try {
+                    SyncStatus.valueOf(event.syncStatus)
+                } catch (_: Exception) {
+                    SyncStatus.LOCAL_ONLY
+                }
+                val title = when (event.flagType) {
+                    "SOS" -> "Manual SOS Triggered"
+                    "GEOFENCE", "GEOFENCE_EXIT" -> "Safe Zone Exit Confirmed"
+                    "MOTION", "MOTION_ANOMALY" -> "Motion Anomaly Detected"
+                    "ROUTE", "ROUTE_DEVIATION" -> "Route Corridor Deviation"
+                    "TAMPER" -> "Band Tamper / Clasp Cut"
+                    "BOUNDARY", "BOUNDARY_VIOLATION" -> "Boundary Violation"
+                    "BLE_BEACON_RECEIVED" -> "BLE Emergency Beacon Received"
+                    "BLE_BEACON_RESOLVED" -> "Safe Beacon Received (Resolved)"
+                    "CONFIRMATION_RESOLVED_REENTRY" -> "Safe Boundary Re-Entry"
+                    else -> event.flagType
+                }
+                TimelineItem(
+                    id = "${event.id}-${event.timestamp}",
+                    timestamp = event.timestamp,
+                    title = title,
+                    description = event.details.ifEmpty { "${event.flagType} (${event.outcome})" },
+                    riskLevel = risk,
+                    flagType = event.flagType,
+                    outcome = event.outcome,
+                    syncStatus = sync,
+                    observationCount = 1,
+                    sourceNode = if (event.observationId.contains("-")) event.observationId.substringBefore("-") else event.deviceId,
+                    hopCount = event.hopCount,
+                    isSimulation = event.outcome.contains("SIMULAT"),
+                    rawEventId = event.id
+                )
+            }
+
+            // Collapse adjacent events of identical flagType and sourceNode within 15 seconds
+            val result = mutableListOf<TimelineItem>()
+            for (item in mapped) {
+                val last = result.lastOrNull()
+                if (last != null && last.flagType == item.flagType && last.sourceNode == item.sourceNode &&
+                    kotlin.math.abs(last.timestamp - item.timestamp) < 15_000L
+                ) {
+                    result[result.size - 1] = last.copy(
+                        observationCount = last.observationCount + 1,
+                        hopCount = maxOf(last.hopCount, item.hopCount)
+                    )
+                } else {
+                    result.add(item)
+                }
+            }
+            return result
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         alertNotifier.release()
@@ -1054,5 +1394,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         bleManager.stopScanning()
         motionDetector.stop()
         locationHelper.stopLocationUpdates()
+        batteryManager.unregisterBatteryReceiver()
+        scenarioRunner.stopScenario()
+        replayJob?.cancel()
     }
 }

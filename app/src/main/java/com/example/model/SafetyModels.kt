@@ -199,6 +199,16 @@ enum class IncidentStage(val displayName: String) {
     RESOLVED("Incident Resolved")
 }
 
+data class IncidentObservation(
+    val observationId: String = "",
+    val sourceNodeId: String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val riskLevel: RiskLevel = RiskLevel.MEDIUM,
+    val hopCount: Int = 0,
+    val rssi: Int = -75,
+    val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY
+)
+
 data class SafetyIncident(
     val incidentId: String = "",
     val deviceId: String = "",
@@ -214,7 +224,12 @@ data class SafetyIncident(
     val childBioProfile: ChildBioProfile? = null,
     val emergencyContacts: List<com.example.data.local.TrustedContact> = emptyList(),
     val resolutionReason: String? = null,
-    val isSimulation: Boolean = false
+    val isSimulation: Boolean = false,
+    val observations: List<IncidentObservation> = emptyList(),
+    val observationCount: Int = 1,
+    val sourceNodes: List<String> = emptyList(),
+    val maxHopCount: Int = 0,
+    val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY
 ) {
     val isEmergencyActive: Boolean
         get() = stage in setOf(
@@ -285,3 +300,119 @@ data class ChildBioProfile(
     val allergies: String = "Severe Peanut Allergy",
     val emergencyNotes: String = "Wears medical ID band. In emergency call parents or 112 immediately."
 )
+
+// =========================================================================
+// Batch E: Timeline V2 & Incident Replay Models
+// =========================================================================
+
+data class TimelineItem(
+    val id: String,
+    val timestamp: Long,
+    val title: String,
+    val description: String,
+    val riskLevel: RiskLevel,
+    val flagType: String,
+    val outcome: String,
+    val syncStatus: SyncStatus,
+    val observationCount: Int = 1,
+    val sourceNode: String = "",
+    val hopCount: Int = 0,
+    val verifiedLocation: VerifiedLocation? = null,
+    val isSimulation: Boolean = false,
+    val rawEventId: Long? = null
+)
+
+data class ReplayStep(
+    val stepIndex: Int,
+    val label: String,
+    val description: String,
+    val geofenceState: GeofenceState,
+    val routeState: RouteState,
+    val riskLevel: RiskLevel,
+    val stage: IncidentStage,
+    val latitude: Double,
+    val longitude: Double,
+    val syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY,
+    val observationCount: Int = 1
+)
+
+data class IncidentReplayState(
+    val isPlaying: Boolean = false,
+    val currentStepIndex: Int = 0,
+    val totalSteps: Int = 0,
+    val currentStep: ReplayStep? = null,
+    val isCompleted: Boolean = false
+)
+
+// =========================================================================
+// Batch F: Battery & Connectivity Models
+// =========================================================================
+
+enum class BatteryState(val displayName: String) {
+    NORMAL("Normal"),
+    LOW("Low Battery"),
+    CRITICAL("Critically Low")
+}
+
+enum class OperatingMode(val displayName: String) {
+    NORMAL("Normal Mode"),
+    POWER_SAVING("Power Saving Mode")
+}
+
+data class BatteryInfo(
+    val percentage: Int? = null,
+    val isCharging: Boolean = false,
+    val batteryState: BatteryState = BatteryState.NORMAL,
+    val operatingMode: OperatingMode = OperatingMode.NORMAL
+) {
+    fun getDisplaySummary(): String {
+        val pctStr = percentage?.let { "$it%" } ?: "Unknown"
+        val chargeStr = if (isCharging) " (Charging)" else ""
+        return when (batteryState) {
+            BatteryState.CRITICAL -> "Battery $pctStr$chargeStr • Critically low, safety monitoring affected"
+            BatteryState.LOW -> "Battery $pctStr$chargeStr • Power saving recommended"
+            BatteryState.NORMAL -> "Battery $pctStr$chargeStr • Normal operation"
+        }
+    }
+}
+
+enum class ConnectivityTier(val displayName: String) {
+    ONLINE("Internet Connected"),
+    NEARBY("Direct BLE Peer"),
+    RELAYED("Mesh Relayed"),
+    OFFLINE("Signal Lost / Offline"),
+    UNKNOWN("Awaiting Status")
+}
+
+data class ConnectivityStatus(
+    val isInternetAvailable: Boolean = false,
+    val isBleAvailable: Boolean = false,
+    val isBleAdvertising: Boolean = false,
+    val hasNearbyPeer: Boolean = false,
+    val hasRelayedPeer: Boolean = false,
+    val lastSeenPeerTimestamp: Long = 0L,
+    val tier: ConnectivityTier = ConnectivityTier.UNKNOWN
+)
+
+// =========================================================================
+// Batch G: Evaluation Scenario Models
+// =========================================================================
+
+enum class ScenarioId(val displayName: String, val description: String) {
+    NORMAL_DAY("1. Normal Transit", "Child transit along safe corridor to school without anomalies"),
+    SAFE_ZONE_EXIT("2. Safe Zone Exit", "Child exits safe zone with grace period, countdown, and escalation"),
+    MOTION_ANOMALY("3. Motion Anomaly", "Fall / sudden stillness triggers motion anomaly escalation"),
+    TAMPER_MOVEMENT("4. Tamper + Movement", "Physical band tamper paired with motion triggers high emergency"),
+    OFFLINE_EMERGENCY("5. Offline Emergency", "Emergency saved locally and queued for peer sync"),
+    MULTI_RELAY_EMERGENCY("6. Multi-Relay Emergency", "Incident routed across 2 mesh peer relays with duplicate suppression"),
+    MANUAL_SOS("7. Manual SOS", "Child holds SOS for 2s triggering immediate CRITICAL escalation")
+}
+
+data class ScenarioStatus(
+    val activeScenarioId: ScenarioId? = null,
+    val isRunning: Boolean = false,
+    val currentStepDescription: String = "",
+    val progressFraction: Float = 0f,
+    val isCompleted: Boolean = false
+)
+

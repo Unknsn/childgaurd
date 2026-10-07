@@ -72,9 +72,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import com.example.model.AlertFlag
+import com.example.model.BatteryState
+import com.example.model.ConnectivityTier
 import com.example.model.GeofenceState
 import com.example.model.LocationConfidence
+import com.example.model.OperatingMode
 import com.example.model.RiskLevel
 import com.example.model.RouteState
 import com.example.model.TrustedRoute
@@ -82,6 +101,14 @@ import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.CountdownAlertCard
 import com.example.ui.components.RiskStatusBanner
+
+enum class SosHoldState {
+    IDLE,
+    HOLDING,
+    ACTIVATING,
+    ACTIVATED,
+    CANCELLED
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,8 +133,13 @@ fun ChildHomeScreen(
     val deviceId by viewModel.deviceId.collectAsState()
     val safeZone by viewModel.safeZone.collectAsState()
     val childProfile by viewModel.childBioProfile.collectAsState()
+    val batteryInfo by viewModel.batteryInfo.collectAsState()
+    val connectivityStatus by viewModel.connectivityStatus.collectAsState()
 
     var isDemoControlsExpanded by remember { mutableStateOf(false) }
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+    var holdState by remember { mutableStateOf(SosHoldState.IDLE) }
+    val hapticFeedback = LocalHapticFeedback.current
 
     // Pulse animation for SOS button
     val infiniteTransition = rememberInfiniteTransition(label = "SosPulse")
@@ -284,8 +316,8 @@ fun ChildHomeScreen(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // 4. Large Tactile SOS Panic Button
-            val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS)
+            // 4. Large Tactile SOS Panic Button (Phase 19: Press and Hold 2 Seconds)
+            val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS) || holdState == SosHoldState.ACTIVATED
 
             Card(
                 modifier = Modifier
@@ -307,60 +339,249 @@ fun ChildHomeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (isSosActive) "EMERGENCY SOS IS ACTIVE" else "MANUAL SOS / EMERGENCY BUTTON",
+                        text = when {
+                            isSosActive -> "EMERGENCY SOS IS ACTIVE"
+                            holdState == SosHoldState.HOLDING -> "ACTIVATING SOS..."
+                            holdState == SosHoldState.CANCELLED -> "SOS CANCELLED (RELEASED EARLY)"
+                            else -> "MANUAL SOS PANIC BUTTON"
+                        },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Black,
-                        color = if (isSosActive) Color(0xFFDC2626) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isSosActive || holdState == SosHoldState.HOLDING) Color(0xFFDC2626) else MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 1.sp
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = if (isSosActive)
-                            "Broadcasting immediate high-risk emergency beacon to guardians"
-                        else
-                            "Tap button below if you feel unsafe or need immediate help",
+                        text = when {
+                            isSosActive -> "Broadcasting immediate high-risk emergency beacon to guardians. Tap button to cancel."
+                            holdState == SosHoldState.HOLDING -> "Keep holding... %.1fs remaining".format(2.0f * (1f - holdProgress))
+                            holdState == SosHoldState.CANCELLED -> "Press and hold continuously for 2 seconds to trigger emergency."
+                            else -> "Press and hold for 2 full seconds to trigger emergency alarm."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                    // Big Circular Tactile SOS Button
-                    Surface(
-                        shape = CircleShape,
-                        color = if (isSosActive) Color(0xFFB91C1C) else Color(0xFFDC2626),
-                        shadowElevation = if (isSosActive) 14.dp else 6.dp,
-                        modifier = Modifier
-                            .size((140 * (if (isSosActive) pulseScale else 1.0f)).dp)
-                            .clip(CircleShape)
-                            .clickable {
-                                if (isSosActive) {
-                                    viewModel.cancelManualSos()
-                                } else {
-                                    viewModel.triggerManualSos()
+                    // 2-Second Hold SOS Interactive Container
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(160.dp)
+                    ) {
+                        // Outer Progress Ring (Shows 2-second hold progress)
+                        if (holdState == SosHoldState.HOLDING) {
+                            CircularProgressIndicator(
+                                progress = { holdProgress },
+                                modifier = Modifier.size(158.dp),
+                                color = Color(0xFFDC2626),
+                                strokeWidth = 6.dp,
+                                trackColor = Color(0xFFFCA5A5).copy(alpha = 0.4f)
+                            )
+                        } else if (isSosActive) {
+                            CircularProgressIndicator(
+                                progress = { 1f },
+                                modifier = Modifier.size(158.dp),
+                                color = Color(0xFFDC2626),
+                                strokeWidth = 4.dp
+                            )
+                        }
+
+                        // Circular Tactile SOS Button
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isSosActive) Color(0xFFB91C1C) else if (holdState == SosHoldState.HOLDING) Color(0xFFDC2626) else Color(0xFFDC2626),
+                            shadowElevation = if (isSosActive) 14.dp else 6.dp,
+                            modifier = Modifier
+                                .size((136 * (if (isSosActive) pulseScale else 1.0f)).dp)
+                                .clip(CircleShape)
+                                .pointerInput(isSosActive) {
+                                    if (isSosActive) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.cancelManualSos()
+                                                holdState = SosHoldState.IDLE
+                                                holdProgress = 0f
+                                            }
+                                        )
+                                    } else {
+                                        detectTapGestures(
+                                            onPress = {
+                                                holdState = SosHoldState.HOLDING
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                val startTime = System.currentTimeMillis()
+                                                var reachedActivation = false
+                                                try {
+                                                    while (true) {
+                                                        val elapsed = System.currentTimeMillis() - startTime
+                                                        val p = (elapsed / 2000f).coerceIn(0f, 1f)
+                                                        holdProgress = p
+                                                        if (p >= 1f) {
+                                                            reachedActivation = true
+                                                            holdState = SosHoldState.ACTIVATED
+                                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            viewModel.triggerManualSos()
+                                                            break
+                                                        }
+                                                        delay(20L)
+                                                    }
+                                                    tryAwaitRelease()
+                                                } catch (_: CancellationException) {
+                                                    if (!reachedActivation) {
+                                                        holdState = SosHoldState.CANCELLED
+                                                        holdProgress = 0f
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                .testTag("manual_sos_button")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sos,
+                                        contentDescription = "Emergency SOS Button. Press and hold 2 seconds to activate.",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(52.dp)
+                                    )
+                                    Text(
+                                        text = when {
+                                            isSosActive -> "TAP TO CANCEL"
+                                            holdState == SosHoldState.HOLDING -> "${(holdProgress * 100).toInt()}%"
+                                            else -> "HOLD 2s"
+                                        },
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White.copy(alpha = 0.95f)
+                                    )
                                 }
                             }
-                            .testTag("manual_sos_button")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.Sos,
-                                    contentDescription = "SOS Button",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(54.dp)
-                                )
-                                Text(
-                                    text = if (isSosActive) "TAP TO CANCEL" else "TAP FOR SOS",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White.copy(alpha = 0.95f)
-                                )
-                            }
                         }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Batch F: Telemetry Status Cards (Phase 15 Battery & Phase 16 Connectivity)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Battery Intelligence Card
+                val batteryBg = when (batteryInfo.batteryState) {
+                    BatteryState.NORMAL -> Color(0xFFF0FDF4)
+                    BatteryState.LOW -> Color(0xFFFFFBEB)
+                    BatteryState.CRITICAL -> Color(0xFFFEF2F2)
+                }
+                val batteryTint = when (batteryInfo.batteryState) {
+                    BatteryState.NORMAL -> Color(0xFF16A34A)
+                    BatteryState.LOW -> Color(0xFFD97706)
+                    BatteryState.CRITICAL -> Color(0xFFDC2626)
+                }
+                val batteryIcon = when {
+                    batteryInfo.isCharging -> Icons.Default.BatteryChargingFull
+                    batteryInfo.batteryState == BatteryState.CRITICAL -> Icons.Default.BatteryAlert
+                    else -> Icons.Default.BatteryFull
+                }
+
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = batteryBg),
+                    border = BorderStroke(1.dp, batteryTint.copy(alpha = 0.35f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = batteryIcon,
+                                contentDescription = "Battery Status",
+                                tint = batteryTint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${batteryInfo.percentage ?: "--"}%",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = batteryTint
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (batteryInfo.operatingMode == OperatingMode.POWER_SAVING)
+                                "Power Saving Mode"
+                            else
+                                "Battery ${batteryInfo.batteryState.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Connectivity Status Card
+                val connBg = when (connectivityStatus.tier) {
+                    ConnectivityTier.ONLINE -> Color(0xFFF0FDF4)
+                    ConnectivityTier.NEARBY -> Color(0xFFEFF6FF)
+                    ConnectivityTier.RELAYED -> Color(0xFFFAF5FF)
+                    ConnectivityTier.OFFLINE -> Color(0xFFFFFBEB)
+                    ConnectivityTier.UNKNOWN -> Color(0xFFF3F4F6)
+                }
+                val connTint = when (connectivityStatus.tier) {
+                    ConnectivityTier.ONLINE -> Color(0xFF16A34A)
+                    ConnectivityTier.NEARBY -> Color(0xFF2563EB)
+                    ConnectivityTier.RELAYED -> Color(0xFF9333EA)
+                    ConnectivityTier.OFFLINE -> Color(0xFFD97706)
+                    ConnectivityTier.UNKNOWN -> Color.Gray
+                }
+                val connIcon = when (connectivityStatus.tier) {
+                    ConnectivityTier.ONLINE -> Icons.Default.CloudDone
+                    ConnectivityTier.NEARBY -> Icons.Default.Radar
+                    ConnectivityTier.RELAYED -> Icons.Default.Wifi
+                    ConnectivityTier.OFFLINE -> Icons.Default.CloudOff
+                    ConnectivityTier.UNKNOWN -> Icons.Default.CloudOff
+                }
+
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = connBg),
+                    border = BorderStroke(1.dp, connTint.copy(alpha = 0.35f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = connIcon,
+                                contentDescription = "Connectivity Tier",
+                                tint = connTint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = connectivityStatus.tier.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = connTint
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = when (connectivityStatus.tier) {
+                                ConnectivityTier.ONLINE -> "Internet Cloud OK"
+                                ConnectivityTier.NEARBY -> "Direct BLE Peer"
+                                ConnectivityTier.RELAYED -> "Mesh Relay Fresh"
+                                ConnectivityTier.OFFLINE -> "BLE Radio Only"
+                                ConnectivityTier.UNKNOWN -> "Scanning Mesh"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
