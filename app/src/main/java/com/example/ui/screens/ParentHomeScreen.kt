@@ -413,19 +413,27 @@ fun ParentMonitorTab(
                             )
                         }
                         Text(
-                            text = (safeZoneAddress?.formattedSummary() ?: "Within designated safe zone perimeter") +
-                                (verifiedLocation?.let { "\n• ${it.getRelativeTimeString()} • ${it.confidence.displayName} (±${it.accuracyMeters.toInt()}m)" } ?: ""),
+                            text = if (lastBeacon != null && !lastBeacon.isSimulation) {
+                                "Location: UNKNOWN (Physical ESP32 node has no GPS hardware)\n• In BLE direct proximity range"
+                            } else {
+                                (safeZoneAddress?.formattedSummary() ?: "Within designated safe zone perimeter") +
+                                    (verifiedLocation?.let { "\n• ${it.getRelativeTimeString()} • ${it.confidence.displayName} (±${it.accuracyMeters.toInt()}m)" } ?: "")
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                         Text(
-                            text = "• Perimeter Status: ${geofenceState.displayName}" +
-                                (distanceToBoundary?.let { dist ->
-                                    if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
-                                } ?: "") +
-                                if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else "",
+                            text = if (lastBeacon != null && !lastBeacon.isSimulation) {
+                                "• Signal State: Direct BLE Signal Active"
+                            } else {
+                                "• Perimeter Status: ${geofenceState.displayName}" +
+                                    (distanceToBoundary?.let { dist ->
+                                        if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
+                                    } ?: "") +
+                                    if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else ""
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -440,12 +448,13 @@ fun ParentMonitorTab(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val batColor = when (batteryInfo.batteryState) {
+                    val isPhysicalNode = lastBeacon != null && !lastBeacon.isSimulation
+                    val batColor = if (isPhysicalNode) Color.Gray else when (batteryInfo.batteryState) {
                         BatteryState.NORMAL -> Color(0xFF10B981)
                         BatteryState.LOW -> Color(0xFFF59E0B)
                         BatteryState.CRITICAL -> Color(0xFFEF4444)
                     }
-                    val batBg = when (batteryInfo.batteryState) {
+                    val batBg = if (isPhysicalNode) Color(0xFFF3F4F6) else when (batteryInfo.batteryState) {
                         BatteryState.NORMAL -> Color(0xFFECFDF5)
                         BatteryState.LOW -> Color(0xFFFFFBEB)
                         BatteryState.CRITICAL -> Color(0xFFFEF2F2)
@@ -461,7 +470,7 @@ fun ParentMonitorTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = if (batteryInfo.isCharging) Icons.Default.BatteryChargingFull else if (batteryInfo.batteryState == BatteryState.CRITICAL) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
+                                imageVector = if (isPhysicalNode) Icons.Default.BatteryAlert else if (batteryInfo.isCharging) Icons.Default.BatteryChargingFull else if (batteryInfo.batteryState == BatteryState.CRITICAL) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
                                 contentDescription = "Child Band Battery",
                                 tint = batColor,
                                 modifier = Modifier.size(16.dp)
@@ -469,13 +478,13 @@ fun ParentMonitorTab(
                             Spacer(modifier = Modifier.width(6.dp))
                             Column {
                                 Text(
-                                    text = "${batteryInfo.percentage ?: "--"}%",
+                                    text = if (isPhysicalNode) "N/A" else "${batteryInfo.percentage ?: "--"}%",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = batColor
                                 )
                                 Text(
-                                    text = if (batteryInfo.operatingMode == OperatingMode.POWER_SAVING) "Power Saving" else batteryInfo.batteryState.name,
+                                    text = if (isPhysicalNode) "NOT AVAILABLE" else if (batteryInfo.operatingMode == OperatingMode.POWER_SAVING) "Power Saving" else batteryInfo.batteryState.name,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -706,8 +715,8 @@ fun ParentMonitorTab(
             }
         }
 
-        // 3. Nearby Child Nodes (Multi-node support)
-        if (nearbyNodes.size > 1) {
+        // 3. Nearby Child Nodes (Multi-node and Physical node display)
+        if (nearbyNodes.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -732,11 +741,29 @@ fun ParentMonitorTab(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Band: ${node.deviceId}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (node.isSimulation) "Simulated: ${node.deviceId}" else "Physical: ${node.deviceId} (ESP32-S3)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (!node.isSimulation) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFD1FAE5)
+                                    ) {
+                                        Text(
+                                            text = "HARDWARE",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF065F46),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = node.riskLevel.containerColor

@@ -131,7 +131,7 @@ fun IncidentDetailSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Simulation / Evaluation Notice
+                // Simulation vs Hardware Notice
                 if (incident.isSimulation) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -143,6 +143,22 @@ fun IncidentDetailSheet(
                             text = "DEMO SIMULATION EVENT: Isolated evaluation event",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF854D0E),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                } else if (incident.deviceId.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0x2210B981),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "PHYSICAL WEARABLE EVENT: ESP32-S3 Physical Child Node",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF065F46),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )

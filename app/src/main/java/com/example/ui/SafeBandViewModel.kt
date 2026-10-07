@@ -457,6 +457,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 val addr = LocationAddressResolver.resolveAddress(getApplication(), payload.latitude, payload.longitude)
                 _incomingAlertAddress.value = addr
             }
+        } else {
+            _incomingAlertAddress.value = null
         }
 
         // 1. Normal or Low Risk Beacon -> Child cancelled emergency or returned to safe state
@@ -524,9 +526,9 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
                     _parentIncident.value = currentInc.copy(
                         lastUpdatedTimestamp = now,
-                        latitude = payload.latitude ?: currentInc.latitude,
-                        longitude = payload.longitude ?: currentInc.longitude,
-                        address = _incomingAlertAddress.value ?: currentInc.address,
+                        latitude = payload.latitude ?: (if (payload.isSimulation) currentInc.latitude else null),
+                        longitude = payload.longitude ?: (if (payload.isSimulation) currentInc.longitude else null),
+                        address = _incomingAlertAddress.value ?: (if (payload.isSimulation) currentInc.address else null),
                         childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value ?: currentInc.childBioProfile,
                         emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }.ifEmpty { currentInc.emergencyContacts },
                         observations = updatedObs,
@@ -577,10 +579,10 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 riskLevel = highestRisk,
                 startTimestamp = if (isSameActiveIncident) currentInc.startTimestamp else payload.timestamp,
                 lastUpdatedTimestamp = now,
-                latitude = payload.latitude ?: currentInc.latitude,
-                longitude = payload.longitude ?: currentInc.longitude,
-                verifiedLocation = locationHelper.verifiedLocation.value ?: currentInc.verifiedLocation,
-                address = _incomingAlertAddress.value ?: currentInc.address,
+                latitude = payload.latitude ?: (if (payload.isSimulation) currentInc.latitude else null),
+                longitude = payload.longitude ?: (if (payload.isSimulation) currentInc.longitude else null),
+                verifiedLocation = if (payload.isSimulation) (locationHelper.verifiedLocation.value ?: currentInc.verifiedLocation) else null,
+                address = _incomingAlertAddress.value ?: (if (payload.isSimulation) currentInc.address else null),
                 childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value ?: currentInc.childBioProfile,
                 emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }.ifEmpty { currentInc.emergencyContacts },
                 isSimulation = payload.isSimulation,

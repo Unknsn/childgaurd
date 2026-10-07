@@ -18,3 +18,5 @@ local.properties
 debug.keystore
 hs_err_*.log
 replay_*.log
+.pio/
+.vscode/

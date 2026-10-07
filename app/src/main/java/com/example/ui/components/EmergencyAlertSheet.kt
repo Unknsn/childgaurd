@@ -143,7 +143,7 @@ fun EmergencyAlertSheet(
                         color = Color(0x33FFFFFF)
                     ) {
                         Text(
-                            text = if (payload.isSimulation) "SIMULATION / DEMO EVENT" else "BLE EMERGENCY BEACON",
+                            text = if (payload.isSimulation) "SIMULATION / DEMO EVENT" else "PHYSICAL CHILD NODE (ESP32-S3)",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
                             color = if (payload.isSimulation) Color(0xFFFDE047) else Color.White,
@@ -176,6 +176,22 @@ fun EmergencyAlertSheet(
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFFEF9C3),
                             fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0x3310B981),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.7f))
+                    ) {
+                        Text(
+                            text = "PHYSICAL WEARABLE ALERT: Received from ESP32-S3 hardware via BLE.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFD1FAE5),
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             textAlign = TextAlign.Center
                         )
@@ -278,6 +294,8 @@ fun EmergencyAlertSheet(
                         // Lat, Lon and freshness
                         val locCoords = if (payload.latitude != null && payload.longitude != null) {
                             "Coordinates: %.5f° N, %.5f° E".format(payload.latitude, payload.longitude)
+                        } else if (!payload.isSimulation) {
+                            "Location: UNKNOWN (Hardware prototype has no GPS) • BLE Proximity"
                         } else {
                             "Near Designated Safe Zone Vicinity"
                         }

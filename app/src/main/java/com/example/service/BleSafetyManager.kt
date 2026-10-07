@@ -260,8 +260,12 @@ class BleSafetyManager(private val context: Context) {
                         var lat: Double? = null
                         var lon: Double? = null
                         if (buffer.remaining() >= 8) {
-                            lat = buffer.float.toDouble()
-                            lon = buffer.float.toDouble()
+                            val rawLat = buffer.float.toDouble()
+                            val rawLon = buffer.float.toDouble()
+                            if (!rawLat.isNaN() && !rawLon.isNaN() && (rawLat != 0.0 || rawLon != 0.0)) {
+                                lat = rawLat
+                                lon = rawLon
+                            }
                         }
 
                         DecodedPacket.Telemetry(
