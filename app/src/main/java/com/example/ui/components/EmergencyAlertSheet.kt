@@ -281,7 +281,11 @@ fun EmergencyAlertSheet(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Street, Area, City, State, Pin Code
-                        val addressText = resolvedAddress?.formattedSummary() ?: "Resolving physical address..."
+                        val addressText = if (!payload.isSimulation) {
+                            "Location Unavailable (No GPS hardware on child node)"
+                        } else {
+                            resolvedAddress?.formattedSummary() ?: "Within Designated Safe Zone Perimeter"
+                        }
                         Text(
                             text = addressText,
                             style = MaterialTheme.typography.bodyLarge,
@@ -295,7 +299,7 @@ fun EmergencyAlertSheet(
                         val locCoords = if (payload.latitude != null && payload.longitude != null) {
                             "Coordinates: %.5f° N, %.5f° E".format(payload.latitude, payload.longitude)
                         } else if (!payload.isSimulation) {
-                            "Location: UNKNOWN (Hardware prototype has no GPS) • BLE Proximity"
+                            "Proximity BLE only • Direct range (~30m)"
                         } else {
                             "Near Designated Safe Zone Vicinity"
                         }

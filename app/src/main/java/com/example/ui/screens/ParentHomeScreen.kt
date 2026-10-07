@@ -335,6 +335,69 @@ fun ParentMonitorTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Physical Child Node Status Banner (STEP 9)
+        if (lastBeacon != null && !lastBeacon.isSimulation) {
+            val isSosActive = lastBeacon.riskLevel == RiskLevel.CRITICAL
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSosActive) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
+                ),
+                border = BorderStroke(
+                    1.5.dp,
+                    if (isSosActive) Color(0xFFEF4444) else Color(0xFF10B981)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isSosActive) Color(0xFFDC2626) else Color(0xFF10B981),
+                            modifier = Modifier.size(10.dp)
+                        ) {}
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "PHYSICAL CHILD NODE (ESP32-S3)",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = if (isSosActive) Color(0xFF991B1B) else Color(0xFF065F46),
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = if (isSosActive) "● CRITICAL: SOS ACTIVATED BY CHILD NODE" else "● STATUS: NEARBY / ONLINE",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSosActive) Color(0xFFDC2626) else Color(0xFF047857)
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Text(
+                            text = lastBeacon.deviceId,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         // 1. PRIMARY PARENT QUESTION: "Is my child safe?"
         val heroBg = if (isEmergency) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
         val heroBorder = if (isEmergency) Color(0xFFF87171) else Color(0xFF6EE7B7)
@@ -390,10 +453,11 @@ fun ParentMonitorTab(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Location / Safe Zone Summary
+                // Location / Safe Zone Summary (High Contrast & No Fake San Francisco)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -412,27 +476,33 @@ fun ParentMonitorTab(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                        val loc = verifiedLocation
+                        val beacon = lastBeacon
                         Text(
-                            text = if (lastBeacon != null && !lastBeacon.isSimulation) {
-                                "Location: UNKNOWN (Physical ESP32 node has no GPS hardware)\n• In BLE direct proximity range"
-                            } else {
+                            text = if (beacon != null && !beacon.isSimulation) {
+                                "Location: Unavailable (No GPS hardware on child node)\n• Direct BLE Proximity Range (~30m)"
+                            } else if (loc != null && loc.isSimulation) {
                                 (safeZoneAddress?.formattedSummary() ?: "Within designated safe zone perimeter") +
-                                    (verifiedLocation?.let { "\n• ${it.getRelativeTimeString()} • ${it.confidence.displayName} (±${it.accuracyMeters.toInt()}m)" } ?: "")
+                                    "\n• ${loc.getRelativeTimeString()} • ${loc.confidence.displayName} (±${loc.accuracyMeters.toInt()}m)"
+                            } else {
+                                "Location: Awaiting Child Wearer Telemetry\n• BLE scanner active, listening for beacons"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                         Text(
-                            text = if (lastBeacon != null && !lastBeacon.isSimulation) {
-                                "• Signal State: Direct BLE Signal Active"
-                            } else {
+                            text = if (beacon != null && !beacon.isSimulation) {
+                                "• Signal State: Direct BLE Signal Active • No GPS coordinates reported"
+                            } else if (loc != null && loc.isSimulation) {
                                 "• Perimeter Status: ${geofenceState.displayName}" +
                                     (distanceToBoundary?.let { dist ->
                                         if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
                                     } ?: "") +
                                     if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else ""
+                            } else {
+                                "• Perimeter Status: Monitoring Active"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

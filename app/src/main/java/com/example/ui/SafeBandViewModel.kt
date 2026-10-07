@@ -572,17 +572,30 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
             val incidentId = if (isSameActiveIncident) currentInc.incidentId else "INC-${payload.deviceId}-${payload.timestamp}"
 
+            val triggerFlags = if (payload.riskLevel == RiskLevel.CRITICAL) {
+                setOf(AlertFlag.MANUAL_SOS)
+            } else if (isSameActiveIncident) {
+                currentInc.triggerFlags
+            } else emptySet()
+
+            if (!payload.isSimulation && payload.riskLevel == RiskLevel.CRITICAL) {
+                Log.w("SafeBandViewModel", "[RISK] MANUAL_SOS -> CRITICAL")
+                Log.w("SafeBandViewModel", "[INCIDENT] physical SOS incident created (ID: $incidentId, Device: ${payload.deviceId})")
+                Log.w("SafeBandViewModel", "[UI] EmergencyAlertSheet requested")
+            }
+
             _parentIncident.value = SafetyIncident(
                 incidentId = incidentId,
                 deviceId = payload.deviceId,
                 stage = IncidentStage.ACTIVE,
                 riskLevel = highestRisk,
+                triggerFlags = triggerFlags,
                 startTimestamp = if (isSameActiveIncident) currentInc.startTimestamp else payload.timestamp,
                 lastUpdatedTimestamp = now,
-                latitude = payload.latitude ?: (if (payload.isSimulation) currentInc.latitude else null),
-                longitude = payload.longitude ?: (if (payload.isSimulation) currentInc.longitude else null),
+                latitude = if (payload.isSimulation) (payload.latitude ?: currentInc.latitude) else null,
+                longitude = if (payload.isSimulation) (payload.longitude ?: currentInc.longitude) else null,
                 verifiedLocation = if (payload.isSimulation) (locationHelper.verifiedLocation.value ?: currentInc.verifiedLocation) else null,
-                address = _incomingAlertAddress.value ?: (if (payload.isSimulation) currentInc.address else null),
+                address = if (payload.isSimulation) (_incomingAlertAddress.value ?: currentInc.address) else null,
                 childBioProfile = payload.childBioProfile ?: _incomingChildProfile.value ?: currentInc.childBioProfile,
                 emergencyContacts = payload.emergencyContacts.ifEmpty { _incomingChildContacts.value }.ifEmpty { currentInc.emergencyContacts },
                 isSimulation = payload.isSimulation,

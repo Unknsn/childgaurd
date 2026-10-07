@@ -38,27 +38,50 @@
 
 ## 3. BLE Architecture & Protocol Format
 
-The ESP32-S3 child node strictly implements the existing SafeBand V2 BLE protocol specification:
+The ESP32-S3 child node strictly implements the canonical SafeBand V2 BLE protocol specification shared identically with Android:
 
 ### Service & Manufacturer Metadata
-- **Manufacturer ID**: `0x5AFE` (23294 decimal)
-- **Service UUID**: `00005afe-0000-1000-8000-00805f9b34fb`
+- **Manufacturer Company ID**: `0x5AFE` (23294 decimal, encoded Little-Endian `[0xFE, 0x5A]`)
+- **Service UUID**: `00005afe-0000-1000-8000-00805f9b34fb` (128-bit)
 - **Telemetry Characteristic UUID**: `00005afe-0001-1000-8000-00805f9b34fb` (READ, NOTIFY)
-- **Public Device Name**: `SafeBand-Child`
+- **Public Device Name**: `SafeBand` (advertised in Scan Response)
 
-### 22-Byte Manufacturer Telemetry Packet Structure
+### Shared Protocol Byte-by-Byte Table
 
-| Offset | Length | Type | Description | Values |
-|---|---|---|---|---|
-| `[0]` | 1 | Byte | Magic Byte 1 | `0x53` ('S') |
-| `[1]` | 1 | Byte | Magic Byte 2 | `0x42` ('B') |
-| `[2..8]` | 7 | ASCII | Ephemeral Node ID | `EP-XXXX` (padded to 7 bytes) |
-| `[9]` | 1 | Byte | Risk Level Code | `0` = NORMAL, `4` = CRITICAL (SOS) |
-| `[10..13]` | 4 | uint32_t (BE) | Timestamp | Seconds since boot / epoch |
-| `[14..17]` | 4 | float (BE) | Latitude | `0.0f` (indicates No GPS fix) |
-| `[18..21]` | 4 | float (BE) | Longitude | `0.0f` (indicates No GPS fix) |
+| Packet Byte Offset | Length | Type | Description | ESP32 C++ Encoder | Android Kotlin Decoder (`BleSafetyManager`) | Wire Value |
+|---|---|---|---|---|---|---|
+| `[0]` | 1 | uint8_t | Magic Byte 1 | `MAGIC_BYTE_1` | `payload[0] == 0x53.toByte()` | `0x53` ('S') |
+| `[1]` | 1 | uint8_t | Magic Byte 2 | `MAGIC_BYTE_2` | `payload[1] == 0x42.toByte()` | `0x42` ('B') |
+| `[2..8]` | 7 | char[7] | Ephemeral ID | `memcpy(&p[2], ephem.c_str(), 7)` | `String(payload.copyOfRange(2, 9), UTF_8)` | `EP-XXXX` |
+| `[9]` | 1 | uint8_t | Risk Level Code | `p[9] = (uint8_t)currentRisk` | `when (payload[9].toInt()) { 0->NORMAL, 4->CRITICAL }` | `0` = NORMAL, `4` = CRITICAL |
+| `[10..13]` | 4 | uint32_t | Timestamp (BE) | `htonl(now)` | `ByteBuffer.wrap(payload, 10, 4).int.toLong()` | Unix epoch / boot seconds |
+| `[14..17]` | 4 | float | Latitude (BE) | `0.0f` (No GPS) | `ByteBuffer.wrap(payload, 14, 4).float` | `0.0f` -> `null` (No GPS) |
+| `[18..21]` | 4 | float | Longitude (BE) | `0.0f` (No GPS) | `ByteBuffer.wrap(payload, 18, 4).float` | `0.0f` -> `null` (No GPS) |
 
-*(Over-the-air BLE advertisement encapsulates this inside Manufacturer Specific Data starting with Company ID `0x5AFE`).*
+### Over-The-Air Packet Budget (Strict BLE 31-Byte Limit)
+
+Bluetooth Core Specification strictly enforces a maximum payload of **31 bytes** for legacy advertising PDUs (`ADV_IND`). Transmitting UUID + Manufacturer Data in the primary packet causes packet overflow (47 bytes) which ESP-IDF rejects (`ESP_ERR_INVALID_ARG`). SafeBand V2 partitions the broadcast as follows:
+
+#### Primary Advertising Packet (`advData`) — Exactly 29 Bytes (<= 31 Bytes)
+1. **Flags AD Structure (3 Bytes)**:
+   - `[0]`: `0x02` (Length = 2 bytes)
+   - `[1]`: `0x01` (AD Type: Flags)
+   - `[2]`: `0x06` (`LE General Discoverable` + `BR/EDR Not Supported`)
+2. **Manufacturer Specific Data AD Structure (26 Bytes)**:
+   - `[3]`: `0x19` (Length = 25 bytes: 2B Company ID + 22B Payload)
+   - `[4]`: `0xFF` (AD Type: Manufacturer Specific Data)
+   - `[5..6]`: `0xFE, 0x5A` (Company ID `0x5AFE` in Little-Endian)
+   - `[7..28]`: 22-byte SafeBand Telemetry Payload (Magic 'SB' + Ephemeral ID + Risk + Telemetry)
+
+#### Scan Response Packet (`scanResponseData`) — Exactly 28 Bytes (<= 31 Bytes)
+1. **128-bit Complete Service UUID (18 Bytes)**:
+   - `[0]`: `0x11` (Length = 17 bytes: 1B Type + 16B UUID)
+   - `[1]`: `0x07` (AD Type: Complete List of 128-bit Service Class UUIDs)
+   - `[2..17]`: `00005afe-0000-1000-8000-00805f9b34fb` (Little-Endian on-wire)
+2. **Shortened Local Name (10 Bytes)**:
+   - `[18]`: `0x09` (Length = 9 bytes: 1B Type + 8B Name)
+   - `[19]`: `0x08` (AD Type: Shortened Local Name)
+   - `[20..27]`: `"SafeBand"` ASCII
 
 ---
 

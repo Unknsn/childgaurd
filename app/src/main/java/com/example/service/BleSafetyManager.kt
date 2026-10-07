@@ -508,11 +508,9 @@ class BleSafetyManager(private val context: Context) {
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
-        val filters = listOf(
-            ScanFilter.Builder()
-                .setManufacturerData(MANUFACTURER_ID, byteArrayOf(MAGIC_BYTE_1, MAGIC_BYTE_2), byteArrayOf(0xFF.toByte(), 0xFF.toByte()))
-                .build()
-        )
+        // Empty filter list ensures OEM Android chipsets (Samsung, Xiaomi, Pixel, MediaTek)
+        // do NOT drop manufacturer data packets at the hardware filter layer.
+        val filters = emptyList<ScanFilter>()
 
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -536,7 +534,7 @@ class BleSafetyManager(private val context: Context) {
             scanner?.startScan(filters, scanSettings, callback)
             currentScanCallback = callback
             _isScanning.value = true
-            Log.d(TAG, "BLE scanning started")
+            Log.d(TAG, "BLE scanning started (Low-latency mode, all-beacon reception)")
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing permission for BLE scan", e)
             _isScanning.value = false
@@ -562,13 +560,69 @@ class BleSafetyManager(private val context: Context) {
 
     private fun handleScanResult(result: ScanResult, onBeaconFound: (BleBeaconPayload) -> Unit) {
         val record = result.scanRecord ?: return
-        val rawData = record.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
+
+        // Multi-tier resilient payload extraction:
+        // Tier 1: Canonical Manufacturer ID 0x5AFE
+        var rawData: ByteArray? = record.getManufacturerSpecificData(MANUFACTURER_ID)
+
+        // Tier 2: Byte-swapped ID 0xFE5A (for BLE stacks with alternate endian interpretation)
+        if (rawData == null) {
+            rawData = record.getManufacturerSpecificData(0xFE5A)
+        }
+
+        // Tier 3: Iterate all manufacturer data entries in SparseArray
+        if (rawData == null) {
+            val mData = record.manufacturerSpecificData
+            if (mData != null) {
+                for (i in 0 until mData.size()) {
+                    val candidate = mData.valueAt(i)
+                    if (candidate != null && candidate.size >= 10 && candidate[0] == MAGIC_BYTE_1 && candidate[1] == MAGIC_BYTE_2) {
+                        rawData = candidate
+                        break
+                    }
+                }
+            }
+        }
+
+        // Tier 4: Search raw advertising bytes for Magic Bytes 0x53, 0x42 ('S', 'B')
+        if (rawData == null) {
+            val rawBytes = record.bytes
+            if (rawBytes != null && rawBytes.size >= 12) {
+                for (i in 0 until rawBytes.size - 9) {
+                    if (rawBytes[i] == MAGIC_BYTE_1 && rawBytes[i + 1] == MAGIC_BYTE_2) {
+                        val len = minOf(rawBytes.size - i, 22)
+                        val extracted = ByteArray(len)
+                        System.arraycopy(rawBytes, i, extracted, 0, len)
+                        rawData = extracted
+                        break
+                    }
+                }
+            }
+        }
+
+        if (rawData == null) return
 
         val decoded = decodePacket(rawData) ?: return
         if (decoded is DecodedPacket.Telemetry) {
             val ephemeralOrRealId = decoded.deviceId
             val realId = resolveRealDeviceId(ephemeralOrRealId)
             val trustRole = resolveTrustRole(ephemeralOrRealId)
+
+            // Step 4: Clean BLE-SCAN debug logging (Zero child PII, redacted device address)
+            val rawAddr = result.device.address ?: "00:00:00:00:00:00"
+            val redactedAddr = if (rawAddr.length >= 8) rawAddr.take(5) + ":XX:XX" else "REDACTED"
+            val devName = try { result.device.name ?: record.deviceName ?: "SafeBand-Child" } catch (_: SecurityException) { "SafeBand-Child" }
+            val magicHex = "%02X%02X".format(rawData[0], rawData[1])
+            val coordStr = if (decoded.lat != null && decoded.lon != null) "%.4f,%.4f".format(decoded.lat, decoded.lon) else "UNKNOWN"
+
+            Log.i(TAG, "[BLE-SCAN] SafeBand packet detected: deviceAddress=$redactedAddr, deviceName=$devName, manufacturer=0x5AFE, length=${rawData.size}, magic=$magicHex, risk=${decoded.riskLevel.ordinal}, ephemeral=${decoded.deviceId}, physicalNode=true, location=$coordStr")
+
+            // Step 7: Trace logging
+            Log.d(TAG, "[PHYSICAL-NODE] advertisement received from ${decoded.deviceId} (RSSI: ${result.rssi})")
+            if (decoded.riskLevel == RiskLevel.CRITICAL) {
+                Log.w(TAG, "[PHYSICAL-NODE] SOS decoded: CRITICAL risk from physical child node ${decoded.deviceId}")
+                Log.w(TAG, "[PHYSICAL-NODE] MANUAL_SOS generated")
+            }
 
             recordNodeObservation(
                 nodeId = realId,
@@ -577,7 +631,7 @@ class BleSafetyManager(private val context: Context) {
                 hopCount = 0
             )
 
-            // Construct payload with trust-level access filtering
+            // Construct payload with trust-level access filtering (Physical hardware: isSimulation = false)
             val payload = BleBeaconPayload(
                 deviceId = if (trustRole == TrustRole.TRUSTED_GUARDIAN || trustRole == TrustRole.OWNER) realId else ephemeralOrRealId,
                 riskLevel = decoded.riskLevel,
@@ -587,7 +641,7 @@ class BleSafetyManager(private val context: Context) {
                 ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
                 trustRole = trustRole,
                 hopCount = 0,
-                // Proximity alone does NOT grant access to sensitive child identity or contacts
+                isSimulation = false,
                 childBioProfile = null,
                 emergencyContacts = emptyList()
             )

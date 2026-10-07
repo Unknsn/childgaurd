@@ -13,7 +13,7 @@ class SafeBandServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) override {
         SafeBandBleManager::setDeviceConnected(true);
         StatusLed::flashBleConnected();
-        Serial.println("[BLE] Guardian device connected!");
+        Serial.println("[BLE] Guardian device connected via GATT!");
     }
 
     void onDisconnect(BLEServer* pServer) override {
@@ -113,14 +113,12 @@ void SafeBandBleManager::init() {
 
     // Setup initial advertising
     s_pAdvertising = BLEDevice::getAdvertising();
-    s_pAdvertising->addServiceUUID(SAFEBAND_SERVICE_UUID);
-    s_pAdvertising->setScanResponse(false);
+    s_pAdvertising->setScanResponse(true);
     s_pAdvertising->setMinPreferred(0x06);
     s_pAdvertising->setMinPreferred(0x12);
 
     updateAdvertisement(NODE_NORMAL, millis());
 
-    s_pAdvertising->start();
     Serial.println("[BLE] SafeBand BLE advertising active!");
     Serial.printf("[BLE] Service UUID: %s\n", SAFEBAND_SERVICE_UUID);
     Serial.printf("[BLE] Device Name : %s\n", SAFEBAND_BLE_DEVICE_NAME);
@@ -145,21 +143,32 @@ void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestamp
 
     std::string mfString((char*)payloadBytes, 24);
 
+    // 1. Primary Advertising Packet: MUST stay <= 31 bytes!
+    // Flags (3 bytes) + Manufacturer Data (26 bytes: 2 header + 24 data) = 29 bytes!
     BLEAdvertisementData advData;
     advData.setFlags(0x06); // General Discoverable + BR/EDR Not Supported
-    advData.setCompleteServices(BLEUUID(SAFEBAND_SERVICE_UUID));
     advData.setManufacturerData(mfString);
+
+    // 2. Scan Response Packet: MUST stay <= 31 bytes!
+    // Service UUID (18 bytes) + Short Name (10 bytes) = 28 bytes!
+    BLEAdvertisementData scanResponseData;
+    scanResponseData.setCompleteServices(BLEUUID(SAFEBAND_SERVICE_UUID));
+    scanResponseData.setShortName("SafeBand");
 
     s_pAdvertising->stop();
     s_pAdvertising->setAdvertisementData(advData);
+    s_pAdvertising->setScanResponseData(scanResponseData);
+    s_pAdvertising->setScanResponse(true);
     s_pAdvertising->start();
 
     s_lastAdvUpdateMs = timestampMs;
 
-    Serial.printf("[BLE] Advertisement updated: Ephemeral ID=%s, Risk=%s, State=%s\n",
+    Serial.printf("[BLE] Adv updated: Ephemeral=%s, Risk=%s, State=%s [AdvLen=%d, ScanRspLen=%d]\n",
         s_currentEphemeralId.c_str(),
         (risk == RISK_CRITICAL) ? "CRITICAL (SOS)" : "NORMAL",
-        SafeBandNodeIdentity::getStateName(state)
+        SafeBandNodeIdentity::getStateName(state),
+        advData.getPayload().length(),
+        scanResponseData.getPayload().length()
     );
 
     notifyStatus(state);
