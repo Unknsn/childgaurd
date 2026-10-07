@@ -7,6 +7,7 @@ import com.example.data.local.TrustedContactDao
 import com.example.data.preferences.SafeBandPreferences
 import com.example.model.AppMode
 import com.example.model.SafeZone
+import com.example.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
 class SafetyRepository(
@@ -20,20 +21,37 @@ class SafetyRepository(
     val deviceId: Flow<String> = preferences.deviceId
     val safeZone: Flow<SafeZone> = preferences.safeZone
     val childBioProfile: Flow<com.example.model.ChildBioProfile> = preferences.childBioProfile
+    val trustedRoute: Flow<com.example.model.TrustedRoute> = preferences.trustedRoute
 
+    /**
+     * Logs a safety event with offline store-and-forward tracking and duplicate suppression.
+     */
     suspend fun logEvent(
         flagType: String,
         riskLevel: String,
         outcome: String,
         deviceId: String,
-        details: String = ""
+        details: String = "",
+        syncStatus: SyncStatus = SyncStatus.LOCAL_ONLY,
+        observationId: String = "",
+        hopCount: Int = 0
     ): Long {
+        // Prevent duplicate observation insertion
+        if (observationId.isNotBlank()) {
+            val existing = eventDao.findByObservationId(observationId)
+            if (existing != null) {
+                return existing.id
+            }
+        }
         val event = SafetyEvent(
             flagType = flagType,
             riskLevel = riskLevel,
             outcome = outcome,
             deviceId = deviceId,
-            details = details
+            details = details,
+            syncStatus = syncStatus.name,
+            observationId = observationId,
+            hopCount = hopCount
         )
         return eventDao.insertEvent(event)
     }
@@ -41,6 +59,51 @@ class SafetyRepository(
     suspend fun clearHistory() {
         eventDao.clearAllEvents()
     }
+
+    // =========================================================================
+    // Store-and-Forward Lifecycle Transitions (Phase 7)
+    // =========================================================================
+
+    suspend fun updateEventSyncStatus(id: Long, status: SyncStatus) {
+        eventDao.updateSyncStatus(id, status.name)
+    }
+
+    suspend fun markEventPendingSync(id: Long) {
+        eventDao.updateSyncStatus(id, SyncStatus.PENDING_SYNC.name)
+    }
+
+    suspend fun markEventRelayed(id: Long) {
+        eventDao.updateSyncStatus(id, SyncStatus.RELAYED.name)
+    }
+
+    suspend fun markEventAcknowledged(id: Long) {
+        eventDao.updateSyncStatus(id, SyncStatus.ACKNOWLEDGED.name)
+    }
+
+    suspend fun markEventSynced(id: Long) {
+        eventDao.updateSyncStatus(id, SyncStatus.SYNCED.name)
+    }
+
+    suspend fun expireOldPendingEvents(cutoffTimestamp: Long): Int {
+        return eventDao.expireOldPendingEvents(cutoffTimestamp)
+    }
+
+    suspend fun getPendingSyncEvents(): List<SafetyEvent> {
+        return eventDao.getPendingSyncEvents()
+    }
+
+    fun getEventsBySyncStatus(status: SyncStatus): Flow<List<SafetyEvent>> {
+        return eventDao.getEventsBySyncStatus(status.name)
+    }
+
+    suspend fun isObservationStored(observationId: String): Boolean {
+        if (observationId.isBlank()) return false
+        return eventDao.countObservationId(observationId) > 0
+    }
+
+    // =========================================================================
+    // Contact Management
+    // =========================================================================
 
     suspend fun addContact(name: String, phoneNumber: String, relationship: String): Long {
         val contact = TrustedContact(
@@ -69,6 +132,10 @@ class SafetyRepository(
 
     suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
         preferences.saveChildBioProfile(profile)
+    }
+
+    suspend fun saveTrustedRoute(route: com.example.model.TrustedRoute) {
+        preferences.saveTrustedRoute(route)
     }
 
     suspend fun seedDefaultEmergencyServicesIfNecessary() {

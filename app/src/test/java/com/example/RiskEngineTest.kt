@@ -16,24 +16,24 @@ class RiskEngineTest {
         // No flags -> Normal
         assertEquals(RiskLevel.NORMAL, RiskEngine.calculateRisk(emptySet()))
 
-        // Motion Anomaly alone -> Low
+        // Motion Anomaly alone (20 pts) -> Low
         assertEquals(RiskLevel.LOW, RiskEngine.calculateRisk(setOf(AlertFlag.MOTION_ANOMALY)))
 
-        // Geofence Exit alone -> Low
-        assertEquals(RiskLevel.LOW, RiskEngine.calculateRisk(setOf(AlertFlag.GEOFENCE_EXIT)))
+        // Geofence Exit alone (30 pts) -> Medium
+        assertEquals(RiskLevel.MEDIUM, RiskEngine.calculateRisk(setOf(AlertFlag.GEOFENCE_EXIT)))
 
-        // Motion Anomaly + Geofence Exit -> Medium (escalation)
+        // Motion Anomaly + Geofence Exit (50 pts) -> Medium (escalation)
         assertEquals(
             RiskLevel.MEDIUM,
             RiskEngine.calculateRisk(setOf(AlertFlag.MOTION_ANOMALY, AlertFlag.GEOFENCE_EXIT))
         )
 
-        // Manual SOS alone -> High (immediate emergency)
-        assertEquals(RiskLevel.HIGH, RiskEngine.calculateRisk(setOf(AlertFlag.MANUAL_SOS)))
+        // Manual SOS alone -> Critical (immediate emergency override)
+        assertEquals(RiskLevel.CRITICAL, RiskEngine.calculateRisk(setOf(AlertFlag.MANUAL_SOS)))
 
-        // Manual SOS with others -> High
+        // Manual SOS with others -> Critical
         assertEquals(
-            RiskLevel.HIGH,
+            RiskLevel.CRITICAL,
             RiskEngine.calculateRisk(setOf(AlertFlag.MANUAL_SOS, AlertFlag.MOTION_ANOMALY))
         )
     }

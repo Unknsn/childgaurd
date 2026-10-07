@@ -88,7 +88,8 @@ fun EmergencyAlertSheet(
 ) {
     val context = LocalContext.current
     var showEditBioDialog by remember { mutableStateOf(false) }
-    val isEmergency = payload.riskLevel == RiskLevel.HIGH
+    val isEmergency = payload.riskLevel == RiskLevel.HIGH || payload.riskLevel == RiskLevel.CRITICAL
+    val isCritical = payload.riskLevel == RiskLevel.CRITICAL
 
     // Use alerting child's profile or default labeled with child device ID
     val activeBio = childBioProfile ?: payload.childBioProfile ?: ChildBioProfile(
@@ -107,8 +108,8 @@ fun EmergencyAlertSheet(
         label = "PulseScale"
     )
 
-    val bgColor = if (isEmergency) Color(0xFF7F1D1D) else Color(0xFF78350F)
-    val accentColor = if (isEmergency) Color(0xFFEF4444) else Color(0xFFF59E0B)
+    val bgColor = if (isCritical) Color(0xFF450A0A) else if (isEmergency) Color(0xFF7F1D1D) else Color(0xFF78350F)
+    val accentColor = if (isCritical) Color(0xFFDC2626) else if (isEmergency) Color(0xFFEF4444) else Color(0xFFF59E0B)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -142,10 +143,10 @@ fun EmergencyAlertSheet(
                         color = Color(0x33FFFFFF)
                     ) {
                         Text(
-                            text = "BLE EMERGENCY BEACON",
+                            text = if (payload.isSimulation) "SIMULATION / DEMO EVENT" else "BLE EMERGENCY BEACON",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
-                            color = Color.White,
+                            color = if (payload.isSimulation) Color(0xFFFDE047) else Color.White,
                             letterSpacing = 1.2.sp,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )
@@ -163,7 +164,25 @@ fun EmergencyAlertSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                if (payload.isSimulation) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0x33FEF08A),
+                        border = BorderStroke(1.dp, Color(0xFFFACC15).copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            text = "DEMO SIMULATION: Real SMS/calls are NOT dispatched automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFFEF9C3),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Pulsing Warning Icon
                 Surface(
@@ -188,7 +207,11 @@ fun EmergencyAlertSheet(
 
                 // Alert Title & Risk Level
                 Text(
-                    text = if (isEmergency) "CRITICAL EMERGENCY" else "SAFETY WARNING",
+                    text = when {
+                        isCritical -> "CRITICAL EMERGENCY"
+                        isEmergency -> "EMERGENCY ALERT"
+                        else -> "SAFETY WARNING"
+                    },
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
@@ -197,8 +220,10 @@ fun EmergencyAlertSheet(
                 )
 
                 Text(
-                    text = if (isEmergency) {
-                        "Incoming SOS / Danger beacon from child node ${payload.deviceId}"
+                    text = if (isCritical) {
+                        "IMMEDIATE ACTION: Manual SOS or compounding safety signals from node ${payload.deviceId}"
+                    } else if (isEmergency) {
+                        "Incoming danger beacon from child node ${payload.deviceId}"
                     } else {
                         "Potential boundary or motion anomaly from child node ${payload.deviceId}"
                     },

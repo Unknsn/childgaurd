@@ -18,7 +18,10 @@ import android.util.Log
 import com.example.data.local.TrustedContact
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
+import com.example.model.NodeConnectionState
 import com.example.model.RiskLevel
+import com.example.model.SafetyNode
+import com.example.model.TrustRole
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,13 +34,17 @@ import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.absoluteValue
 
 /**
- * Manages Bluetooth Low Energy (BLE) direct peer communication between Child and Parent phones.
- * Fully offline: No internet, no backend, no cloud.
+ * Privacy-Preserving BLE Safety Manager (Batch D: Phases 8, 9, 10).
  *
- * Broadcasts telemetry, child medical & bio identity, and emergency contacts
- * using multi-packet manufacturer advertising over manufacturer id 0x5AFE.
+ * Implements:
+ * - Rotating Ephemeral Identifiers (EP-XXXX) rotating every 15 minutes.
+ * - Strict Privacy Boundary: Public BLE advertisements NEVER expose child name,
+ *   age, blood type, medical conditions, allergies, parent phone, or full address.
+ * - Trust Level Filtering (OWNER, TRUSTED_GUARDIAN, INSTITUTION, EMERGENCY_AUTHORITY, ANONYMOUS_RELAY).
+ * - SafetyNode discovery and tracking with RSSI, connection state, and stale pruning.
  */
 class BleSafetyManager(private val context: Context) {
 
@@ -49,7 +56,7 @@ class BleSafetyManager(private val context: Context) {
         val SAFEBAND_SERVICE_UUID: UUID = UUID.fromString("00005afe-0000-1000-8000-00805f9b34fb")
 
         // Packet Types (Byte 9)
-        // 0..3: Legacy/Telemetry (NORMAL, LOW, MEDIUM, HIGH)
+        const val TYPE_TELEMETRY: Byte = 0x00
         const val TYPE_BIO_CORE: Byte = 0x10
         const val TYPE_BIO_PHONE: Byte = 0x11
         const val TYPE_BIO_MEDICAL: Byte = 0x12
@@ -57,17 +64,31 @@ class BleSafetyManager(private val context: Context) {
 
         val BLOOD_TYPES = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
 
+        /**
+         * Deterministically derives a rotating ephemeral identifier (EP-XXXX) for the given device ID.
+         * Default rotation interval: 15 minutes (900,000 ms).
+         * Fits into 7 ASCII bytes without truncation.
+         */
+        fun generateEphemeralId(deviceId: String, epochWindow: Long = System.currentTimeMillis() / 900_000L): String {
+            val combined = "$deviceId-$epochWindow"
+            val hash = (combined.hashCode().absoluteValue % 65536).toString(16).uppercase().padStart(4, '0')
+            return "EP-$hash"
+        }
+
         fun encodePayload(
             deviceId: String,
             riskLevel: RiskLevel,
             lat: Double,
-            lon: Double
+            lon: Double,
+            ephemeralId: String = ""
         ): ByteArray {
             val buffer = ByteBuffer.allocate(22)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
 
-            val idBytes = deviceId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
+            // Prefer ephemeral ID for privacy if provided; fallback to deviceId
+            val broadcastId = ephemeralId.ifEmpty { deviceId }
+            val idBytes = broadcastId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
             buffer.put(idBytes)
 
             val riskByte: Byte = when (riskLevel) {
@@ -75,6 +96,7 @@ class BleSafetyManager(private val context: Context) {
                 RiskLevel.LOW -> 1
                 RiskLevel.MEDIUM -> 2
                 RiskLevel.HIGH -> 3
+                RiskLevel.CRITICAL -> 4
             }
             buffer.put(riskByte)
 
@@ -86,91 +108,66 @@ class BleSafetyManager(private val context: Context) {
             return buffer.array()
         }
 
-        fun encodeBioCorePayload(
-            deviceId: String,
-            bio: ChildBioProfile?
-        ): ByteArray {
+        // Legacy compatibility helpers (for internal test assertions only)
+        fun encodeBioCorePayload(deviceId: String, bio: ChildBioProfile?): ByteArray {
             val buffer = ByteBuffer.allocate(22)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
-
             val idBytes = deviceId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
             buffer.put(idBytes)
             buffer.put(TYPE_BIO_CORE)
-
             val bloodIdx = BLOOD_TYPES.indexOfFirst { it.equals(bio?.bloodType, ignoreCase = true) }
             buffer.put(if (bloodIdx >= 0) bloodIdx.toByte() else 0xFF.toByte())
-
             val ageVal = bio?.age?.toIntOrNull() ?: 0
             buffer.put(ageVal.coerceIn(0, 99).toByte())
-
             val nameBytes = (bio?.childName ?: "Child").take(10).toByteArray(Charsets.UTF_8)
             val namePadded = ByteArray(10)
             System.arraycopy(nameBytes, 0, namePadded, 0, minOf(nameBytes.size, 10))
             buffer.put(namePadded)
-
             return buffer.array()
         }
 
-        fun encodeBioPhonePayload(
-            deviceId: String,
-            phoneNumber: String?
-        ): ByteArray {
+        fun encodeBioPhonePayload(deviceId: String, phoneNumber: String?): ByteArray {
             val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
-
             val idBytes = deviceId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
             buffer.put(idBytes)
             buffer.put(TYPE_BIO_PHONE)
-
             val digitsOnly = (phoneNumber ?: "").filter { it.isDigit() || it == '+' }.take(14)
             val phoneBytes = digitsOnly.toByteArray(Charsets.US_ASCII)
             val phonePadded = ByteArray(14)
             System.arraycopy(phoneBytes, 0, phonePadded, 0, minOf(phoneBytes.size, 14))
             buffer.put(phonePadded)
-
             return buffer.array()
         }
 
-        fun encodeBioMedicalPayload(
-            deviceId: String,
-            medicalInfo: String?
-        ): ByteArray {
+        fun encodeBioMedicalPayload(deviceId: String, medicalInfo: String?): ByteArray {
             val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
-
             val idBytes = deviceId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
             buffer.put(idBytes)
             buffer.put(TYPE_BIO_MEDICAL)
-
             val medBytes = (medicalInfo ?: "").take(14).toByteArray(Charsets.US_ASCII)
             val medPadded = ByteArray(14)
             System.arraycopy(medBytes, 0, medPadded, 0, minOf(medBytes.size, 14))
             buffer.put(medPadded)
-
             return buffer.array()
         }
 
-        fun encodeContactPayload(
-            deviceId: String,
-            contactPhone: String?
-        ): ByteArray {
+        fun encodeContactPayload(deviceId: String, contactPhone: String?): ByteArray {
             val buffer = ByteBuffer.allocate(24)
             buffer.put(MAGIC_BYTE_1)
             buffer.put(MAGIC_BYTE_2)
-
             val idBytes = deviceId.padEnd(7, ' ').take(7).toByteArray(Charsets.US_ASCII)
             buffer.put(idBytes)
             buffer.put(TYPE_EMERGENCY_CONTACT)
-
             val digitsOnly = (contactPhone ?: "").filter { it.isDigit() || it == '+' }.take(14)
             val bytes = digitsOnly.toByteArray(Charsets.US_ASCII)
             val padded = ByteArray(14)
             System.arraycopy(bytes, 0, padded, 0, minOf(bytes.size, 14))
             buffer.put(padded)
-
             return buffer.array()
         }
 
@@ -250,11 +247,11 @@ class BleSafetyManager(private val context: Context) {
                         DecodedPacket.EmergencyContact(deviceId, phone)
                     }
                     else -> {
-                        // Standard Telemetry (riskLevel 0..3)
                         val riskLevel = when (typeOrRisk.toInt()) {
                             1 -> RiskLevel.LOW
                             2 -> RiskLevel.MEDIUM
                             3 -> RiskLevel.HIGH
+                            4 -> RiskLevel.CRITICAL
                             else -> RiskLevel.NORMAL
                         }
                         val timeSeconds = buffer.int
@@ -290,60 +287,88 @@ class BleSafetyManager(private val context: Context) {
                     riskLevel = packet.riskLevel,
                     timestamp = packet.timestamp,
                     latitude = packet.lat,
-                    longitude = packet.lon
+                    longitude = packet.lon,
+                    ephemeralId = if (packet.deviceId.startsWith("EP-")) packet.deviceId else ""
                 )
                 else -> null
             }
         }
     }
 
-    private class AggregatedChildData(
-        val deviceId: String,
-        @Volatile var riskLevel: RiskLevel = RiskLevel.NORMAL,
-        @Volatile var timestamp: Long = System.currentTimeMillis(),
-        @Volatile var latitude: Double? = null,
-        @Volatile var longitude: Double? = null,
-        @Volatile var childName: String = "",
-        @Volatile var age: String = "",
-        @Volatile var bloodType: String = "",
-        @Volatile var primaryParentPhone: String = "",
-        @Volatile var medicalConditions: String = "",
-        @Volatile var allergies: String = "",
-        private val _emergencyContacts: MutableList<TrustedContact> = mutableListOf()
-    ) {
-        private val lock = Any()
+    // =========================================================================
+    // Local Trust Registry & Ephemeral Mapping (Phase 8 & 9)
+    // =========================================================================
 
-        fun addContactIfAbsent(contact: TrustedContact) = synchronized(lock) {
-            if (_emergencyContacts.none { it.phoneNumber == contact.phoneNumber }) {
-                _emergencyContacts.add(contact)
+    private val pairedTrustedDevices = ConcurrentHashMap<String, TrustRole>()
+    private val ephemeralToRealDeviceMap = ConcurrentHashMap<String, String>()
+
+    fun registerPairedDevice(realDeviceId: String, role: TrustRole = TrustRole.TRUSTED_GUARDIAN) {
+        pairedTrustedDevices[realDeviceId] = role
+    }
+
+    fun associateEphemeralId(ephemeralId: String, realDeviceId: String) {
+        ephemeralToRealDeviceMap[ephemeralId] = realDeviceId
+    }
+
+    fun resolveRealDeviceId(ephemeralOrRealId: String): String {
+        return ephemeralToRealDeviceMap[ephemeralOrRealId] ?: ephemeralOrRealId
+    }
+
+    fun resolveTrustRole(ephemeralOrRealId: String): TrustRole {
+        val realId = resolveRealDeviceId(ephemeralOrRealId)
+        return pairedTrustedDevices[realId] ?: TrustRole.ANONYMOUS_RELAY
+    }
+
+    // =========================================================================
+    // Node Discovery & Lifecycle Registry (Phase 10)
+    // =========================================================================
+
+    private val _discoveredSafetyNodes = MutableStateFlow<Map<String, SafetyNode>>(emptyMap())
+    val discoveredSafetyNodes: StateFlow<Map<String, SafetyNode>> = _discoveredSafetyNodes.asStateFlow()
+
+    fun recordNodeObservation(
+        nodeId: String,
+        ephemeralId: String,
+        rssi: Int,
+        hopCount: Int = 0
+    ) {
+        val now = System.currentTimeMillis()
+        val trustRole = resolveTrustRole(ephemeralId.ifEmpty { nodeId })
+        val connectionState = when {
+            hopCount > 1 -> NodeConnectionState.RELAYED
+            rssi > -95 -> NodeConnectionState.NEARBY
+            else -> NodeConnectionState.ONLINE
+        }
+
+        val map = _discoveredSafetyNodes.value.toMutableMap()
+        val key = ephemeralId.ifEmpty { nodeId }
+        map[key] = SafetyNode(
+            nodeId = nodeId,
+            ephemeralId = ephemeralId,
+            role = trustRole,
+            rssi = rssi,
+            lastSeenTimestamp = now,
+            trustLevel = trustRole,
+            connectionState = connectionState
+        )
+        _discoveredSafetyNodes.value = map
+    }
+
+    fun pruneStaleNodes(now: Long = System.currentTimeMillis()) {
+        val map = _discoveredSafetyNodes.value.mapValues { (_, node) ->
+            val age = now - node.lastSeenTimestamp
+            when {
+                age >= 45_000L -> node.copy(connectionState = NodeConnectionState.OFFLINE)
+                age >= 15_000L -> node.copy(connectionState = NodeConnectionState.UNKNOWN)
+                else -> node
             }
         }
-        fun toPayload(): BleBeaconPayload = synchronized(lock) {
-            val contactsCopy = _emergencyContacts.toList()
-            val bio = if (childName.isNotBlank() || primaryParentPhone.isNotBlank() || bloodType.isNotBlank()) {
-                ChildBioProfile(
-                    childName = childName.ifEmpty { "Child ($deviceId)" },
-                    age = age.ifEmpty { "8" },
-                    bloodType = bloodType.ifEmpty { "O+" },
-                    primaryParentPhone = primaryParentPhone,
-                    secondaryContactPhone = contactsCopy.firstOrNull { it.phoneNumber != primaryParentPhone }?.phoneNumber ?: "",
-                    medicalConditions = medicalConditions.ifEmpty { "None Reported" },
-                    allergies = allergies.ifEmpty { "None Reported" },
-                    emergencyNotes = "Transmitted live via SafeBand BLE from child node $deviceId"
-                )
-            } else null
-
-            return BleBeaconPayload(
-                deviceId = deviceId,
-                riskLevel = riskLevel,
-                timestamp = timestamp,
-                latitude = latitude,
-                longitude = longitude,
-                childBioProfile = bio,
-                emergencyContacts = contactsCopy
-            )
-        }
+        _discoveredSafetyNodes.value = map
     }
+
+    // =========================================================================
+    // BLE Hardware & State Management
+    // =========================================================================
 
     private val bluetoothManager: BluetoothManager? =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
@@ -369,10 +394,7 @@ class BleSafetyManager(private val context: Context) {
 
     private var currentAdvertiseCallback: AdvertiseCallback? = null
     private var currentScanCallback: ScanCallback? = null
-    private var rotationJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
-
-    private val childDataCache = ConcurrentHashMap<String, AggregatedChildData>()
 
     @SuppressLint("MissingPermission")
     fun startAdvertising(
@@ -394,7 +416,10 @@ class BleSafetyManager(private val context: Context) {
             return
         }
 
-        stopAdvertising() // Stop previous if any
+        stopAdvertising()
+
+        val ephemeralId = generateEphemeralId(deviceId)
+        associateEphemeralId(ephemeralId, deviceId)
 
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
@@ -403,8 +428,9 @@ class BleSafetyManager(private val context: Context) {
             .setTimeout(0)
             .build()
 
-        val telemetryPayload = encodePayload(deviceId, riskLevel, lat, lon)
-        val bioCorePayload = encodeBioCorePayload(deviceId, childBioProfile)
+        // Privacy: Broadcast only minimal telemetry with ephemeral ID.
+        // Public packet contains NO child name, medical condition, allergies, or phone numbers.
+        val telemetryPayload = encodePayload(deviceId, riskLevel, lat, lon, ephemeralId)
 
         val mainData = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
@@ -413,17 +439,16 @@ class BleSafetyManager(private val context: Context) {
             .addManufacturerData(MANUFACTURER_ID, telemetryPayload)
             .build()
 
-        // Include bio data in Scan Response so both telemetry and child bio arrive simultaneously!
+        // Privacy: Scan response is empty to avoid exposing PII over unencrypted BLE
         val scanResponse = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .addManufacturerData(MANUFACTURER_ID, bioCorePayload)
             .build()
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                 super.onStartSuccess(settingsInEffect)
-                Log.d(TAG, "BLE advertising started successfully")
+                Log.d(TAG, "BLE advertising started successfully with ephemeral ID $ephemeralId")
                 _isAdvertising.value = true
             }
 
@@ -437,11 +462,6 @@ class BleSafetyManager(private val context: Context) {
         try {
             advertiser?.startAdvertising(settings, mainData, scanResponse, callback)
             currentAdvertiseCallback = callback
-
-            // If in active emergency (MEDIUM or HIGH), rotate supplemental packets (Parent Phone, Medical, Contacts)
-            if (riskLevel == RiskLevel.MEDIUM || riskLevel == RiskLevel.HIGH) {
-                startRotationSequence(deviceId, riskLevel, lat, lon, childBioProfile, contacts)
-            }
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing permission for BLE advertising", e)
             _isAdvertising.value = false
@@ -452,69 +472,7 @@ class BleSafetyManager(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private fun startRotationSequence(
-        deviceId: String,
-        riskLevel: RiskLevel,
-        lat: Double,
-        lon: Double,
-        childBioProfile: ChildBioProfile?,
-        contacts: List<TrustedContact>
-    ) {
-        rotationJob?.cancel()
-        rotationJob = scope.launch {
-            val supplementalPayloads = mutableListOf<ByteArray>()
-            supplementalPayloads.add(encodeBioPhonePayload(deviceId, childBioProfile?.primaryParentPhone))
-            if (!childBioProfile?.medicalConditions.isNullOrBlank()) {
-                supplementalPayloads.add(encodeBioMedicalPayload(deviceId, childBioProfile?.medicalConditions))
-            }
-            contacts.take(2).forEach { contact ->
-                supplementalPayloads.add(encodeContactPayload(deviceId, contact.phoneNumber))
-            }
-
-            var idx = 0
-            while (isActive && _isAdvertising.value && supplementalPayloads.isNotEmpty()) {
-                delay(1500L)
-                if (!isActive || !_isAdvertising.value) break
-
-                val extraPayload = supplementalPayloads[idx % supplementalPayloads.size]
-                idx++
-
-                // Rotate scan response
-                val newScanResp = AdvertiseData.Builder()
-                    .setIncludeDeviceName(false)
-                    .setIncludeTxPowerLevel(false)
-                    .addManufacturerData(MANUFACTURER_ID, extraPayload)
-                    .build()
-
-                try {
-                    // Update advertisement with supplemental payload
-                    advertiser?.stopAdvertising(currentAdvertiseCallback ?: continue)
-                    val settings = AdvertiseSettings.Builder()
-                        .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                        .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                        .setConnectable(false)
-                        .setTimeout(0)
-                        .build()
-
-                    val mainData = AdvertiseData.Builder()
-                        .setIncludeDeviceName(false)
-                        .setIncludeTxPowerLevel(false)
-                        .addServiceUuid(ParcelUuid(SAFEBAND_SERVICE_UUID))
-                        .addManufacturerData(MANUFACTURER_ID, encodePayload(deviceId, riskLevel, lat, lon))
-                        .build()
-
-                    advertiser?.startAdvertising(settings, mainData, newScanResp, currentAdvertiseCallback)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Packet rotation tick exception: ${e.message}")
-                }
-            }
-        }
-    }
-
-    @SuppressLint("MissingPermission")
     fun stopAdvertising() {
-        rotationJob?.cancel()
-        rotationJob = null
         try {
             currentAdvertiseCallback?.let {
                 advertiser?.stopAdvertising(it)
@@ -530,7 +488,7 @@ class BleSafetyManager(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun startScanning(onBeaconFound: (BleBeaconPayload) -> Unit) {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
-            Log.w(TAG, "Bluetooth not available or enabled for scanning")
+            Log.w(TAG, "Bluetooth not available for scanning")
             return
         }
 
@@ -603,44 +561,36 @@ class BleSafetyManager(private val context: Context) {
         val rawData = record.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
 
         val decoded = decodePacket(rawData) ?: return
-        val aggregated = childDataCache.getOrPut(decoded.deviceId) { AggregatedChildData(deviceId = decoded.deviceId) }
+        if (decoded is DecodedPacket.Telemetry) {
+            val ephemeralOrRealId = decoded.deviceId
+            val realId = resolveRealDeviceId(ephemeralOrRealId)
+            val trustRole = resolveTrustRole(ephemeralOrRealId)
 
-        when (decoded) {
-            is DecodedPacket.Telemetry -> {
-                aggregated.riskLevel = decoded.riskLevel
-                aggregated.timestamp = decoded.timestamp
-                if (decoded.lat != null && decoded.lon != null) {
-                    aggregated.latitude = decoded.lat
-                    aggregated.longitude = decoded.lon
-                }
-            }
-            is DecodedPacket.BioCore -> {
-                if (decoded.childName.isNotBlank()) aggregated.childName = decoded.childName
-                if (decoded.age.isNotBlank()) aggregated.age = decoded.age
-                if (decoded.bloodType.isNotBlank()) aggregated.bloodType = decoded.bloodType
-            }
-            is DecodedPacket.BioPhone -> {
-                if (decoded.phone.isNotBlank()) aggregated.primaryParentPhone = decoded.phone
-            }
-            is DecodedPacket.BioMedical -> {
-                if (decoded.medicalInfo.isNotBlank()) aggregated.medicalConditions = decoded.medicalInfo
-            }
-            is DecodedPacket.EmergencyContact -> {
-                if (decoded.phone.isNotBlank()) {
-                    aggregated.addContactIfAbsent(
-                        TrustedContact(
-                            name = "Child's Contact",
-                            phoneNumber = decoded.phone,
-                            relationship = "Transmitted by Child"
-                        )
-                    )
-                }
-            }
+            recordNodeObservation(
+                nodeId = realId,
+                ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
+                rssi = result.rssi,
+                hopCount = 0
+            )
+
+            // Construct payload with trust-level access filtering
+            val payload = BleBeaconPayload(
+                deviceId = if (trustRole == TrustRole.TRUSTED_GUARDIAN || trustRole == TrustRole.OWNER) realId else ephemeralOrRealId,
+                riskLevel = decoded.riskLevel,
+                timestamp = decoded.timestamp,
+                latitude = decoded.lat,
+                longitude = decoded.lon,
+                ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
+                trustRole = trustRole,
+                hopCount = 0,
+                // Proximity alone does NOT grant access to sensitive child identity or contacts
+                childBioProfile = null,
+                emergencyContacts = emptyList()
+            )
+
+            _lastReceivedBeacon.value = payload
+            onBeaconFound(payload)
         }
-
-        val payload = aggregated.toPayload()
-        _lastReceivedBeacon.value = payload
-        onBeaconFound(payload)
     }
 
     /**
@@ -648,6 +598,12 @@ class BleSafetyManager(private val context: Context) {
      */
     fun injectSimulatedBeacon(payload: BleBeaconPayload, onBeaconFound: (BleBeaconPayload) -> Unit) {
         _lastReceivedBeacon.value = payload
+        recordNodeObservation(
+            nodeId = payload.deviceId,
+            ephemeralId = payload.ephemeralId,
+            rssi = -70,
+            hopCount = payload.hopCount
+        )
         onBeaconFound(payload)
     }
 }

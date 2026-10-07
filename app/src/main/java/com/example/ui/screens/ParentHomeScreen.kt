@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -10,9 +11,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +35,8 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Radar
@@ -60,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,7 +81,12 @@ import androidx.compose.ui.unit.sp
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
 import com.example.model.GeoAddress
+import com.example.model.GeofenceState
+import com.example.model.LocationConfidence
 import com.example.model.RiskLevel
+import com.example.model.RouteState
+import com.example.model.TrustedRoute
+import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.EmergencyAlertSheet
 
@@ -290,7 +301,14 @@ fun ParentMonitorTab(
     onNavigateToHistory: () -> Unit
 ) {
     val context = LocalContext.current
-    val isEmergency = lastBeacon != null && (lastBeacon.riskLevel == RiskLevel.HIGH || lastBeacon.riskLevel == RiskLevel.MEDIUM)
+    val isEmergency = lastBeacon != null && (lastBeacon.riskLevel == RiskLevel.CRITICAL || lastBeacon.riskLevel == RiskLevel.HIGH || lastBeacon.riskLevel == RiskLevel.MEDIUM)
+    var isDemoExpanded by remember { mutableStateOf(false) }
+
+    val verifiedLocation by viewModel.verifiedLocation.collectAsState()
+    val geofenceState by viewModel.geofenceState.collectAsState()
+    val distanceToBoundary by viewModel.distanceToBoundary.collectAsState()
+    val routeState by viewModel.routeState.collectAsState()
+    val trustedRoute by viewModel.trustedRoute.collectAsState()
 
     Column(
         modifier = Modifier
@@ -370,18 +388,29 @@ fun ParentMonitorTab(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isEmergency) "Last Alert Incident Location:" else "Verified Location Area:",
+                                text = if (isEmergency) "Last Alert Incident Location:" else "Last Verified Location:",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Text(
-                            text = safeZoneAddress?.formattedSummary() ?: "Within designated perimeter",
+                            text = (safeZoneAddress?.formattedSummary() ?: "Within designated safe zone perimeter") +
+                                (verifiedLocation?.let { "\n• ${it.getRelativeTimeString()} • ${it.confidence.displayName} (±${it.accuracyMeters.toInt()}m)" } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(top = 2.dp)
+                        )
+                        Text(
+                            text = "• Perimeter Status: ${geofenceState.displayName}" +
+                                (distanceToBoundary?.let { dist ->
+                                    if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
+                                } ?: "") +
+                                if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }
@@ -438,22 +467,34 @@ fun ParentMonitorTab(
                             }
                         },
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Call", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            text = "Call",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
                     // View Map
                     OutlinedButton(
                         onClick = onNavigateToSafeZone,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.2f),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Safe Zone", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            text = "Safe Zone",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
                     // Emergency 112
@@ -465,13 +506,19 @@ fun ParentMonitorTab(
                             } catch (_: Exception) {}
                         },
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFDC2626),
                             contentColor = Color.White
                         )
                     ) {
-                        Text("112 SOS", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "112 SOS",
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -648,77 +695,107 @@ fun ParentMonitorTab(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 5. Single-Device Evaluation / Demo Simulator Button (DEMO MODE)
+        // 5. Prototype Evaluation Controls (Demarcated Demo Mode)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFFEF2F2)
+                containerColor = Color(0xFFFEF2F2).copy(alpha = 0.7f)
             ),
-            border = BorderStroke(1.5.dp, Color(0xFFFCA5A5))
+            border = BorderStroke(1.dp, Color(0xFFFCA5A5))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp)
+                    .padding(16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.BugReport,
-                        contentDescription = null,
-                        tint = Color(0xFFDC2626),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "DEMO CONTROLS (PROTOTYPE EVALUATION)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF991B1B),
-                        letterSpacing = 1.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = "Simulate an incoming BLE beacon from a child node (Aarav Sharma) with full address, medical data, and siren on this device:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF7F1D1D)
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isDemoExpanded = !isDemoExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Button(
-                        onClick = { viewModel.simulateIncomingEmergency(RiskLevel.MEDIUM) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("simulate_warning_beacon_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFF59E0B),
-                            contentColor = Color.White
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Simulate Warning", fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Default.BugReport,
+                            contentDescription = null,
+                            tint = Color(0xFFDC2626),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "DEMO CONTROLS (DEVELOPER / EVALUATION)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF991B1B),
+                            letterSpacing = 0.8.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
-                    Button(
-                        onClick = { viewModel.simulateIncomingEmergency(RiskLevel.HIGH) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("simulate_emergency_beacon_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFDC2626),
-                            contentColor = Color.White
-                        )
+                    IconButton(
+                        onClick = { isDemoExpanded = !isDemoExpanded },
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        Text("Simulate Emergency", fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = if (isDemoExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Toggle Demo",
+                            tint = Color(0xFF991B1B)
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = isDemoExpanded) {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Simulate an incoming BLE beacon from a child node (Aarav Sharma) with full address, medical data, and siren on this device:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF7F1D1D)
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.MEDIUM) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("simulate_warning_beacon_button"),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFF59E0B),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Simulate Warning", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                            }
+
+                            Button(
+                                onClick = { viewModel.simulateIncomingEmergency(RiskLevel.HIGH) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("simulate_emergency_beacon_button"),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFDC2626),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Simulate Emergency", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                            }
+                        }
                     }
                 }
             }

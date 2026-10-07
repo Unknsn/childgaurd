@@ -9,10 +9,13 @@ data class SafetyEvent(
     val id: Long = 0,
     val timestamp: Long = System.currentTimeMillis(),
     val flagType: String, // e.g. "SOS", "MOTION", "GEOFENCE", "BLE_RECEIVED"
-    val riskLevel: String, // "NORMAL", "LOW", "MEDIUM", "HIGH"
+    val riskLevel: String, // "NORMAL", "LOW", "MEDIUM", "HIGH", "CRITICAL"
     val outcome: String, // "CONFIRMED_ESCALATED", "CANCELLED_BY_USER", "LOGGED_LOCAL", "ALERT_RECEIVED", "SIMULATED"
     val deviceId: String,
-    val details: String = ""
+    val details: String = "",
+    val syncStatus: String = "LOCAL_ONLY",
+    val observationId: String = "",
+    val hopCount: Int = 0
 )
 
 @Entity(tableName = "trusted_contacts")

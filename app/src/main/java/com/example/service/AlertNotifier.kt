@@ -44,11 +44,13 @@ class AlertNotifier(private val context: Context, private val scope: CoroutineSc
         // 1. Vibration
         try {
             val timings = when (riskLevel) {
+                RiskLevel.CRITICAL -> longArrayOf(0, 800, 150, 800, 150, 1000)
                 RiskLevel.HIGH -> longArrayOf(0, 600, 200, 600, 200, 900)
                 RiskLevel.MEDIUM -> longArrayOf(0, 350, 250, 350, 250)
                 else -> longArrayOf(0, 150)
             }
             val amplitudes = when (riskLevel) {
+                RiskLevel.CRITICAL -> intArrayOf(0, 255, 0, 255, 0, 255)
                 RiskLevel.HIGH -> intArrayOf(0, 255, 0, 255, 0, 255)
                 RiskLevel.MEDIUM -> intArrayOf(0, 180, 0, 180, 0)
                 else -> intArrayOf(0, 120)
@@ -72,16 +74,18 @@ class AlertNotifier(private val context: Context, private val scope: CoroutineSc
         // 2. Sound pulses
         soundJob = scope.launch(Dispatchers.Default) {
             val toneType = when (riskLevel) {
-                RiskLevel.HIGH -> ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK
+                RiskLevel.CRITICAL, RiskLevel.HIGH -> ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK
                 RiskLevel.MEDIUM -> ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
                 else -> ToneGenerator.TONE_PROP_BEEP
             }
             val pulseDuration = when (riskLevel) {
+                RiskLevel.CRITICAL -> 800
                 RiskLevel.HIGH -> 600
                 RiskLevel.MEDIUM -> 400
                 else -> 200
             }
             val pauseDuration = when (riskLevel) {
+                RiskLevel.CRITICAL -> 250L
                 RiskLevel.HIGH -> 350L
                 RiskLevel.MEDIUM -> 500L
                 else -> 1000L

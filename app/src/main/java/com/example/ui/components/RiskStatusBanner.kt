@@ -91,7 +91,7 @@ fun RiskStatusBanner(
                             RiskLevel.NORMAL -> Icons.Default.CheckCircle
                             RiskLevel.LOW -> Icons.Default.Info
                             RiskLevel.MEDIUM -> Icons.Default.WarningAmber
-                            RiskLevel.HIGH -> Icons.Default.Warning
+                            RiskLevel.HIGH, RiskLevel.CRITICAL -> Icons.Default.Warning
                         }
                         Icon(
                             imageVector = icon,

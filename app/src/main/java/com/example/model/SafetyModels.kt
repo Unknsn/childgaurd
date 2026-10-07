@@ -43,8 +43,15 @@ enum class RiskLevel(
     ),
     HIGH(
         title = "Emergency",
-        description = "Critical alert active. Immediate BLE alert and escalation.",
-        primaryColor = Color(0xFFEF4444), // Bright warning red
+        description = "Guardian & trusted escalation. Imminent threat detected.",
+        primaryColor = Color(0xFFEA580C), // Deep warning orange
+        containerColor = Color(0xFFFFF7ED),
+        onContainerColor = Color(0xFF9A3412)
+    ),
+    CRITICAL(
+        title = "Critical Emergency",
+        description = "Emergency pathway active. Manual SOS or compounding threats.",
+        primaryColor = Color(0xFFDC2626), // Urgent crimson red
         containerColor = Color(0xFFFEF2F2),
         onContainerColor = Color(0xFF991B1B)
     )
@@ -53,7 +60,125 @@ enum class RiskLevel(
 enum class AlertFlag(val displayName: String, val code: String) {
     MOTION_ANOMALY("Motion Anomaly", "MOTION"),
     GEOFENCE_EXIT("Safe Zone Exit", "GEOFENCE"),
-    MANUAL_SOS("Manual SOS / Tamper", "SOS")
+    MANUAL_SOS("Manual SOS", "SOS"),
+    ROUTE_DEVIATION("Route Deviation", "ROUTE"),
+    TAMPER("Band Tamper / Cut", "TAMPER"),
+    BOUNDARY_VIOLATION("Repeated Boundary Violation", "BOUNDARY")
+}
+
+enum class GeofenceState(val displayName: String) {
+    SAFE("Inside Safe Zone"),
+    APPROACHING("Approaching Boundary"),
+    EXIT_PENDING("Exit Pending Confirmation"),
+    OUTSIDE("Outside Safe Zone"),
+    REENTERED("Re-entered Safe Zone")
+}
+
+enum class RouteState(val displayName: String) {
+    ON_ROUTE("On Designated Route"),
+    APPROACHING_EDGE("Approaching Route Corridor Edge"),
+    ROUTE_DEVIATION("Route Deviation Detected"),
+    UNKNOWN("Route Not Active")
+}
+
+enum class SyncStatus(val displayName: String) {
+    LOCAL_ONLY("Local Node Only"),
+    PENDING_SYNC("Pending Relay/Sync"),
+    RELAYED("Relayed via Peer Node"),
+    ACKNOWLEDGED("Guardian Acknowledged"),
+    SYNCED("Synchronized"),
+    EXPIRED("Sync Window Expired")
+}
+
+enum class TrustRole(val displayName: String) {
+    OWNER("Primary Child Wearer / Device"),
+    TRUSTED_GUARDIAN("Verified Guardian / Parent"),
+    INSTITUTION("Authorized School / Facility"),
+    EMERGENCY_AUTHORITY("First Responder / Police"),
+    ANONYMOUS_RELAY("Anonymous Mesh Relay Node")
+}
+
+enum class NodeConnectionState(val displayName: String) {
+    ONLINE("Active Beaconing"),
+    NEARBY("Direct BLE Range"),
+    RELAYED("Observed via Peer Relay"),
+    OFFLINE("Signal Lost / Stale"),
+    UNKNOWN("Awaiting Initial Discovery")
+}
+
+data class SafetyNode(
+    val nodeId: String,
+    val ephemeralId: String = "",
+    val role: TrustRole = TrustRole.ANONYMOUS_RELAY,
+    val rssi: Int = -100,
+    val lastSeenTimestamp: Long = System.currentTimeMillis(),
+    val trustLevel: TrustRole = TrustRole.ANONYMOUS_RELAY,
+    val connectionState: NodeConnectionState = NodeConnectionState.UNKNOWN
+) {
+    val isNearby: Boolean
+        get() = connectionState == NodeConnectionState.NEARBY || connectionState == NodeConnectionState.ONLINE
+
+    fun getSignalStrengthCategory(): String {
+        return when {
+            rssi >= -65 -> "Strong"
+            rssi >= -85 -> "Moderate"
+            rssi > -110 -> "Weak"
+            else -> "Lost"
+        }
+    }
+}
+
+data class RouteWaypoint(
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0
+)
+
+data class TrustedRoute(
+    val id: String = "default_route",
+    val name: String = "Home to School",
+    val waypoints: List<RouteWaypoint> = emptyList(),
+    val corridorRadiusMeters: Float = 60f,
+    val isEnabled: Boolean = false
+)
+
+enum class LocationConfidence(val displayName: String) {
+    HIGH("High Confidence"),
+    MEDIUM("Medium Confidence"),
+    LOW("Low Confidence"),
+    UNKNOWN("Unknown Confidence")
+}
+
+data class VerifiedLocation(
+    val latitude: Double,
+    val longitude: Double,
+    val timestamp: Long = System.currentTimeMillis(),
+    val source: String = "GPS",
+    val accuracyMeters: Float = 10f,
+    val confidence: LocationConfidence = LocationConfidence.MEDIUM,
+    val isSimulation: Boolean = false
+) {
+    fun getRelativeTimeString(now: Long = System.currentTimeMillis()): String {
+        val ageMs = (now - timestamp).coerceAtLeast(0L)
+        val ageSeconds = ageMs / 1000L
+        return when {
+            ageSeconds < 5L -> "Verified just now"
+            ageSeconds < 60L -> "Verified ${ageSeconds}s ago"
+            ageSeconds < 3600L -> "Verified ${ageSeconds / 60L}m ago"
+            else -> "Verified >1h ago"
+        }
+    }
+
+    companion object {
+        fun calculateConfidence(accuracyMeters: Float, ageMs: Long): LocationConfidence {
+            return when {
+                accuracyMeters <= 20f && ageMs < 30_000L -> LocationConfidence.HIGH
+                accuracyMeters <= 50f && ageMs < 60_000L -> LocationConfidence.MEDIUM
+                accuracyMeters > 0f -> LocationConfidence.LOW
+                else -> LocationConfidence.UNKNOWN
+            }
+        }
+    }
 }
 
 enum class AppMode {
@@ -84,10 +209,12 @@ data class SafetyIncident(
     val lastUpdatedTimestamp: Long = System.currentTimeMillis(),
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val verifiedLocation: VerifiedLocation? = null,
     val address: GeoAddress? = null,
     val childBioProfile: ChildBioProfile? = null,
     val emergencyContacts: List<com.example.data.local.TrustedContact> = emptyList(),
-    val resolutionReason: String? = null
+    val resolutionReason: String? = null,
+    val isSimulation: Boolean = false
 ) {
     val isEmergencyActive: Boolean
         get() = stage in setOf(
@@ -98,7 +225,7 @@ data class SafetyIncident(
         )
 
     val isSirenAudible: Boolean
-        get() = stage == IncidentStage.ACTIVE && (riskLevel == RiskLevel.HIGH || riskLevel == RiskLevel.MEDIUM)
+        get() = stage == IncidentStage.ACTIVE && (riskLevel == RiskLevel.CRITICAL || riskLevel == RiskLevel.HIGH || riskLevel == RiskLevel.MEDIUM)
 }
 
 data class SafeZone(
@@ -141,7 +268,11 @@ data class BleBeaconPayload(
     val longitude: Double? = null,
     val childBioProfile: ChildBioProfile? = null,
     val emergencyContacts: List<com.example.data.local.TrustedContact> = emptyList(),
-    val address: GeoAddress? = null
+    val address: GeoAddress? = null,
+    val isSimulation: Boolean = false,
+    val ephemeralId: String = "",
+    val trustRole: TrustRole = TrustRole.ANONYMOUS_RELAY,
+    val hopCount: Int = 0
 )
 
 data class ChildBioProfile(

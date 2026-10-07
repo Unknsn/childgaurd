@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,7 +73,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AlertFlag
+import com.example.model.GeofenceState
+import com.example.model.LocationConfidence
 import com.example.model.RiskLevel
+import com.example.model.RouteState
+import com.example.model.TrustedRoute
+import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.CountdownAlertCard
 import com.example.ui.components.RiskStatusBanner
@@ -93,6 +99,10 @@ fun ChildHomeScreen(
     val accelMagnitude by viewModel.motionDetector.currentMagnitude.collectAsState()
     val isMotionActive by viewModel.motionDetector.isAnomalyActive.collectAsState()
     val isOutsideSafeZone by viewModel.locationHelper.isOutsideSafeZone.collectAsState()
+    val geofenceState by viewModel.geofenceState.collectAsState()
+    val routeState by viewModel.routeState.collectAsState()
+    val verifiedLocation by viewModel.verifiedLocation.collectAsState()
+    val trustedRoute by viewModel.trustedRoute.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
     val safeZone by viewModel.safeZone.collectAsState()
     val childProfile by viewModel.childBioProfile.collectAsState()
@@ -176,7 +186,7 @@ fun ChildHomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // 1. Child Safety Reassurance Hero Card (Calm when normal, alerting during danger)
-            val isEmergency = currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
+            val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
             val heroBgColor = when {
                 isEmergency -> Color(0xFFFEF2F2)
                 isCountingDown -> Color(0xFFFFFBEB)
@@ -360,32 +370,98 @@ fun ChildHomeScreen(
             // 5. Essential Status Indicators (Child Friendly)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Zone Chip
+                val zoneChipColor = when (geofenceState) {
+                    com.example.model.GeofenceState.SAFE -> Color(0xFFECFDF5)
+                    com.example.model.GeofenceState.APPROACHING -> Color(0xFFFEF3C7)
+                    com.example.model.GeofenceState.EXIT_PENDING -> Color(0xFFFFF7ED)
+                    com.example.model.GeofenceState.OUTSIDE -> Color(0xFFFEF2F2)
+                    com.example.model.GeofenceState.REENTERED -> Color(0xFFECFDF5)
+                }
+                val zoneTextColor = when (geofenceState) {
+                    com.example.model.GeofenceState.SAFE -> Color(0xFF059669)
+                    com.example.model.GeofenceState.APPROACHING -> Color(0xFFD97706)
+                    com.example.model.GeofenceState.EXIT_PENDING -> Color(0xFFEA580C)
+                    com.example.model.GeofenceState.OUTSIDE -> Color(0xFFDC2626)
+                    com.example.model.GeofenceState.REENTERED -> Color(0xFF047857)
+                }
+                val zoneLabel = when (geofenceState) {
+                    com.example.model.GeofenceState.SAFE -> "Inside Zone"
+                    com.example.model.GeofenceState.APPROACHING -> "Near Edge"
+                    com.example.model.GeofenceState.EXIT_PENDING -> "Exit Pending"
+                    com.example.model.GeofenceState.OUTSIDE -> "Outside Zone"
+                    com.example.model.GeofenceState.REENTERED -> "Re-entered"
+                }
+
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (isOutsideSafeZone) Color(0xFFFEF2F2) else Color(0xFFECFDF5),
-                    border = BorderStroke(1.dp, if (isOutsideSafeZone) Color(0xFFFCA5A5) else Color(0xFFA7F3D0)),
+                    color = zoneChipColor,
+                    border = BorderStroke(1.dp, zoneTextColor.copy(alpha = 0.4f)),
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = if (isOutsideSafeZone) Color(0xFFDC2626) else Color(0xFF059669),
+                            tint = zoneTextColor,
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isOutsideSafeZone) "Outside Zone" else "Inside Zone",
+                            text = zoneLabel,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (isOutsideSafeZone) Color(0xFFDC2626) else Color(0xFF059669)
+                            color = zoneTextColor,
+                            maxLines = 1,
+                            softWrap = false
                         )
+                    }
+                }
+
+                // Route Corridor Chip (if active)
+                if (trustedRoute.isEnabled) {
+                    val routeColor = when (routeState) {
+                        com.example.model.RouteState.ON_ROUTE -> Color(0xFF10B981)
+                        com.example.model.RouteState.APPROACHING_EDGE -> Color(0xFFF59E0B)
+                        com.example.model.RouteState.ROUTE_DEVIATION -> Color(0xFFEF4444)
+                        com.example.model.RouteState.UNKNOWN -> Color.Gray
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = routeColor.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, routeColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = routeColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = when (routeState) {
+                                    com.example.model.RouteState.ON_ROUTE -> "On Route"
+                                    com.example.model.RouteState.APPROACHING_EDGE -> "Route Edge"
+                                    com.example.model.RouteState.ROUTE_DEVIATION -> "Off Route"
+                                    com.example.model.RouteState.UNKNOWN -> "No Route"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = routeColor,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
 
@@ -397,7 +473,7 @@ fun ChildHomeScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -406,16 +482,28 @@ fun ChildHomeScreen(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Band Active",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Verified Location line (Phase 6)
+            Text(
+                text = "📍 Location: ${verifiedLocation?.getRelativeTimeString() ?: "Verified recently"} • ${verifiedLocation?.confidence?.displayName ?: "High Confidence"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -436,7 +524,10 @@ fun ChildHomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.BugReport,
                                 contentDescription = null,
@@ -448,7 +539,9 @@ fun ChildHomeScreen(
                                 text = "PROTOTYPE SENSOR SIMULATORS (DEMO MODE)",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
 
@@ -485,6 +578,7 @@ fun ChildHomeScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .testTag("simulate_motion_button"),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isMotionActive) Color(0xFFF59E0B) else MaterialTheme.colorScheme.surfaceVariant,
@@ -494,7 +588,9 @@ fun ChildHomeScreen(
                                     Text(
                                         text = if (isMotionActive) "Stop Shake" else "Simulate Fall",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
 
@@ -503,6 +599,7 @@ fun ChildHomeScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .testTag("simulate_geofence_button"),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isOutsideSafeZone) Color(0xFFEF4444) else MaterialTheme.colorScheme.surfaceVariant,
@@ -512,7 +609,9 @@ fun ChildHomeScreen(
                                     Text(
                                         text = if (isOutsideSafeZone) "Inside Zone" else "Simulate Exit",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }

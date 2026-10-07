@@ -35,6 +35,12 @@ class SafeBandPreferences(private val context: Context) {
         private val KEY_BIO_MEDICAL = stringPreferencesKey("bio_medical_conditions")
         private val KEY_BIO_ALLERGIES = stringPreferencesKey("bio_allergies")
         private val KEY_BIO_NOTES = stringPreferencesKey("bio_emergency_notes")
+
+        // Route Corridor Keys (Phase 2)
+        private val KEY_ROUTE_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("route_enabled")
+        private val KEY_ROUTE_NAME = stringPreferencesKey("route_name")
+        private val KEY_ROUTE_CORRIDOR_METERS = floatPreferencesKey("route_corridor_meters")
+        private val KEY_ROUTE_WAYPOINTS = stringPreferencesKey("route_waypoints")
     }
 
     val appMode: Flow<AppMode> = context.dataStore.data.map { preferences ->
@@ -96,7 +102,7 @@ class SafeBandPreferences(private val context: Context) {
         }
     }
 
-    suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
+        suspend fun saveChildBioProfile(profile: com.example.model.ChildBioProfile) {
         context.dataStore.edit { preferences ->
             preferences[KEY_BIO_CHILD_NAME] = profile.childName
             preferences[KEY_BIO_AGE] = profile.age
@@ -106,6 +112,66 @@ class SafeBandPreferences(private val context: Context) {
             preferences[KEY_BIO_MEDICAL] = profile.medicalConditions
             preferences[KEY_BIO_ALLERGIES] = profile.allergies
             preferences[KEY_BIO_NOTES] = profile.emergencyNotes
+        }
+    }
+
+    val trustedRoute: Flow<com.example.model.TrustedRoute> = context.dataStore.data.map { preferences ->
+        val isEnabled = preferences[KEY_ROUTE_ENABLED] ?: false
+        val name = preferences[KEY_ROUTE_NAME] ?: "Home to School Route"
+        val corridorMeters = preferences[KEY_ROUTE_CORRIDOR_METERS] ?: 60f
+        val rawWaypoints = preferences[KEY_ROUTE_WAYPOINTS]
+
+        val waypoints = if (!rawWaypoints.isNullOrBlank()) {
+            decodeWaypoints(rawWaypoints)
+        } else {
+            // Default demo route based on default safe zone
+            val baseLat = preferences[KEY_SAFE_ZONE_LAT] ?: 37.7749
+            val baseLon = preferences[KEY_SAFE_ZONE_LON] ?: -122.4194
+            listOf(
+                com.example.model.RouteWaypoint("Home", baseLat, baseLon),
+                com.example.model.RouteWaypoint("Bus Stop", baseLat + 0.002, baseLon + 0.002),
+                com.example.model.RouteWaypoint("School", baseLat + 0.005, baseLon + 0.005)
+            )
+        }
+
+        com.example.model.TrustedRoute(
+            id = "default_route",
+            name = name,
+            waypoints = waypoints,
+            corridorRadiusMeters = corridorMeters,
+            isEnabled = isEnabled
+        )
+    }
+
+    suspend fun saveTrustedRoute(route: com.example.model.TrustedRoute) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_ROUTE_ENABLED] = route.isEnabled
+            preferences[KEY_ROUTE_NAME] = route.name
+            preferences[KEY_ROUTE_CORRIDOR_METERS] = route.corridorRadiusMeters
+            preferences[KEY_ROUTE_WAYPOINTS] = encodeWaypoints(route.waypoints)
+        }
+    }
+
+    private fun encodeWaypoints(waypoints: List<com.example.model.RouteWaypoint>): String {
+        return waypoints.joinToString("|") { "${it.name}:${it.latitude},${it.longitude}" }
+    }
+
+    private fun decodeWaypoints(raw: String): List<com.example.model.RouteWaypoint> {
+        return try {
+            raw.split("|").mapNotNull { part ->
+                val tokens = part.split(":")
+                if (tokens.size == 2) {
+                    val name = tokens[0]
+                    val coords = tokens[1].split(",")
+                    if (coords.size == 2) {
+                        val lat = coords[0].toDoubleOrNull() ?: 0.0
+                        val lon = coords[1].toDoubleOrNull() ?: 0.0
+                        com.example.model.RouteWaypoint(name, lat, lon)
+                    } else null
+                } else null
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 }

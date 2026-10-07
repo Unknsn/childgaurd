@@ -18,10 +18,16 @@ import com.example.model.AppMode
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
 import com.example.model.GeoAddress
+import com.example.model.GeofenceState
 import com.example.model.IncidentStage
 import com.example.model.RiskLevel
+import com.example.model.RouteState
 import com.example.model.SafeZone
 import com.example.model.SafetyIncident
+import com.example.model.SafetyNode
+import com.example.model.SyncStatus
+import com.example.model.TrustedRoute
+import com.example.model.VerifiedLocation
 import com.example.service.AlertNotifier
 import com.example.service.BleSafetyManager
 import com.example.service.LocationAddressResolver
@@ -91,9 +97,28 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         initialValue = ChildBioProfile()
     )
 
+    val trustedRoute: StateFlow<TrustedRoute> = repository.trustedRoute.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = TrustedRoute()
+    )
+
+    val geofenceState: StateFlow<GeofenceState> = locationHelper.geofenceState
+    val distanceToBoundary: StateFlow<Float?> = locationHelper.distanceToBoundaryMeters
+    val distanceFromCenter: StateFlow<Float?> = locationHelper.distanceFromCenterMeters
+    val verifiedLocation: StateFlow<VerifiedLocation?> = locationHelper.verifiedLocation
+    val routeState: StateFlow<RouteState> = locationHelper.routeState
+    val distanceToRouteCorridor: StateFlow<Float?> = locationHelper.distanceToRouteCorridorMeters
+
     fun updateChildBioProfile(profile: ChildBioProfile) {
         viewModelScope.launch {
             repository.saveChildBioProfile(profile)
+        }
+    }
+
+    fun saveTrustedRoute(route: TrustedRoute) {
+        viewModelScope.launch {
+            repository.saveTrustedRoute(route)
         }
     }
 
@@ -157,6 +182,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     private val _nearbyNodes = MutableStateFlow<Map<String, BleBeaconPayload>>(emptyMap())
     val nearbyNodes: StateFlow<Map<String, BleBeaconPayload>> = _nearbyNodes.asStateFlow()
+    val discoveredSafetyNodes: StateFlow<Map<String, SafetyNode>> = bleManager.discoveredSafetyNodes
 
     init {
         // Seed default emergency services (Police 112, Childline India 1098)
@@ -191,11 +217,57 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Collect geofence exit
+        // Collect geofence exit (backward compatible)
         viewModelScope.launch {
             locationHelper.isOutsideSafeZone.collect { isOutside ->
                 if (appMode.value == AppMode.CHILD) {
                     updateFlag(AlertFlag.GEOFENCE_EXIT, isOutside)
+                }
+            }
+        }
+
+        // Propagate trusted route to locationHelper
+        viewModelScope.launch {
+            trustedRoute.collect { route ->
+                locationHelper.setTrustedRoute(route)
+            }
+        }
+
+        // Collect route corridor deviation
+        viewModelScope.launch {
+            locationHelper.routeState.collect { rState ->
+                if (appMode.value == AppMode.CHILD) {
+                    val isDeviated = rState == RouteState.ROUTE_DEVIATION
+                    updateFlag(AlertFlag.ROUTE_DEVIATION, isDeviated)
+                }
+            }
+        }
+
+        // Collect Geofence Engine state transitions for audit logging
+        viewModelScope.launch {
+            locationHelper.geofenceState.collect { gState ->
+                if (appMode.value == AppMode.CHILD) {
+                    when (gState) {
+                        GeofenceState.REENTERED -> {
+                            repository.logEvent(
+                                flagType = "GEOFENCE_REENTERED",
+                                riskLevel = RiskLevel.NORMAL.name,
+                                outcome = "CANCELLED_BY_USER",
+                                deviceId = deviceId.value,
+                                details = "Child safely re-entered designated safe zone boundary."
+                            )
+                        }
+                        GeofenceState.OUTSIDE -> {
+                            repository.logEvent(
+                                flagType = "GEOFENCE_CONFIRMED_EXIT",
+                                riskLevel = RiskLevel.MEDIUM.name,
+                                outcome = "CONFIRMED_ESCALATED",
+                                deviceId = deviceId.value,
+                                details = "Safe zone boundary exit confirmed by distance, accuracy, and time verification."
+                            )
+                        }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -387,7 +459,9 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                         riskLevel = payload.riskLevel.name,
                         outcome = "ALERT_RECEIVED",
                         deviceId = payload.deviceId,
-                        details = "Risk ${payload.riskLevel.title} broadcast received. Lat: ${payload.latitude ?: 0.0}, Lon: ${payload.longitude ?: 0.0}"
+                        details = "Risk ${payload.riskLevel.title} broadcast received. Lat: ${payload.latitude ?: 0.0}, Lon: ${payload.longitude ?: 0.0}",
+                        syncStatus = SyncStatus.RELAYED,
+                        observationId = "${payload.deviceId}-${payload.timestamp}"
                     )
                 }
             }
@@ -418,7 +492,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                         riskLevel = RiskLevel.NORMAL.name,
                         outcome = "ALERT_RESOLVED_AUTO",
                         deviceId = deviceId,
-                        details = "Emergency broadcast ended. Alert automatically cleared."
+                        details = "Emergency broadcast ended. Alert automatically cleared.",
+                        syncStatus = SyncStatus.SYNCED
                     )
                 }
             }
@@ -437,9 +512,54 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         alertTimerJob = null
     }
 
+    fun acknowledgeIncident(incidentId: String = "") {
+        _isParentAlertSilenced.value = true
+        alertNotifier.stopAlert()
+        _parentIncident.value = _parentIncident.value.copy(
+            stage = IncidentStage.SILENCED,
+            lastUpdatedTimestamp = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            repository.logEvent(
+                flagType = "INCIDENT_ACKNOWLEDGED",
+                riskLevel = activeAlertRiskLevel?.name ?: RiskLevel.NORMAL.name,
+                outcome = "ACKNOWLEDGED",
+                deviceId = _parentIncident.value.deviceId,
+                details = "Incident acknowledged by guardian.",
+                syncStatus = SyncStatus.ACKNOWLEDGED
+            )
+        }
+    }
+
+    fun resolveIncident(incidentId: String = "", reason: String = "Resolved by guardian") {
+        _isParentAlertActive.value = false
+        _isParentAlertSilenced.value = false
+        activeAlertRiskLevel = null
+        alertNotifier.stopAlert()
+        alertTimerJob?.cancel()
+        alertTimerJob = null
+        _parentIncident.value = _parentIncident.value.copy(
+            stage = IncidentStage.RESOLVED,
+            lastUpdatedTimestamp = System.currentTimeMillis(),
+            resolutionReason = reason
+        )
+        viewModelScope.launch {
+            repository.logEvent(
+                flagType = "INCIDENT_RESOLVED",
+                riskLevel = RiskLevel.NORMAL.name,
+                outcome = "RESOLVED_BY_GUARDIAN",
+                deviceId = _parentIncident.value.deviceId,
+                details = reason,
+                syncStatus = SyncStatus.SYNCED
+            )
+        }
+    }
+
     fun reopenAlertSheet() {
         if (_incomingAlert.value != null &&
-            (_incomingAlert.value!!.riskLevel == RiskLevel.MEDIUM || _incomingAlert.value!!.riskLevel == RiskLevel.HIGH)
+            (_incomingAlert.value!!.riskLevel == RiskLevel.MEDIUM ||
+             _incomingAlert.value!!.riskLevel == RiskLevel.HIGH ||
+             _incomingAlert.value!!.riskLevel == RiskLevel.CRITICAL)
         ) {
             _isParentAlertActive.value = true
             _isParentAlertSilenced.value = false
@@ -487,7 +607,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             latitude = simLat,
             longitude = simLon,
             childBioProfile = simulatedChild,
-            emergencyContacts = simulatedContacts
+            emergencyContacts = simulatedContacts,
+            isSimulation = true
         )
 
         viewModelScope.launch {
@@ -514,16 +635,18 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     // Flag & Risk Management for Child Mode
     fun triggerManualSos() {
         cancellationAdvertisingJob?.cancel()
+        countdownJob?.cancel()
+        _isCountingDown.value = false
         val flags = _activeFlags.value + AlertFlag.MANUAL_SOS
         _activeFlags.value = flags
-        val newRisk = RiskEngine.calculateRisk(flags)
+        val newRisk = RiskLevel.CRITICAL
         _currentRiskLevel.value = newRisk
 
-        // Manual SOS is immediate: bypasses confirmation countdown
-        cancelCountdown()
+        // Manual SOS is immediate: ALWAYS bypasses confirmation countdown immediately
         startBleAdvertising(newRisk)
 
         val loc = locationHelper.currentLocation.value
+        val verified = locationHelper.verifiedLocation.value
         _childIncident.value = SafetyIncident(
             incidentId = "${deviceId.value}-${System.currentTimeMillis()}",
             deviceId = deviceId.value,
@@ -533,9 +656,11 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             lastUpdatedTimestamp = System.currentTimeMillis(),
             latitude = loc?.latitude ?: safeZone.value.latitude,
             longitude = loc?.longitude ?: safeZone.value.longitude,
+            verifiedLocation = verified,
             address = _childAddress.value,
             childBioProfile = childBioProfile.value,
-            emergencyContacts = allContacts.value
+            emergencyContacts = allContacts.value,
+            isSimulation = false
         )
 
         viewModelScope.launch {
@@ -544,7 +669,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 riskLevel = newRisk.name,
                 outcome = "CONFIRMED_IMMEDIATE_SOS",
                 deviceId = deviceId.value,
-                details = "Manual SOS emergency button triggered by child"
+                details = "Manual SOS emergency button triggered by child - immediate CRITICAL escalation without countdown"
             )
         }
     }
@@ -582,6 +707,11 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateFlag(flag: AlertFlag, isActive: Boolean) {
+        if (flag == AlertFlag.MANUAL_SOS && isActive) {
+            triggerManualSos()
+            return
+        }
+
         val current = _activeFlags.value.toMutableSet()
         if (isActive) {
             current.add(flag)
@@ -597,7 +727,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             val isEscalation = evaluatedRisk.ordinal > _currentRiskLevel.value.ordinal
 
             if (isEscalation && RiskEngine.requiresConfirmationCountdown(evaluatedRisk, false)) {
-                // Start visible countdown to allow "I'm OK, cancel"
+                // Start visible 15-second countdown to allow "I'm OK, cancel"
                 startConfirmationCountdown(evaluatedRisk, flag)
             } else if (!isEscalation) {
                 // Downgrade
@@ -641,9 +771,10 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         cancellationAdvertisingJob?.cancel()
         countdownJob?.cancel()
         _isCountingDown.value = true
-        _countdownRemainingSeconds.value = 10
+        _countdownRemainingSeconds.value = RiskEngine.CONFIRMATION_COUNTDOWN_SECONDS
 
         val loc = locationHelper.currentLocation.value
+        val verified = locationHelper.verifiedLocation.value
         _childIncident.value = SafetyIncident(
             incidentId = "${deviceId.value}-${System.currentTimeMillis()}",
             deviceId = deviceId.value,
@@ -653,33 +784,94 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             lastUpdatedTimestamp = System.currentTimeMillis(),
             latitude = loc?.latitude ?: safeZone.value.latitude,
             longitude = loc?.longitude ?: safeZone.value.longitude,
+            verifiedLocation = verified,
             address = _childAddress.value,
             childBioProfile = childBioProfile.value,
-            emergencyContacts = allContacts.value
+            emergencyContacts = allContacts.value,
+            isSimulation = false
         )
 
         countdownJob = viewModelScope.launch {
-            for (i in 10 downTo 1) {
+            var currentTargetRisk = targetRisk
+            for (i in RiskEngine.CONFIRMATION_COUNTDOWN_SECONDS downTo 1) {
                 _countdownRemainingSeconds.value = i
+
+                // 1. Active location & confidence re-evaluation
+                val freshLoc = locationHelper.currentLocation.value
+                val freshVerified = locationHelper.verifiedLocation.value
+                if (freshLoc != null) {
+                    _childIncident.value = _childIncident.value.copy(
+                        latitude = freshLoc.latitude,
+                        longitude = freshLoc.longitude,
+                        verifiedLocation = freshVerified,
+                        lastUpdatedTimestamp = System.currentTimeMillis()
+                    )
+                }
+
+                // 2. Detect re-entry during countdown
+                val gState = locationHelper.geofenceState.value
+                val rState = locationHelper.routeState.value
+                if ((gState == GeofenceState.REENTERED || gState == GeofenceState.SAFE) &&
+                    (rState == RouteState.ON_ROUTE || rState == RouteState.UNKNOWN) &&
+                    !_activeFlags.value.contains(AlertFlag.MANUAL_SOS) &&
+                    !_activeFlags.value.contains(AlertFlag.TAMPER)
+                ) {
+                    // Child safely re-entered inside boundary
+                    _isCountingDown.value = false
+                    _currentRiskLevel.value = RiskLevel.NORMAL
+                    _childIncident.value = _childIncident.value.copy(
+                        stage = IncidentStage.RESOLVED,
+                        riskLevel = RiskLevel.NORMAL,
+                        lastUpdatedTimestamp = System.currentTimeMillis(),
+                        resolutionReason = "Safe boundary re-entry detected during 15s confirmation window"
+                    )
+                    repository.logEvent(
+                        flagType = "CONFIRMATION_RESOLVED_REENTRY",
+                        riskLevel = RiskLevel.NORMAL.name,
+                        outcome = "RESOLVED_SAFE_REENTRY",
+                        deviceId = deviceId.value,
+                        details = "Child safely re-entered safe zone boundary within 15s window. Escalation aborted."
+                    )
+                    return@launch
+                }
+
+                // 3. Detect worsening risk / compounding signals
+                val active = _activeFlags.value
+                if (active.contains(AlertFlag.MANUAL_SOS)) {
+                    _isCountingDown.value = false
+                    triggerManualSos()
+                    return@launch
+                }
+
+                val freshlyEvaluatedRisk = RiskEngine.calculateRisk(active)
+                if (freshlyEvaluatedRisk.ordinal > currentTargetRisk.ordinal) {
+                    currentTargetRisk = freshlyEvaluatedRisk
+                    _childIncident.value = _childIncident.value.copy(
+                        riskLevel = currentTargetRisk,
+                        lastUpdatedTimestamp = System.currentTimeMillis()
+                    )
+                }
+
                 delay(1000L)
             }
-            // Escalation finalized after countdown
+
+            // Escalation finalized after 15s confirmation countdown
             _isCountingDown.value = false
-            _currentRiskLevel.value = targetRisk
-            startBleAdvertising(targetRisk)
+            _currentRiskLevel.value = currentTargetRisk
+            startBleAdvertising(currentTargetRisk)
 
             _childIncident.value = _childIncident.value.copy(
                 stage = IncidentStage.BROADCASTING,
-                riskLevel = targetRisk,
+                riskLevel = currentTargetRisk,
                 lastUpdatedTimestamp = System.currentTimeMillis()
             )
 
             repository.logEvent(
                 flagType = triggerFlag.displayName,
-                riskLevel = targetRisk.name,
+                riskLevel = currentTargetRisk.name,
                 outcome = "CONFIRMED_ESCALATED",
                 deviceId = deviceId.value,
-                details = "Confirmation countdown elapsed without cancellation. Escalated to BLE."
+                details = "15-second confirmation window elapsed without cancellation. Escalated to BLE broadcast."
             )
         }
     }

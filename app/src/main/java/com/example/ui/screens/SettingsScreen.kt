@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,6 +75,7 @@ fun SettingsScreen(
     var deviceIdInput by remember(deviceId) { mutableStateOf(deviceId) }
     var idSavedMessage by remember { mutableStateOf(false) }
     var showEditBioDialog by remember { mutableStateOf(false) }
+    var isEmergencyProfileUnlocked by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -137,13 +141,14 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("switch_to_child_mode_button"),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (currentMode == AppMode.CHILD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = if (currentMode == AppMode.CHILD) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         ) {
-                            Text("Child Mode", fontWeight = FontWeight.Bold)
+                            Text("Child Mode", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
 
                         Button(
@@ -151,13 +156,14 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("switch_to_parent_mode_button"),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (currentMode == AppMode.PARENT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = if (currentMode == AppMode.PARENT) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         ) {
-                            Text("Parent Mode", fontWeight = FontWeight.Bold)
+                            Text("Parent Mode", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -224,10 +230,11 @@ fun SettingsScreen(
                                 viewModel.setCustomDeviceId(deviceIdInput.ifEmpty { "SB-0001" })
                                 idSavedMessage = true
                             },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("save_device_id_button")
                         ) {
-                            Text("Save")
+                            Text("Save", maxLines = 1, softWrap = false)
                         }
                     }
 
@@ -244,7 +251,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Child Bio & Medical Data Profile Card
+            // Child Bio & Medical Data Profile Card (Protected Privacy View)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,7 +275,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Child Bio & Medical Profile",
+                                text = "Child Emergency Profile",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -276,13 +283,13 @@ fun SettingsScreen(
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFDC2626)
+                            color = if (isEmergencyProfileUnlocked) Color(0xFFDC2626) else MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "🩸 ${bioProfile.bloodType}",
+                                text = if (isEmergencyProfileUnlocked) "🩸 ${bioProfile.bloodType}" else "🔒 Protected",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isEmergencyProfileUnlocked) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -290,57 +297,98 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = "Displayed in the emergency alert sheet during incidents and attached to SMS alerts.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Bio Details Summary
-                    Text(
-                        text = "Child: ${bioProfile.childName} (Age: ${bioProfile.age})",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Parent Phone: ${bioProfile.primaryParentPhone}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (bioProfile.secondaryContactPhone.isNotBlank()) {
+                    if (!isEmergencyProfileUnlocked) {
+                        // Collapsed Protected Presentation
                         Text(
-                            text = "Secondary Phone: ${bioProfile.secondaryContactPhone}",
+                            text = "Medical information is protected. Details (blood type, allergies, medical conditions) are restricted to authorized emergency/guardian contexts and never broadcast over unencrypted BLE.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedButton(
+                            onClick = { isEmergencyProfileUnlocked = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("view_emergency_profile_button"),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("View Emergency Profile", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
+                    } else {
+                        // Unlocked presentation (revealed upon explicit user action)
+                        Text(
+                            text = "Displayed in the emergency alert sheet during incidents and attached to SMS alerts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Child: ${bioProfile.childName} (Age: ${bioProfile.age})",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Parent Phone: ${bioProfile.primaryParentPhone}",
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    Text(
-                        text = "Conditions: ${bioProfile.medicalConditions}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Allergies: ${bioProfile.allergies}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        if (bioProfile.secondaryContactPhone.isNotBlank()) {
+                            Text(
+                                text = "Secondary Phone: ${bioProfile.secondaryContactPhone}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "Conditions: ${bioProfile.medicalConditions}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Allergies: ${bioProfile.allergies}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                    Button(
-                        onClick = { showEditBioDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("edit_bio_profile_button"),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Edit Child Bio & Medical Profile", fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showEditBioDialog = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("edit_bio_profile_button"),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Edit Profile", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                            }
+
+                            OutlinedButton(
+                                onClick = { isEmergencyProfileUnlocked = false },
+                                modifier = Modifier.weight(0.8f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Hide", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                            }
+                        }
                     }
                 }
             }
@@ -389,9 +437,10 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("test_warning_alarm_button"),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Test Warning")
+                            Text("Test Warning", maxLines = 1, softWrap = false)
                         }
 
                         Button(
@@ -399,10 +448,11 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("test_emergency_alarm_button"),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                         ) {
-                            Text("Test Siren")
+                            Text("Test Siren", maxLines = 1, softWrap = false)
                         }
                     }
 
@@ -413,9 +463,10 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("stop_test_alarm_button"),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Silence Alarm")
+                        Text("Silence Alarm", maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -426,14 +477,15 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -441,14 +493,43 @@ fun SettingsScreen(
                             text = "Future Hardware / Cloud Phase",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "This prototype demonstrates on-device anomaly detection, rule-based risk scoring, and peer-to-peer Bluetooth Low Energy alerting without any external server or cloud dependency.\n\nExplicitly out of scope for this prototype (reserved for future hardware/cloud phases):\n• Dedicated wearable hardware with physical tamper switch\n• Long-range relay via fixed hubs\n• Cloud-based escalation to authorities\n• Multi-hop alert propagation beyond direct BLE range",
+                        text = "CURRENT NODE / OFFLINE-FIRST PROTOTYPE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 0.8.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Active in this Android application:\n• Local risk detection (on-device sensor anomaly scoring)\n• Local persistence (offline Room SQLite & DataStore)\n• Local geofencing (on-device OpenStreetMap boundary monitoring)\n• BLE-based signaling (direct peer-to-peer 2.4 GHz broadcasts)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "FUTURE NETWORK LAYER & CLOUD PHASE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.outline,
+                        letterSpacing = 0.8.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Represented in the separate network layer demonstration:\n• Software band node (dedicated wearable hardware with tamper switch)\n• Fixed hub node & community relay node\n• Cloud / event processing simulation\n• Parent notification & authority escalation\n• Multi-hop alert propagation beyond direct BLE range",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                         lineHeight = 18.sp
