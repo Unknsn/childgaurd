@@ -87,6 +87,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import java.util.Locale
 import com.example.model.BatteryState
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
@@ -94,6 +98,8 @@ import com.example.model.ConnectivityTier
 import com.example.model.GeoAddress
 import com.example.model.GeofenceState
 import com.example.model.LocationConfidence
+import com.example.model.LocationSource
+import com.example.model.MonitoringServiceState
 import com.example.model.OperatingMode
 import com.example.model.RiskLevel
 import com.example.model.RouteState
@@ -115,6 +121,7 @@ fun ParentHomeScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val isScanning by viewModel.bleManager.isScanning.collectAsState()
+    val monitoringState by viewModel.monitoringServiceState.collectAsState()
     val lastBeacon by viewModel.incomingAlert.collectAsState()
     val isAlertActive by viewModel.isParentAlertActive.collectAsState()
     val isAlertSilenced by viewModel.isParentAlertSilenced.collectAsState()
@@ -145,17 +152,44 @@ fun ParentHomeScreen(
         topBar = {
             TopAppBar(
                 title = {
+                    val isDark = isSystemInDarkTheme()
+                    val pillText = when (monitoringState) {
+                        MonitoringServiceState.ACTIVE -> "BLE ACTIVE"
+                        MonitoringServiceState.STARTING -> "STARTING"
+                        MonitoringServiceState.ERROR -> "ERROR"
+                        else -> "STANDBY"
+                    }
+                    val pillBg = when (monitoringState) {
+                        MonitoringServiceState.ACTIVE -> if (isDark) Color(0xFF064E3B) else Color(0xFFECFDF5)
+                        MonitoringServiceState.STARTING -> if (isDark) Color(0xFF78350F) else Color(0xFFFFFBEB)
+                        MonitoringServiceState.ERROR -> if (isDark) Color(0xFF7F1D1D) else Color(0xFFFEF2F2)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val pillDotColor = when (monitoringState) {
+                        MonitoringServiceState.ACTIVE -> Color(0xFF10B981)
+                        MonitoringServiceState.STARTING -> Color(0xFFF59E0B)
+                        MonitoringServiceState.ERROR -> Color(0xFFEF4444)
+                        else -> Color.Gray
+                    }
+                    val pillTextColor = when (monitoringState) {
+                        MonitoringServiceState.ACTIVE -> if (isDark) Color(0xFF34D399) else Color(0xFF047857)
+                        MonitoringServiceState.STARTING -> if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+                        MonitoringServiceState.ERROR -> if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
+                        else -> if (isDark) Color(0xFF94A3B8) else Color.Gray
+                    }
+
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "SafeBand Guardian",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (isScanning) Color(0xFFECFDF5) else MaterialTheme.colorScheme.surfaceVariant
+                                color = pillBg
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -163,15 +197,15 @@ fun ParentHomeScreen(
                                 ) {
                                     Surface(
                                         shape = CircleShape,
-                                        color = if (isScanning) Color(0xFF10B981) else Color.Gray,
+                                        color = pillDotColor,
                                         modifier = Modifier.size(6.dp)
                                     ) {}
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (isScanning) "BLE ACTIVE" else "STANDBY",
+                                        text = pillText,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isScanning) Color(0xFF047857) else Color.Gray
+                                        color = pillTextColor
                                     )
                                 }
                             }
@@ -251,6 +285,7 @@ fun ParentHomeScreen(
                     childBio = incomingBio ?: childBioProfile,
                     safeZoneAddress = safeZoneAddress,
                     nearbyNodes = nearbyNodes,
+                    monitoringState = monitoringState,
                     onNavigateToSafeZone = { selectedTab = 1 },
                     onNavigateToHistory = { selectedTab = 2 }
                 )
@@ -311,6 +346,7 @@ fun ParentMonitorTab(
     childBio: ChildBioProfile,
     safeZoneAddress: GeoAddress?,
     nearbyNodes: Map<String, BleBeaconPayload>,
+    monitoringState: MonitoringServiceState = MonitoringServiceState.ACTIVE,
     onNavigateToSafeZone: () -> Unit,
     onNavigateToHistory: () -> Unit
 ) {
@@ -328,6 +364,8 @@ fun ParentMonitorTab(
     val scenarioStatus by viewModel.scenarioRunner.scenarioStatus.collectAsState()
     var selectedScenario by remember { mutableStateOf(ScenarioId.SAFE_ZONE_EXIT) }
 
+    val isDark = isSystemInDarkTheme()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -338,17 +376,39 @@ fun ParentMonitorTab(
         // Physical Child Node Status Banner (STEP 9)
         if (lastBeacon != null && !lastBeacon.isSimulation) {
             val isSosActive = lastBeacon.riskLevel == RiskLevel.CRITICAL
+            val bannerBg = if (isDark) {
+                if (isSosActive) Color(0xFF450A0A) else Color(0xFF064E3B).copy(alpha = 0.5f)
+            } else {
+                if (isSosActive) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
+            }
+            val bannerBorder = if (isDark) {
+                if (isSosActive) Color(0xFFDC2626) else Color(0xFF059669)
+            } else {
+                if (isSosActive) Color(0xFFEF4444) else Color(0xFF10B981)
+            }
+            val bannerTitleColor = if (isDark) {
+                if (isSosActive) Color(0xFFFCA5A5) else Color(0xFFA7F3D0)
+            } else {
+                if (isSosActive) Color(0xFF991B1B) else Color(0xFF065F46)
+            }
+            val bannerStatusColor = if (isDark) {
+                if (isSosActive) Color(0xFFEF4444) else Color(0xFF34D399)
+            } else {
+                if (isSosActive) Color(0xFFDC2626) else Color(0xFF047857)
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 12.dp)
+                    .semantics { contentDescription = "Physical child node hardware status" },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSosActive) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
+                    containerColor = bannerBg
                 ),
                 border = BorderStroke(
                     1.5.dp,
-                    if (isSosActive) Color(0xFFEF4444) else Color(0xFF10B981)
+                    bannerBorder
                 )
             ) {
                 Row(
@@ -358,7 +418,10 @@ fun ParentMonitorTab(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Surface(
                             shape = CircleShape,
                             color = if (isSosActive) Color(0xFFDC2626) else Color(0xFF10B981),
@@ -370,14 +433,14 @@ fun ParentMonitorTab(
                                 text = "PHYSICAL CHILD NODE (ESP32-S3)",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Black,
-                                color = if (isSosActive) Color(0xFF991B1B) else Color(0xFF065F46),
+                                color = bannerTitleColor,
                                 letterSpacing = 1.sp
                             )
                             Text(
                                 text = if (isSosActive) "● CRITICAL: SOS ACTIVATED BY CHILD NODE" else "● STATUS: NEARBY / ONLINE",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSosActive) Color(0xFFDC2626) else Color(0xFF047857)
+                                color = bannerStatusColor
                             )
                         }
                     }
@@ -391,6 +454,7 @@ fun ParentMonitorTab(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
@@ -399,12 +463,31 @@ fun ParentMonitorTab(
         }
 
         // 1. PRIMARY PARENT QUESTION: "Is my child safe?"
-        val heroBg = if (isEmergency) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
-        val heroBorder = if (isEmergency) Color(0xFFF87171) else Color(0xFF6EE7B7)
-        val heroIconTint = if (isEmergency) Color(0xFFDC2626) else Color(0xFF059669)
+        val heroBg = if (isDark) {
+            if (isEmergency) Color(0xFF450A0A) else Color(0xFF064E3B).copy(alpha = 0.4f)
+        } else {
+            if (isEmergency) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
+        }
+        val heroBorder = if (isDark) {
+            if (isEmergency) Color(0xFFDC2626) else Color(0xFF059669)
+        } else {
+            if (isEmergency) Color(0xFFF87171) else Color(0xFF6EE7B7)
+        }
+        val heroIconTint = if (isDark) {
+            if (isEmergency) Color(0xFFF87171) else Color(0xFF34D399)
+        } else {
+            if (isEmergency) Color(0xFFDC2626) else Color(0xFF059669)
+        }
+        val heroStatusColor = if (isDark) {
+            if (isEmergency) Color(0xFFFCA5A5) else Color(0xFFA7F3D0)
+        } else {
+            if (isEmergency) Color(0xFFDC2626) else Color(0xFF065F46)
+        }
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "Child overall safety status" },
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = heroBg),
             border = BorderStroke(1.5.dp, heroBorder)
@@ -439,13 +522,14 @@ fun ParentMonitorTab(
                             Text(
                                 text = childBio.childName.ifEmpty { "Child ($deviceId)" },
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Black
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = if (isEmergency) "ALERT IN PROGRESS • ${lastBeacon?.riskLevel?.title}" else "ALL SECURE • Child is Safe",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = heroIconTint
+                                color = heroStatusColor
                             )
                         }
                     }
@@ -458,9 +542,11 @@ fun ParentMonitorTab(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "Last verified location and address" }
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
@@ -476,38 +562,135 @@ fun ParentMonitorTab(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
                         val loc = verifiedLocation
                         val beacon = lastBeacon
-                        Text(
-                            text = if (beacon != null && !beacon.isSimulation) {
-                                "Location: Unavailable (No GPS hardware on child node)\n• Direct BLE Proximity Range (~30m)"
-                            } else if (loc != null && loc.isSimulation) {
-                                (safeZoneAddress?.formattedSummary() ?: "Within designated safe zone perimeter") +
-                                    "\n• ${loc.getRelativeTimeString()} • ${loc.confidence.displayName} (±${loc.accuracyMeters.toInt()}m)"
+                        val isPhysicalNode = beacon != null && !beacon.isSimulation
+
+                        if (isPhysicalNode) {
+                            // Phase 7 & 26: Physical ESP32 has NO GPS hardware
+                            Text(
+                                text = "Unavailable",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "No GPS hardware on child node\nDirect BLE proximity ~30m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "• Signal State: Direct BLE Signal Active • No GPS coordinates reported",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        } else if (loc == null) {
+                            Text(
+                                text = "Awaiting Child Wearer Telemetry",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "BLE scanner active • Listening for child telemetry beacons",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "• Perimeter Status: Monitoring Active",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        } else {
+                            if (!loc.resolvedAddress.isNullOrBlank()) {
+                                Text(
+                                    text = loc.resolvedAddress,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val detailsStr = loc.addressDetails?.formattedSummary()
+                                if (!detailsStr.isNullOrBlank() && detailsStr != loc.resolvedAddress) {
+                                    Text(
+                                        text = detailsStr,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                if (loc.isStale()) {
+                                    Text(
+                                        text = "Last verified ${loc.getDisplayTimeOrStaleString().replace("Verified ", "")} • STALE\nAccuracy ±${loc.accuracyMeters.toInt()}m",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = "${loc.getDisplayTimeOrStaleString()} • Accuracy ±${loc.accuracyMeters.toInt()}m",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                            } else if (loc.isResolvingAddress) {
+                                Text(
+                                    text = "%.4f, %.4f".format(Locale.US, loc.latitude, loc.longitude),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Verified just now\nResolving address...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             } else {
-                                "Location: Awaiting Child Wearer Telemetry\n• BLE scanner active, listening for beacons"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                        Text(
-                            text = if (beacon != null && !beacon.isSimulation) {
-                                "• Signal State: Direct BLE Signal Active • No GPS coordinates reported"
-                            } else if (loc != null && loc.isSimulation) {
-                                "• Perimeter Status: ${geofenceState.displayName}" +
-                                    (distanceToBoundary?.let { dist ->
-                                        if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
-                                    } ?: "") +
-                                    if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else ""
+                                Text(
+                                    text = "%.4f, %.4f".format(Locale.US, loc.latitude, loc.longitude),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Address unavailable\n${loc.getDisplayTimeOrStaleString()} • Accuracy ±${loc.accuracyMeters.toInt()}m",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (loc.isSimulation) {
+                                Text(
+                                    text = "• Perimeter Status: ${geofenceState.displayName}" +
+                                        (distanceToBoundary?.let { dist ->
+                                            if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
+                                        } ?: "") +
+                                        if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             } else {
-                                "• Perimeter Status: Monitoring Active"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                                Text(
+                                    text = "• Source: ${loc.source} • Confidence: ${loc.confidence.displayName}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -519,15 +702,19 @@ fun ParentMonitorTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val isPhysicalNode = lastBeacon != null && !lastBeacon.isSimulation
-                    val batColor = if (isPhysicalNode) Color.Gray else when (batteryInfo.batteryState) {
+                    val batColor = if (isPhysicalNode) (if (isDark) Color(0xFF94A3B8) else Color.Gray) else when (batteryInfo.batteryState) {
                         BatteryState.NORMAL -> Color(0xFF10B981)
                         BatteryState.LOW -> Color(0xFFF59E0B)
                         BatteryState.CRITICAL -> Color(0xFFEF4444)
                     }
-                    val batBg = if (isPhysicalNode) Color(0xFFF3F4F6) else when (batteryInfo.batteryState) {
-                        BatteryState.NORMAL -> Color(0xFFECFDF5)
-                        BatteryState.LOW -> Color(0xFFFFFBEB)
-                        BatteryState.CRITICAL -> Color(0xFFFEF2F2)
+                    val batBg = if (isDark) {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        if (isPhysicalNode) Color(0xFFF3F4F6) else when (batteryInfo.batteryState) {
+                            BatteryState.NORMAL -> Color(0xFFECFDF5)
+                            BatteryState.LOW -> Color(0xFFFFFBEB)
+                            BatteryState.CRITICAL -> Color(0xFFFEF2F2)
+                        }
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -568,14 +755,18 @@ fun ParentMonitorTab(
                         ConnectivityTier.NEARBY -> Color(0xFF2563EB)
                         ConnectivityTier.RELAYED -> Color(0xFF9333EA)
                         ConnectivityTier.OFFLINE -> Color(0xFFF59E0B)
-                        ConnectivityTier.UNKNOWN -> Color.Gray
+                        ConnectivityTier.UNKNOWN -> if (isDark) Color(0xFF94A3B8) else Color.Gray
                     }
-                    val connBg = when (connectivityStatus.tier) {
-                        ConnectivityTier.ONLINE -> Color(0xFFECFDF5)
-                        ConnectivityTier.NEARBY -> Color(0xFFEFF6FF)
-                        ConnectivityTier.RELAYED -> Color(0xFFFAF5FF)
-                        ConnectivityTier.OFFLINE -> Color(0xFFFFFBEB)
-                        ConnectivityTier.UNKNOWN -> Color(0xFFF3F4F6)
+                    val connBg = if (isDark) {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        when (connectivityStatus.tier) {
+                            ConnectivityTier.ONLINE -> Color(0xFFECFDF5)
+                            ConnectivityTier.NEARBY -> Color(0xFFEFF6FF)
+                            ConnectivityTier.RELAYED -> Color(0xFFFAF5FF)
+                            ConnectivityTier.OFFLINE -> Color(0xFFFFFBEB)
+                            ConnectivityTier.UNKNOWN -> Color(0xFFF3F4F6)
+                        }
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -734,9 +925,41 @@ fun ParentMonitorTab(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // 2. BLE Receiver Status Pill Card
+        // 2. BLE Receiver Status Pill Card (Phase 25)
+        val (statusText, statusSubtext, statusColor) = when (monitoringState) {
+            MonitoringServiceState.ACTIVE -> Triple(
+                "BLE Guardian Scanner ACTIVE",
+                "Listening for wearable safety beacons (range ~30m)",
+                if (isDark) Color(0xFF34D399) else Color(0xFF047857)
+            )
+            MonitoringServiceState.STARTING -> Triple(
+                "BLE Guardian Scanner STARTING",
+                "Initializing background safety monitor...",
+                if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+            )
+            MonitoringServiceState.DISABLED -> Triple(
+                "BLE Guardian Scanner OFF",
+                "Safety monitoring is turned off in settings",
+                if (isDark) Color(0xFF94A3B8) else Color.Gray
+            )
+            MonitoringServiceState.ERROR -> Triple(
+                "BLE Guardian Scanner ERROR",
+                "Bluetooth permission or hardware error",
+                if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
+            )
+            MonitoringServiceState.PAUSED -> Triple(
+                "BLE Guardian Scanner PAUSED",
+                "Scanner temporarily paused",
+                if (isDark) Color(0xFF94A3B8) else Color.Gray
+            )
+        }
+
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = "Bluetooth monitoring status: $statusText"
+                },
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -748,22 +971,32 @@ fun ParentMonitorTab(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val dotColor = when (monitoringState) {
+                        MonitoringServiceState.ACTIVE -> Color(0xFF10B981)
+                        MonitoringServiceState.STARTING -> Color(0xFFF59E0B)
+                        MonitoringServiceState.ERROR -> Color(0xFFEF4444)
+                        else -> Color.Gray
+                    }
+                    val isPulsing = monitoringState == MonitoringServiceState.ACTIVE || monitoringState == MonitoringServiceState.STARTING
                     Surface(
                         shape = CircleShape,
-                        color = if (isScanning) Color(0xFF10B981).copy(alpha = pulseAlpha) else Color.Gray,
+                        color = if (isPulsing) dotColor.copy(alpha = pulseAlpha) else dotColor,
                         modifier = Modifier.size(12.dp)
                     ) {}
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (isScanning) "BLE GUARDIAN SCANNER ACTIVE" else "SCANNER PAUSED",
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (isScanning) Color(0xFF047857) else Color.Gray
+                            color = statusColor
                         )
                         Text(
-                            text = "Listening for wearable safety beacons (range ~30m)",
+                            text = statusSubtext,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -779,6 +1012,7 @@ fun ParentMonitorTab(
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }

@@ -22,6 +22,11 @@ class SafetyRepository(
     val safeZone: Flow<SafeZone> = preferences.safeZone
     val childBioProfile: Flow<com.example.model.ChildBioProfile> = preferences.childBioProfile
     val trustedRoute: Flow<com.example.model.TrustedRoute> = preferences.trustedRoute
+    val safetyMonitoringEnabled: Flow<Boolean> = preferences.safetyMonitoringEnabled
+
+    suspend fun setSafetyMonitoringEnabled(enabled: Boolean) {
+        preferences.setSafetyMonitoringEnabled(enabled)
+    }
 
     /**
      * Logs a safety event with offline store-and-forward tracking and duplicate suppression.

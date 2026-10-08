@@ -18,6 +18,9 @@ import com.example.model.VerifiedLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,7 +40,10 @@ import kotlin.math.min
  * - Route corridor deviation monitoring with orthogonal planar projections
  * - VerifiedLocation generation with confidence classification
  */
-class LocationSafetyHelper(private val context: Context) {
+class LocationSafetyHelper(
+    private val context: Context,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
+) {
 
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     private var fusedClient: FusedLocationProviderClient? = null
@@ -163,7 +169,8 @@ class LocationSafetyHelper(private val context: Context) {
     }
 
     /**
-     * Phase 6: Verified Location with deterministic confidence classification.
+     * Phase 6: Verified Location with deterministic confidence classification
+     * and non-blocking asynchronous reverse geocoding (Phases 2, 3, 4, 5, 6).
      */
     fun evaluateVerifiedLocation(location: Location): VerifiedLocation {
         val now = System.currentTimeMillis()
@@ -177,15 +184,59 @@ class LocationSafetyHelper(private val context: Context) {
             else -> LocationConfidence.UNKNOWN
         }
 
+        // Check local spatial cache for existing address (~50m threshold)
+        val cached = LocationCache.getCachedEntry(location.latitude, location.longitude, now)
+        val cachedAddress = cached?.resolvedAddress
+        val cachedDetails = cached?.addressDetails
+        val cachedTime = cached?.addressTimestamp
+
         val verified = VerifiedLocation(
             latitude = location.latitude,
             longitude = location.longitude,
             accuracyMeters = accuracy,
             timestamp = now,
             confidence = confidence,
-            source = "DEVICE_GPS"
+            source = "DEVICE_GPS",
+            resolvedAddress = cachedAddress,
+            addressDetails = cachedDetails,
+            addressTimestamp = cachedTime,
+            isResolvingAddress = (cachedAddress == null),
+            isAddressUnavailable = false
         )
+
+        // 1. Immediately emit StateFlow to update UI without delay
         _verifiedLocation.value = verified
+        LocationCache.putLocation(verified, now)
+
+        // 2. If address is not cached, asynchronously resolve in background
+        if (cachedAddress == null) {
+            scope.launch(Dispatchers.IO) {
+                val geo = LocationAddressResolver.resolveAddress(context, location.latitude, location.longitude)
+                if (geo != null) {
+                    val formatted = geo.formattedSummary()
+                    LocationCache.putAddress(location.latitude, location.longitude, formatted, geo)
+                    val current = _verifiedLocation.value
+                    if (current != null && LocationCache.isSameLocation(current.latitude, current.longitude, location.latitude, location.longitude)) {
+                        _verifiedLocation.value = current.copy(
+                            resolvedAddress = formatted,
+                            addressDetails = geo,
+                            addressTimestamp = System.currentTimeMillis(),
+                            isResolvingAddress = false,
+                            isAddressUnavailable = false
+                        )
+                    }
+                } else {
+                    val current = _verifiedLocation.value
+                    if (current != null && LocationCache.isSameLocation(current.latitude, current.longitude, location.latitude, location.longitude)) {
+                        _verifiedLocation.value = current.copy(
+                            isResolvingAddress = false,
+                            isAddressUnavailable = true
+                        )
+                    }
+                }
+            }
+        }
+
         return verified
     }
 
@@ -417,5 +468,6 @@ class LocationSafetyHelper(private val context: Context) {
 
     fun simulateVerifiedLocation(verified: VerifiedLocation) {
         _verifiedLocation.value = verified
+        LocationCache.putLocation(verified)
     }
 }

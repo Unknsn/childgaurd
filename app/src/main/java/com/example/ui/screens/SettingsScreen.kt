@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -72,6 +73,7 @@ fun SettingsScreen(
     val currentMode by viewModel.appMode.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
     val bioProfile by viewModel.childBioProfile.collectAsState()
+    val safetyMonitoringEnabled by viewModel.safetyMonitoringEnabled.collectAsState()
     var deviceIdInput by remember(deviceId) { mutableStateOf(deviceId) }
     var idSavedMessage by remember { mutableStateOf(false) }
     var showEditBioDialog by remember { mutableStateOf(false) }
@@ -99,6 +101,72 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Always-On Safety Monitoring Setting Card (Phase 13)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("safety_monitoring_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = if (safetyMonitoringEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Safety Monitoring",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (safetyMonitoringEnabled) "Safety Monitoring ON" else "Safety Monitoring OFF",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (safetyMonitoringEnabled) Color(0xFF10B981) else Color(0xFFEF4444)
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = safetyMonitoringEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.setSafetyMonitoringEnabled(enabled)
+                            },
+                            modifier = Modifier.testTag("safety_monitoring_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = if (safetyMonitoringEnabled) {
+                            "SafeBand Guardian runs in the background to detect child wearable SOS beacons even when the screen is locked or app is closed."
+                        } else {
+                            "⚠️ WARNING: Safety monitoring is OFF. Emergency notifications may not appear while notifications or monitoring are disabled."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (safetyMonitoringEnabled) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFFDC2626)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Mode Switch Card
             Card(
                 modifier = Modifier.fillMaxWidth(),

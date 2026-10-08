@@ -60,6 +60,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.model.MonitoringServiceState
+import com.example.service.BleSafetyMonitorService
+import kotlinx.coroutines.flow.first
 
 class SafeBandViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -130,6 +133,27 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val verifiedLocation: StateFlow<VerifiedLocation?> = locationHelper.verifiedLocation
     val routeState: StateFlow<RouteState> = locationHelper.routeState
     val distanceToRouteCorridor: StateFlow<Float?> = locationHelper.distanceToRouteCorridorMeters
+
+    val monitoringServiceState: StateFlow<MonitoringServiceState> = BleSafetyMonitorService.serviceState
+
+    val safetyMonitoringEnabled: StateFlow<Boolean> = repository.safetyMonitoringEnabled.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
+    )
+
+    fun setSafetyMonitoringEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setSafetyMonitoringEnabled(enabled)
+            if (enabled) {
+                if (appMode.value == AppMode.PARENT) {
+                    BleSafetyMonitorService.start(getApplication())
+                }
+            } else {
+                BleSafetyMonitorService.stop(getApplication())
+            }
+        }
+    }
 
     fun updateChildBioProfile(profile: ChildBioProfile) {
         viewModelScope.launch {
@@ -293,6 +317,33 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             repository.seedDefaultEmergencyServicesIfNecessary()
         }
 
+        // Collect background monitor service state & incoming emergency events
+        viewModelScope.launch {
+            BleSafetyMonitorService.latestBeacon.collect { beacon ->
+                if (beacon != null) {
+                    onBeaconReceived(beacon)
+                }
+            }
+        }
+        viewModelScope.launch {
+            BleSafetyMonitorService.activeEmergencyIncident.collect { incident ->
+                if (incident != null && incident.isEmergencyActive) {
+                    _parentIncident.value = incident
+                    _isParentAlertActive.value = true
+                    _isParentAlertSilenced.value = false
+                    activeAlertRiskLevel = incident.riskLevel
+                    alertNotifier.startAlert(incident.riskLevel)
+                }
+            }
+        }
+        viewModelScope.launch {
+            BleSafetyMonitorService.discoveredNodes.collect { nodes ->
+                nodes.forEach { (_, node) ->
+                    bleManager.recordNodeObservation(node.nodeId, node.ephemeralId, node.rssi, 0)
+                }
+            }
+        }
+
         // Continually resolve Safe Zone physical address
         viewModelScope.launch {
             safeZone.collect { sz ->
@@ -421,12 +472,20 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun startParentScanning() {
-        bleManager.startScanning { payload ->
-            onBeaconReceived(payload)
+        viewModelScope.launch {
+            val isMonitoringEnabled = repository.safetyMonitoringEnabled.first()
+            if (isMonitoringEnabled) {
+                BleSafetyMonitorService.start(getApplication())
+            } else {
+                bleManager.startScanning { payload ->
+                    onBeaconReceived(payload)
+                }
+            }
         }
     }
 
     fun stopParentScanning() {
+        BleSafetyMonitorService.stop(getApplication())
         bleManager.stopScanning()
         beaconWatchdogJob?.cancel()
         beaconWatchdogJob = null

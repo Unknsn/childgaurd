@@ -149,6 +149,38 @@ enum class LocationConfidence(val displayName: String) {
     UNKNOWN("Unknown Confidence")
 }
 
+object LocationSource {
+    const val CHILD_GPS = "CHILD_GPS"
+    const val GUARDIAN_PHONE = "GUARDIAN_PHONE"
+    const val RELAY_OBSERVER = "RELAY_OBSERVER"
+    const val SAFE_ZONE = "SAFE_ZONE"
+    const val SIMULATION = "SIMULATION"
+    const val SIMULATED = "SIMULATED"
+    const val PHYSICAL_CHILD_NODE = "PHYSICAL_CHILD_NODE"
+    const val NONE = "NONE"
+    const val UNKNOWN = "UNKNOWN"
+
+    fun formatSource(source: String): String {
+        return when (source) {
+            CHILD_GPS -> "Child GPS location"
+            GUARDIAN_PHONE -> "Guardian phone location"
+            RELAY_OBSERVER -> "Relay verified location"
+            SAFE_ZONE -> "Safe Zone location"
+            SIMULATION, SIMULATED -> "Simulated location"
+            PHYSICAL_CHILD_NODE -> "Physical child node (No GPS)"
+            else -> "Unknown location"
+        }
+    }
+}
+
+enum class MonitoringServiceState(val displayName: String) {
+    DISABLED("BLE Guardian Scanner OFF"),
+    STARTING("BLE Guardian Scanner STARTING"),
+    ACTIVE("BLE Guardian Scanner ACTIVE"),
+    PAUSED("BLE Guardian Scanner PAUSED"),
+    ERROR("BLE Guardian Scanner ERROR")
+}
+
 data class VerifiedLocation(
     val latitude: Double,
     val longitude: Double,
@@ -156,8 +188,29 @@ data class VerifiedLocation(
     val source: String = "GPS",
     val accuracyMeters: Float = 10f,
     val confidence: LocationConfidence = LocationConfidence.MEDIUM,
-    val isSimulation: Boolean = false
+    val isSimulation: Boolean = false,
+    val resolvedAddress: String? = null,
+    val addressDetails: GeoAddress? = null,
+    val addressTimestamp: Long? = null,
+    val isResolvingAddress: Boolean = false,
+    val isAddressUnavailable: Boolean = false
 ) {
+    fun isStale(now: Long = System.currentTimeMillis()): Boolean {
+        return (now - timestamp) >= 5 * 60 * 1000L // 5 minutes
+    }
+
+    fun getDisplayTimeOrStaleString(now: Long = System.currentTimeMillis()): String {
+        val ageMs = (now - timestamp).coerceAtLeast(0L)
+        val ageSeconds = ageMs / 1000L
+        val ageMinutes = ageSeconds / 60L
+        return when {
+            ageMinutes >= 5L -> "Last verified $ageMinutes min ago"
+            ageSeconds < 5L -> "Verified just now"
+            ageSeconds < 60L -> "Verified $ageSeconds sec ago"
+            else -> "Verified $ageMinutes min ago"
+        }
+    }
+
     fun getRelativeTimeString(now: Long = System.currentTimeMillis()): String {
         val ageMs = (now - timestamp).coerceAtLeast(0L)
         val ageSeconds = ageMs / 1000L

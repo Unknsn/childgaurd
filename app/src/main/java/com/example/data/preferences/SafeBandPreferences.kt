@@ -41,6 +41,13 @@ class SafeBandPreferences(private val context: Context) {
         private val KEY_ROUTE_NAME = stringPreferencesKey("route_name")
         private val KEY_ROUTE_CORRIDOR_METERS = floatPreferencesKey("route_corridor_meters")
         private val KEY_ROUTE_WAYPOINTS = stringPreferencesKey("route_waypoints")
+
+        // Background Safety Monitoring (Phase 13)
+        private val KEY_SAFETY_MONITORING_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("safety_monitoring_enabled")
+    }
+
+    val safetyMonitoringEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_SAFETY_MONITORING_ENABLED] ?: true
     }
 
     val appMode: Flow<AppMode> = context.dataStore.data.map { preferences ->
@@ -84,6 +91,12 @@ class SafeBandPreferences(private val context: Context) {
     suspend fun setAppMode(mode: AppMode) {
         context.dataStore.edit { preferences ->
             preferences[KEY_APP_MODE] = mode.name
+        }
+    }
+
+    suspend fun setSafetyMonitoringEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_SAFETY_MONITORING_ENABLED] = enabled
         }
     }
 

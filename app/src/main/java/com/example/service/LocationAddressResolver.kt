@@ -13,13 +13,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.coroutines.resume
 
+/**
+ * Privacy-Preserving Asynchronous Reverse Geocoder (Phases 2, 3, 5, 6).
+ *
+ * Requirements:
+ * - Runs asynchronously on Dispatchers.IO. Never blocks UI or BLE processing.
+ * - Integrates with LocationCache to prevent repeated reverse-geocoding for identical coordinates.
+ * - On failure: returns null (NEVER returns fake fallback addresses, default coordinates, or San Francisco).
+ * - Human-readable address extraction: Street, Area, City, State, PIN code.
+ */
 object LocationAddressResolver {
     private const val TAG = "LocationAddressResolver"
-
-    // Simple cache to avoid repeated geocoding for identical or close coordinates
-    private var lastLat: Double? = null
-    private var lastLon: Double? = null
-    private var cachedAddress: GeoAddress? = null
+    private const val GEOCODE_TIMEOUT_MS = 3500L
 
     suspend fun resolveAddress(
         context: Context,
@@ -30,28 +35,31 @@ object LocationAddressResolver {
             return@withContext null
         }
 
-        // Return cache if within ~30 meters (approx 0.0003 deg)
-        val prevLat = lastLat
-        val prevLon = lastLon
-        val prevAddr = cachedAddress
-        if (prevLat != null && prevLon != null && prevAddr != null) {
-            val dist = Math.hypot(latitude - prevLat, longitude - prevLon)
-            if (dist < 0.0003) {
-                return@withContext prevAddr
-            }
+        // 1. Check LocationCache first
+        val cached = LocationCache.getCachedEntry(latitude, longitude)
+        if (cached?.addressDetails != null) {
+            return@withContext cached.addressDetails
+        } else if (cached?.resolvedAddress != null) {
+            return@withContext GeoAddress(
+                fullAddress = cached.resolvedAddress,
+                street = "",
+                area = "",
+                city = "",
+                state = "",
+                pinCode = "",
+                latitude = latitude,
+                longitude = longitude
+            )
         }
 
         if (!Geocoder.isPresent()) {
-            val fallback = createFallbackAddress(latitude, longitude)
-            cachedAddress = fallback
-            lastLat = latitude
-            lastLon = longitude
-            return@withContext fallback
+            Log.w(TAG, "Geocoder service is not present on this device")
+            return@withContext null
         }
 
         try {
             val geocoder = Geocoder(context, Locale.getDefault())
-            val address = withTimeoutOrNull(4000L) {
+            val address = withTimeoutOrNull(GEOCODE_TIMEOUT_MS) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     suspendCancellableCoroutine<Address?> { cont ->
                         try {
@@ -96,35 +104,25 @@ object LocationAddressResolver {
                     latitude = latitude,
                     longitude = longitude
                 )
-                cachedAddress = result
-                lastLat = latitude
-                lastLon = longitude
+
+                // Cache the resolved result
+                LocationCache.putAddress(latitude, longitude, result.formattedSummary(), result)
                 return@withContext result
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to reverse geocode ($latitude, $longitude): ${e.message}")
         }
 
-        val fallback = createFallbackAddress(latitude, longitude)
-        cachedAddress = fallback
-        lastLat = latitude
-        lastLon = longitude
-        fallback
+        // On failure: return null (never return fake mock address)
+        null
     }
 
-    private fun createFallbackAddress(latitude: Double, longitude: Double): GeoAddress {
-        val latDir = if (latitude >= 0) "N" else "S"
-        val lonDir = if (longitude >= 0) "E" else "W"
-        val coordStr = "%.4f° %s, %.4f° %s".format(Math.abs(latitude), latDir, Math.abs(longitude), lonDir)
-        return GeoAddress(
-            fullAddress = "Location Coordinates: $coordStr",
-            street = "Vicinity $coordStr",
-            area = "Safe Area Vicinity",
-            city = "",
-            state = "",
-            pinCode = "",
-            latitude = latitude,
-            longitude = longitude
-        )
+    suspend fun resolveFormattedAddress(
+        context: Context,
+        latitude: Double?,
+        longitude: Double?
+    ): String? {
+        val geo = resolveAddress(context, latitude, longitude)
+        return geo?.formattedSummary()
     }
 }

@@ -23,6 +23,9 @@
     <!-- System and Notification Permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Hardware Feature Requirements (all graceful/optional for compatibility) -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -49,6 +52,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Always-On BLE Safety Monitoring Foreground Service -->
+        <service
+            android:name=".service.BleSafetyMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- Restores Safety Monitoring after Device Reboot -->
+        <receiver
+            android:name=".service.BootCompletedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
