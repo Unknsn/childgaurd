@@ -806,6 +806,15 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 alertNotifier.startAlert(payload.riskLevel)
             }
 
+            // Auto-initiate multi-tier emergency escalation chain for new high/critical incidents
+            if (isNewIncident && (payload.riskLevel == RiskLevel.HIGH || payload.riskLevel == RiskLevel.CRITICAL)) {
+                escalationManager.startEscalation(
+                    incident = _parentIncident.value,
+                    guardians = _incomingChildContacts.value.ifEmpty { allContacts.value },
+                    config = escalationConfig.value
+                )
+            }
+
             // Start elapsed time timer ONLY if not already running
             if (alertTimerJob == null || !alertTimerJob!!.isActive) {
                 _alertDurationSeconds.value = 0L

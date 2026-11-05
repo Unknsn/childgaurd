@@ -325,6 +325,15 @@ fun ParentHomeScreen(
             childBioProfile = activeBio,
             resolvedAddress = activeAddress,
             onDismiss = { viewModel.dismissParentAlert() },
+            onClaimResponse = {
+                val incId = lastBeacon!!.deviceId
+                viewModel.claimIncidentResponse(
+                    incidentId = incId,
+                    responderName = "Primary Parent",
+                    responderPhone = activeBio.primaryParentPhone,
+                    responderRole = "Primary Parent"
+                )
+            },
             onNotifyContact = { contact ->
                 val intent = viewModel.createEmergencySmsIntent(
                     context = context,

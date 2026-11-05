@@ -84,7 +84,8 @@ fun EmergencyAlertSheet(
     onDismiss: () -> Unit,
     onNotifyContact: (TrustedContact) -> Unit,
     onCallPhone: (String) -> Unit = {},
-    onUpdateBioProfile: (ChildBioProfile) -> Unit = {}
+    onUpdateBioProfile: (ChildBioProfile) -> Unit = {},
+    onClaimResponse: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showEditBioDialog by remember { mutableStateOf(false) }
@@ -763,7 +764,10 @@ fun EmergencyAlertSheet(
                         ) {
                             if (!hasClaimedResponse) {
                                 Button(
-                                    onClick = { hasClaimedResponse = true },
+                                    onClick = {
+                                        hasClaimedResponse = true
+                                        onClaimResponse()
+                                    },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
