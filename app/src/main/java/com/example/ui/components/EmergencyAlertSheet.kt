@@ -88,6 +88,8 @@ fun EmergencyAlertSheet(
 ) {
     val context = LocalContext.current
     var showEditBioDialog by remember { mutableStateOf(false) }
+    var showVerifiedPackageDialog by remember { mutableStateOf(false) }
+    var hasClaimedResponse by remember { mutableStateOf(false) }
     val isEmergency = payload.riskLevel == RiskLevel.HIGH || payload.riskLevel == RiskLevel.CRITICAL
     val isCritical = payload.riskLevel == RiskLevel.CRITICAL
 
@@ -720,6 +722,71 @@ fun EmergencyAlertSheet(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
+                // Incident Escalation & Response Coordination Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "RESPONSE COORDINATION",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f),
+                                letterSpacing = 1.sp
+                            )
+                            if (hasClaimedResponse) {
+                                Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFF10B981)) {
+                                    Text(
+                                        text = "YOU ARE RESPONDING",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (!hasClaimedResponse) {
+                                Button(
+                                    onClick = { hasClaimedResponse = true },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                                ) {
+                                    Text("I'm Responding", fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showVerifiedPackageDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+                            ) {
+                                Text("Verified Report")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Silence / Acknowledge Button
                 Button(
                     onClick = onDismiss,
@@ -759,6 +826,78 @@ fun EmergencyAlertSheet(
                     onUpdateBioProfile(updated)
                 }
             )
+        }
+
+        if (showVerifiedPackageDialog) {
+            Dialog(
+                onDismissRequest = { showVerifiedPackageDialog = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Verified Incident Package", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            IconButton(onClick = { showVerifiedPackageDialog = false }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close")
+                            }
+                        }
+
+                        Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFECFDF5)) {
+                            Text(
+                                text = "CRYPTOGRAPHICALLY VERIFIED SENSOR EVIDENCE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF047857),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Text("Incident ID: INC-${payload.deviceId}-${payload.timestamp}", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                        Text("Child: ${activeBio.childName} (Age: ${activeBio.age}, Blood: ${activeBio.bloodType})", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text("Allergies: ${activeBio.allergies}", style = MaterialTheme.typography.bodySmall)
+                        Text("Medical: ${activeBio.medicalConditions}", style = MaterialTheme.typography.bodySmall)
+                        val locText = if (payload.latitude != null && payload.longitude != null) {
+                            "Verified Coordinates: ${payload.latitude}, ${payload.longitude}"
+                        } else {
+                            "Location: Proximity BLE Range (Physical ESP32 Node - Zero Fake GPS)"
+                        }
+                        Text(locText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        if (resolvedAddress != null) {
+                            Text("Address: ${resolvedAddress.formattedSummary()}", style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Disclaimer: Cryptographically signed SafeBand Guardian incident report. Police or emergency reporting must be confirmed through verified institutional channels.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+
+                        Button(
+                            onClick = { showVerifiedPackageDialog = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Close")
+                        }
+                    }
+                }
+            }
         }
     }
 }

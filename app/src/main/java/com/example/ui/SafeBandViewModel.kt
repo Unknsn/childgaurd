@@ -63,15 +63,40 @@ import java.util.Locale
 import com.example.model.MonitoringServiceState
 import com.example.service.BleSafetyMonitorService
 import kotlinx.coroutines.flow.first
+import com.example.data.local.EscalationConfigEntity
+import com.example.data.local.EscalationRecord
+import com.example.data.local.HandoverRecord
+import com.example.data.local.IncidentCoordinationRecord
+import com.example.data.local.JourneyEvent
+import com.example.data.local.PickupAuthorization
+import com.example.data.local.SchoolProfile
+import com.example.data.local.SchoolScheduleException
+import com.example.data.local.SchoolVerificationLog
+import com.example.data.local.SupervisedJourney
+import com.example.model.AppReleaseMetadata
+import com.example.model.JourneySafetyStatus
+import com.example.model.SchoolStatus
+import com.example.model.UpdateInfo
+import com.example.model.UpdateState
+import com.example.model.VerifiedIncidentPackage
+import com.example.service.EscalationSafetyManager
+import com.example.service.JourneySafetyManager
+import com.example.service.SchoolSafetyManager
+import com.example.update.UpdateManager
 
 class SafeBandViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = SafeBandDatabase.getDatabase(application)
     private val preferences = SafeBandPreferences(application)
     private val repository = SafetyRepository(
-        database.safetyEventDao(),
-        database.trustedContactDao(),
-        preferences
+        eventDao = database.safetyEventDao(),
+        contactDao = database.trustedContactDao(),
+        preferences = preferences,
+        pickupDao = database.pickupHandoverDao(),
+        escalationDao = database.escalationDao(),
+        schoolDao = database.schoolDao(),
+        journeyDao = database.journeyDao(),
+        coordinationDao = database.coordinationDao()
     )
 
     val bleManager = BleSafetyManager(application)
@@ -80,6 +105,10 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val alertNotifier = AlertNotifier(application, viewModelScope)
     val batteryManager = BatterySafetyManager(application)
     val connectivityManager = ConnectivitySafetyManager(application)
+    val escalationManager = EscalationSafetyManager(application, repository, viewModelScope)
+    val schoolManager = SchoolSafetyManager(repository, viewModelScope)
+    val journeyManager = JourneySafetyManager(repository, viewModelScope)
+    val updateManager = UpdateManager(application, viewModelScope)
 
     val batteryInfo: StateFlow<BatteryInfo> = batteryManager.batteryInfo
     val connectivityStatus: StateFlow<ConnectivityStatus> = connectivityManager.connectivityStatus
@@ -229,6 +258,72 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val nearbyNodes: StateFlow<Map<String, BleBeaconPayload>> = _nearbyNodes.asStateFlow()
     val discoveredSafetyNodes: StateFlow<Map<String, SafetyNode>> = bleManager.discoveredSafetyNodes
 
+    // Feature A: Safe Pickup and Handover StateFlows
+    val allAuthorizations: StateFlow<List<PickupAuthorization>> = repository.allAuthorizations.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+    val activeAuthorizations: StateFlow<List<PickupAuthorization>> = repository.activeAuthorizations.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+    val allHandoverRecords: StateFlow<List<HandoverRecord>> = repository.allHandoverRecords.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Feature B: Emergency Escalation StateFlows
+    val escalationConfig: StateFlow<EscalationConfigEntity> = repository.escalationConfig.map { it ?: EscalationConfigEntity() }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = EscalationConfigEntity()
+    )
+    val activeEscalationTier: StateFlow<Map<String, Int>> = escalationManager.activeEscalationTier
+
+    // Feature C: School Safe Zone StateFlows
+    val allSchools: StateFlow<List<SchoolProfile>> = repository.allSchools.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+    val activeSchool: StateFlow<SchoolProfile?> = repository.activeSchool.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+    val schoolStatus: StateFlow<SchoolStatus> = schoolManager.schoolStatus
+    val schoolLogs: StateFlow<List<SchoolVerificationLog>> = repository.schoolVerificationLogs.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Feature D: Journey Safety Mode StateFlows
+    val activeJourney: StateFlow<SupervisedJourney?> = repository.activeJourney.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+    val allJourneys: StateFlow<List<SupervisedJourney>> = repository.allJourneys.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+    val journeyStatus: StateFlow<JourneySafetyStatus> = journeyManager.journeyStatus
+
+    // Feature E: Emergency Response Coordination StateFlows
+    val allCoordinations: StateFlow<List<IncidentCoordinationRecord>> = repository.allCoordinations.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Automatic Update System StateFlow
+    val updateInfo: StateFlow<UpdateInfo> = updateManager.updateInfo
+
     // Batch E: Event Timeline V2 Items Flow
     val timelineItems: StateFlow<List<TimelineItem>> = repository.allEvents.map { events ->
         buildTimelineItems(events)
@@ -315,6 +410,47 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         // Seed default emergency services (Police 112, Childline India 1098)
         viewModelScope.launch {
             repository.seedDefaultEmergencyServicesIfNecessary()
+        }
+
+        // Automatic update checking on startup (with frequency suppression)
+        updateManager.checkForUpdates(isManual = false)
+
+        // Seed default school profile if empty
+        viewModelScope.launch {
+            val schools = repository.allSchools.first()
+            if (schools.isEmpty()) {
+                repository.saveSchoolProfile(
+                    SchoolProfile(
+                        schoolId = "SCH-001",
+                        schoolName = "Lincoln Elementary School",
+                        address = "1200 Lincoln Way, San Francisco, CA",
+                        latitude = 37.7650,
+                        longitude = -122.4600,
+                        radiusMeters = 200f,
+                        expectedArrivalStartMinutes = 465, // 07:45
+                        expectedArrivalEndMinutes = 510,   // 08:30
+                        expectedDepartureStartMinutes = 870, // 14:30
+                        expectedDepartureEndMinutes = 930,   // 15:30
+                        schoolDaysMask = 31, // Mon-Fri
+                        isActive = true
+                    )
+                )
+            }
+        }
+
+        // Continually monitor school safe zone & active journey on location updates
+        viewModelScope.launch {
+            verifiedLocation.collect { loc ->
+                val school = activeSchool.value
+                if (school != null) {
+                    val exceptions = repository.getSchoolExceptionsSnapshot(school.schoolId)
+                    schoolManager.evaluateSchoolLocation(loc, school, exceptions)
+                }
+                val journey = activeJourney.value
+                if (journey != null) {
+                    journeyManager.evaluateJourney(journey, loc)
+                }
+            }
         }
 
         // Collect background monitor service state & incoming emergency events
@@ -740,6 +876,10 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             stage = IncidentStage.SILENCED,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
+        val incId = _parentIncident.value.incidentId
+        if (incId.isNotBlank()) {
+            escalationManager.acknowledgeIncident(incId, "Primary Parent")
+        }
         alertNotifier.stopAlert()
         alertTimerJob?.cancel()
         alertTimerJob = null
@@ -752,6 +892,10 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             stage = IncidentStage.SILENCED,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
+        val targetId = incidentId.ifEmpty { _parentIncident.value.incidentId }
+        if (targetId.isNotBlank()) {
+            escalationManager.acknowledgeIncident(targetId, "Primary Parent")
+        }
         viewModelScope.launch {
             repository.logEvent(
                 flagType = "INCIDENT_ACKNOWLEDGED",
@@ -776,13 +920,20 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             lastUpdatedTimestamp = System.currentTimeMillis(),
             resolutionReason = reason
         )
+        val targetId = incidentId.ifEmpty { _parentIncident.value.incidentId }
+        if (targetId.isNotBlank()) {
+            escalationManager.acknowledgeIncident(targetId, "Resolved")
+        }
         viewModelScope.launch {
+            if (targetId.isNotBlank()) {
+                repository.resolveIncidentCoordination(targetId, reason)
+            }
             repository.logEvent(
                 flagType = "INCIDENT_RESOLVED",
                 riskLevel = RiskLevel.NORMAL.name,
-                outcome = "RESOLVED_BY_GUARDIAN",
+                outcome = "RESOLVED",
                 deviceId = _parentIncident.value.deviceId,
-                details = reason,
+                details = "Incident resolved by guardian: $reason",
                 syncStatus = SyncStatus.SYNCED
             )
         }
@@ -1380,6 +1531,192 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     fun resetScenario() {
         scenarioRunner.resetScenario()
     }
+
+    // =========================================================================
+    // Feature A: Safe Pickup and Handover Actions
+    // =========================================================================
+
+    fun createPickupAuthorization(
+        childName: String,
+        authorizedPersonName: String,
+        relationship: String,
+        phoneNumber: String,
+        validityMinutes: Int,
+        isOneTime: Boolean = true,
+        notes: String = "",
+        onCreated: (PickupAuthorization) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val auth = repository.createPickupAuthorization(
+                childName = childName,
+                authorizedPersonName = authorizedPersonName,
+                relationship = relationship,
+                phoneNumber = phoneNumber,
+                validityMinutes = validityMinutes,
+                isOneTime = isOneTime,
+                notes = notes
+            )
+            onCreated(auth)
+        }
+    }
+
+    suspend fun verifyPickupToken(token: String): PickupAuthorization? {
+        return repository.verifyPickupToken(token)
+    }
+
+    fun approveHandover(
+        auth: PickupAuthorization,
+        parentName: String = "Primary Parent",
+        locationSummary: String = "Designated Pickup Zone",
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            repository.approveHandover(auth, parentName, locationSummary, notes)
+        }
+    }
+
+    fun rejectHandover(
+        auth: PickupAuthorization,
+        parentName: String = "Primary Parent",
+        reason: String = "Declined by parent"
+    ) {
+        viewModelScope.launch {
+            repository.rejectHandover(auth, parentName, reason)
+        }
+    }
+
+    fun revokePickupAuthorization(authId: String) {
+        viewModelScope.launch {
+            repository.revokePickupAuthorization(authId)
+        }
+    }
+
+    // =========================================================================
+    // Feature B: Emergency Escalation Actions
+    // =========================================================================
+
+    fun saveEscalationConfig(config: EscalationConfigEntity) {
+        viewModelScope.launch {
+            repository.saveEscalationConfig(config)
+        }
+    }
+
+    suspend fun generateVerifiedIncidentPackage(incident: SafetyIncident): VerifiedIncidentPackage {
+        val records = repository.getEscalationRecords(incident.incidentId).first()
+        return escalationManager.generateVerifiedIncidentPackage(incident, records)
+    }
+
+    fun acknowledgeIncidentEscalation(incidentId: String, responderName: String = "Primary Parent") {
+        escalationManager.acknowledgeIncident(incidentId, responderName)
+    }
+
+    // =========================================================================
+    // Feature C: School Safe Zone Actions
+    // =========================================================================
+
+    fun saveSchoolProfile(school: SchoolProfile) {
+        viewModelScope.launch {
+            repository.saveSchoolProfile(school)
+        }
+    }
+
+    fun deleteSchool(schoolId: String) {
+        viewModelScope.launch {
+            repository.deleteSchool(schoolId)
+        }
+    }
+
+    fun addSchoolHoliday(schoolId: String, epochDay: Long, reason: String) {
+        viewModelScope.launch {
+            repository.addSchoolHolidayException(schoolId, epochDay, reason)
+        }
+    }
+
+    // =========================================================================
+    // Feature D: Journey Safety Mode Actions
+    // =========================================================================
+
+    fun startSupervisedJourney(
+        name: String,
+        startLabel: String,
+        startLat: Double,
+        startLon: Double,
+        destLabel: String,
+        destLat: Double,
+        destLon: Double,
+        corridorRadiusMeters: Float = 80f,
+        expectedDurationMinutes: Int = 30,
+        guardianContacts: String = ""
+    ) {
+        viewModelScope.launch {
+            val journey = repository.startSupervisedJourney(
+                name = name,
+                startLabel = startLabel,
+                startLat = startLat,
+                startLon = startLon,
+                destLabel = destLabel,
+                destLat = destLat,
+                destLon = destLon,
+                corridorRadiusMeters = corridorRadiusMeters,
+                expectedDurationMinutes = expectedDurationMinutes,
+                guardianContactsToNotify = guardianContacts
+            )
+            journeyManager.evaluateJourney(journey, verifiedLocation.value)
+        }
+    }
+
+    fun stopSupervisedJourney(journeyId: String) {
+        viewModelScope.launch {
+            repository.stopSupervisedJourney(journeyId)
+        }
+    }
+
+    // =========================================================================
+    // Feature E: Emergency Response Coordination Actions
+    // =========================================================================
+
+    fun claimIncidentResponse(
+        incidentId: String,
+        responderName: String,
+        responderPhone: String,
+        responderRole: String
+    ) {
+        viewModelScope.launch {
+            repository.claimIncidentResponse(incidentId, responderName, responderPhone, responderRole)
+        }
+    }
+
+    fun updateCoordinationMilestone(incidentId: String, status: String, milestone: String) {
+        viewModelScope.launch {
+            repository.updateCoordinationMilestone(incidentId, status, milestone)
+        }
+    }
+
+    // =========================================================================
+    // Automatic Update System Actions
+    // =========================================================================
+
+    fun checkForUpdates(isManual: Boolean = true) {
+        updateManager.checkForUpdates(isManual = isManual)
+    }
+
+    fun downloadUpdate(release: AppReleaseMetadata) {
+        updateManager.downloadUpdate(release)
+    }
+
+    fun installUpdate(context: Context, apkFile: java.io.File) {
+        val intent = updateManager.createInstallIntent(apkFile)
+        context.startActivity(intent)
+    }
+
+    fun remindUpdateLater(hours: Int = 24) {
+        updateManager.remindLater(hours)
+    }
+
+    fun dismissUpdateError() {
+        updateManager.dismissError()
+    }
+
 
     // =========================================================================
     // Pure Helper: Event Timeline V2 Builder (Phase 12)

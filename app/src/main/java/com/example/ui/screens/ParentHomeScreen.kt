@@ -107,6 +107,11 @@ import com.example.model.ScenarioId
 import com.example.model.ScenarioStatus
 import com.example.model.TrustedRoute
 import com.example.model.VerifiedLocation
+import com.example.model.UpdateState
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.VerifiedUser
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.EmergencyAlertSheet
 
@@ -115,6 +120,10 @@ import com.example.ui.components.EmergencyAlertSheet
 fun ParentHomeScreen(
     viewModel: SafeBandViewModel,
     onNavigateToSettings: () -> Unit,
+    onNavigateToUpdate: () -> Unit = {},
+    onNavigateToPickup: () -> Unit = {},
+    onNavigateToSchool: () -> Unit = {},
+    onNavigateToJourney: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -287,7 +296,11 @@ fun ParentHomeScreen(
                     nearbyNodes = nearbyNodes,
                     monitoringState = monitoringState,
                     onNavigateToSafeZone = { selectedTab = 1 },
-                    onNavigateToHistory = { selectedTab = 2 }
+                    onNavigateToHistory = { selectedTab = 2 },
+                    onNavigateToUpdate = onNavigateToUpdate,
+                    onNavigateToPickup = onNavigateToPickup,
+                    onNavigateToSchool = onNavigateToSchool,
+                    onNavigateToJourney = onNavigateToJourney
                 )
                 1 -> SafeZoneConfigScreen(viewModel = viewModel)
                 2 -> AlertHistoryScreen(viewModel = viewModel)
@@ -348,7 +361,11 @@ fun ParentMonitorTab(
     nearbyNodes: Map<String, BleBeaconPayload>,
     monitoringState: MonitoringServiceState = MonitoringServiceState.ACTIVE,
     onNavigateToSafeZone: () -> Unit,
-    onNavigateToHistory: () -> Unit
+    onNavigateToHistory: () -> Unit,
+    onNavigateToUpdate: () -> Unit = {},
+    onNavigateToPickup: () -> Unit = {},
+    onNavigateToSchool: () -> Unit = {},
+    onNavigateToJourney: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isEmergency = lastBeacon != null && (lastBeacon.riskLevel == RiskLevel.CRITICAL || lastBeacon.riskLevel == RiskLevel.HIGH || lastBeacon.riskLevel == RiskLevel.MEDIUM)
@@ -362,6 +379,7 @@ fun ParentMonitorTab(
     val batteryInfo by viewModel.batteryInfo.collectAsState()
     val connectivityStatus by viewModel.connectivityStatus.collectAsState()
     val scenarioStatus by viewModel.scenarioRunner.scenarioStatus.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
     var selectedScenario by remember { mutableStateOf(ScenarioId.SAFE_ZONE_EXIT) }
 
     val isDark = isSystemInDarkTheme()
@@ -373,6 +391,108 @@ fun ParentMonitorTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // In-App Automatic Update Banner
+        if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .testTag("parent_update_banner"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.5f) else Color(0xFFEFF6FF)),
+                border = BorderStroke(1.dp, Color(0xFF3B82F6))
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "SafeBand Guardian update available",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color(0xFFBFDBFE) else Color(0xFF1E40AF)
+                        )
+                        Text(
+                            text = "Version v${updateInfo.availableRelease?.versionName ?: "1.2.0"} is ready.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8)
+                        )
+                    }
+                    Button(
+                        onClick = onNavigateToUpdate,
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text("Update", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+
+        // Major Features Quick Action Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onNavigateToPickup() },
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Pickup Pass", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onNavigateToJourney() },
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Journey", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onNavigateToSchool() },
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(imageVector = Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("School Zone", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+            }
+        }
         // Physical Child Node Status Banner (STEP 9)
         if (lastBeacon != null && !lastBeacon.isSimulation) {
             val isSosActive = lastBeacon.riskLevel == RiskLevel.CRITICAL

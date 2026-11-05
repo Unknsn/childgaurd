@@ -5,40 +5,50 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- SafeBand Shield and Beacon Emblem inside safe 66dp zone -->
-    <!-- Outer Shield Silhouette -->
+
+    <!-- SafeBand Guardian Shield Emblem (Strictly constrained within 66dp Safe Zone) -->
+    <!-- Outer Shield with Blue/Teal Gradient -->
     <path
-        android:pathData="M54,26 C66,26 76,33 76,46 C76,64 54,82 54,82 C54,82 32,64 32,46 C32,33 42,26 54,26 Z">
+        android:pathData="M 54,24 C 67,24 78,32 78,45 C 78,63 54,82 54,82 C 54,82 30,63 30,45 C 30,32 41,24 54,24 Z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="32"
-                android:startY="26"
-                android:endX="76"
+                android:startX="30"
+                android:startY="24"
+                android:endX="78"
                 android:endY="82"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#00F2FE" />
-                <item android:offset="1.0" android:color="#4FACFE" />
+                <item android:offset="0.0" android:color="#00F5D4" />
+                <item android:offset="0.5" android:color="#00BBF9" />
+                <item android:offset="1.0" android:color="#0077B6" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Inner Shield Inset -->
+    <!-- Inner Shield Cavity for Contrast Depth -->
     <path
-        android:pathData="M54,30 C63,30 71,36 71,46 C71,60 54,75 54,75 C54,75 37,60 37,46 C37,36 45,30 54,30 Z"
-        android:fillColor="#0B132B" />
+        android:pathData="M 54,28 C 64,28 73,34 73,45 C 73,59 54,75 54,75 C 54,75 35,59 35,45 C 35,34 44,28 54,28 Z"
+        android:fillColor="#09182E" />
 
-    <!-- Smartband / Heartbeat Pulse Crest -->
+    <!-- Protective Guardian Arch: Parent / Guardian embracing form -->
     <path
-        android:pathData="M42,50 L48,50 L51,43 L54,55 L57,47 L60,50 L66,50"
-        android:strokeWidth="3.2"
-        android:strokeColor="#00F2FE"
+        android:pathData="M 44,40 C 44,34 64,34 64,40 C 64,48 54,52 54,52 C 54,52 44,48 44,40 Z"
+        android:fillColor="#00BBF9" />
+
+    <!-- Protected Child Node: Core radiant beacon of the child -->
+    <path
+        android:pathData="M 54, 43 m -4, 0 a 4,4 0 1,0 8,0 a 4,4 0 1,0 -8,0"
+        android:fillColor="#00F5D4" />
+
+    <!-- SafeBand Smartband Telemetry Pulse (Safety Signal) -->
+    <path
+        android:pathData="M 42,59 L 48,59 L 51,53 L 54,64 L 57,56 L 60,59 L 66,59"
+        android:strokeWidth="2.8"
+        android:strokeColor="#00F5D4"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 
-    <!-- Radiating Signal Dot -->
+    <!-- High-Trust Golden Sentinel Sparkle -->
     <path
-        android:pathData="M54,37 A3,3 0 1,1 54,37.01"
-        android:strokeWidth="3.5"
-        android:strokeColor="#FFD166"
-        android:strokeLineCap="round" />
+        android:pathData="M 54, 33 m -2.2, 0 a 2.2,2.2 0 1,0 4.4,0 a 2.2,2.2 0 1,0 -4.4,0"
+        android:fillColor="#FFD166" />
 </vector>

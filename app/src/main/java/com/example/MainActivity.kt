@@ -34,16 +34,24 @@ import com.example.model.AppMode
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.PermissionRationaleDialog
 import com.example.ui.screens.AlertHistoryScreen
+import com.example.ui.screens.AppUpdateScreen
 import com.example.ui.screens.ChildHomeScreen
+import com.example.ui.screens.JourneySafetyScreen
 import com.example.ui.screens.ModeSelectionScreen
 import com.example.ui.screens.ParentHomeScreen
+import com.example.ui.screens.PickupManagementScreen
+import com.example.ui.screens.SchoolManagementScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
 
 enum class AppDestination {
     HOME,
     SETTINGS,
-    HISTORY
+    HISTORY,
+    UPDATE,
+    PICKUP,
+    SCHOOL,
+    JOURNEY
 }
 
 class MainActivity : ComponentActivity() {
@@ -141,6 +149,38 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                     destination == AppDestination.SETTINGS -> {
                         SettingsScreen(
                             viewModel = viewModel,
+                            onNavigateBack = { currentDestination = AppDestination.HOME },
+                            onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
+                            onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
+                            onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
+                            onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
+                        )
+                    }
+
+                    destination == AppDestination.UPDATE -> {
+                        AppUpdateScreen(
+                            viewModel = viewModel,
+                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                        )
+                    }
+
+                    destination == AppDestination.PICKUP -> {
+                        PickupManagementScreen(
+                            viewModel = viewModel,
+                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                        )
+                    }
+
+                    destination == AppDestination.SCHOOL -> {
+                        SchoolManagementScreen(
+                            viewModel = viewModel,
+                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                        )
+                    }
+
+                    destination == AppDestination.JOURNEY -> {
+                        JourneySafetyScreen(
+                            viewModel = viewModel,
                             onNavigateBack = { currentDestination = AppDestination.HOME }
                         )
                     }
@@ -164,7 +204,11 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                     mode == AppMode.PARENT -> {
                         ParentHomeScreen(
                             viewModel = viewModel,
-                            onNavigateToSettings = { currentDestination = AppDestination.SETTINGS }
+                            onNavigateToSettings = { currentDestination = AppDestination.SETTINGS },
+                            onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
+                            onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
+                            onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
+                            onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
                         )
                     }
                 }

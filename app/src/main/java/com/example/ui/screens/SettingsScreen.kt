@@ -47,6 +47,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,8 +59,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Emergency
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.VerifiedUser
 import com.example.model.AppMode
 import com.example.model.RiskLevel
+import com.example.model.UpdateState
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.EditChildBioDialog
 
@@ -68,6 +75,10 @@ import com.example.ui.components.EditChildBioDialog
 fun SettingsScreen(
     viewModel: SafeBandViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToUpdate: () -> Unit = {},
+    onNavigateToPickup: () -> Unit = {},
+    onNavigateToSchool: () -> Unit = {},
+    onNavigateToJourney: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentMode by viewModel.appMode.collectAsState()
@@ -602,6 +613,180 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.outline,
                         lineHeight = 18.sp
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 1. Application Updates & Releases Card
+            val updateInfo by viewModel.updateInfo.collectAsState()
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_updates_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Application Updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+
+                        if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) {
+                            Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFEFF6FF)) {
+                                Text(text = "NEW VERSION", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF1D4ED8), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Current version: v${updateInfo.currentVersionName} (Build ${updateInfo.currentVersionCode}) • Distribution: GitHub Releases",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onNavigateToUpdate,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) "View & Install Update" else "Check for Updates")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. Emergency Escalation Hierarchy Settings Card
+            val escalationConfig by viewModel.escalationConfig.collectAsState()
+            var t1Delay by remember(escalationConfig) { mutableIntStateOf(escalationConfig.tier1DelaySeconds) }
+            var t2Delay by remember(escalationConfig) { mutableIntStateOf(escalationConfig.tier2DelaySeconds) }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_escalation_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Emergency Escalation Hierarchy", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Tier 1: Primary Parent  ➜  Tier 2: Trusted Guardians (${t1Delay}s)  ➜  Tier 3: Institution & Helplines (${t2Delay}s)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                t1Delay = if (t1Delay == 30) 60 else 30
+                                viewModel.saveEscalationConfig(escalationConfig.copy(tier1DelaySeconds = t1Delay))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("T1: ${t1Delay}s")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                t2Delay = if (t2Delay == 60) 120 else 60
+                                viewModel.saveEscalationConfig(escalationConfig.copy(tier2DelaySeconds = t2Delay))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("T2: ${t2Delay}s")
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3. Safe Pickup & Handover Quick Access
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Safe Pickup & Handover", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Issue time-limited verification codes for authorized guardians or family members.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(onClick = onNavigateToPickup, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Text("Manage Pickup Authorizations")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 4. School Safe Zone & Journey Navigation Tiles
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Icon(imageVector = Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "School Zone", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(text = "Arrival & departure", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = onNavigateToSchool, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)) {
+                            Text("Open", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Journey Mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(text = "Supervised transit", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = onNavigateToJourney, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)) {
+                            Text("Open", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
 

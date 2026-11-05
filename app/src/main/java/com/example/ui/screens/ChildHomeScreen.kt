@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sos
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -135,6 +137,8 @@ fun ChildHomeScreen(
     val childProfile by viewModel.childBioProfile.collectAsState()
     val batteryInfo by viewModel.batteryInfo.collectAsState()
     val connectivityStatus by viewModel.connectivityStatus.collectAsState()
+    val activeAuthorizations by viewModel.activeAuthorizations.collectAsState()
+    val activeJourney by viewModel.activeJourney.collectAsState()
 
     var isDemoControlsExpanded by remember { mutableStateOf(false) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
@@ -290,6 +294,71 @@ fun ChildHomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp)
                         )
+                    }
+                }
+            }
+
+            // Child Authorized Pickup Reassurance Badge
+            if (activeAuthorizations.isNotEmpty()) {
+                val auth = activeAuthorizations.first()
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = Color(0xFF1D4ED8), modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Authorized Pickup: ${auth.authorizedPersonName}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E40AF)
+                            )
+                            Text(
+                                text = "Parent authorized ${auth.relationship} to pick you up. Pass Code: ${auth.verificationToken}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF1D4ED8)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Child Supervised Journey Reassurance Badge
+            if (activeJourney != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
+                    border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = Color(0xFF047857), modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Supervised Journey: Heading to ${activeJourney!!.destLabel}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF065F46)
+                            )
+                            Text(
+                                text = "Safe transit corridor active. Parents are monitoring your journey.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF047857)
+                            )
+                        }
                     }
                 }
             }

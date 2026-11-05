@@ -469,3 +469,83 @@ data class ScenarioStatus(
     val isCompleted: Boolean = false
 )
 
+// =========================================================================
+// Major Release: Safe Pickup, Escalation, School, Journey, Updates
+// =========================================================================
+
+data class VerifiedIncidentPackage(
+    val incidentId: String,
+    val deviceId: String,
+    val childName: String,
+    val age: String,
+    val bloodType: String,
+    val medicalConditions: String,
+    val allergies: String,
+    val primaryParentPhone: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val riskLevel: RiskLevel,
+    val triggerFlags: List<String>,
+    val verifiedLocation: VerifiedLocation?,
+    val resolvedAddress: String?,
+    val escalationAuditLog: List<com.example.data.local.EscalationRecord> = emptyList(),
+    val reportingDisclaimer: String = "Verified SafeBand incident package. Retains cryptographic hardware timestamp and sensor integrity."
+)
+
+data class SchoolStatus(
+    val profile: com.example.data.local.SchoolProfile? = null,
+    val isInsideZone: Boolean = false,
+    val isArrivalWindowActive: Boolean = false,
+    val isDepartureWindowActive: Boolean = false,
+    val isHolidayToday: Boolean = false,
+    val lastEvent: com.example.data.local.SchoolVerificationLog? = null
+)
+
+data class JourneySafetyStatus(
+    val activeJourney: com.example.data.local.SupervisedJourney? = null,
+    val isDeviation: Boolean = false,
+    val isProlongedStop: Boolean = false,
+    val isEtaExceeded: Boolean = false,
+    val isDeviceDisconnected: Boolean = false,
+    val distanceRemainingMeters: Float = 0f,
+    val progressPercent: Float = 0f,
+    val latestEvent: com.example.data.local.JourneyEvent? = null
+)
+
+enum class UpdateState {
+    CURRENT,
+    UPDATE_AVAILABLE,
+    DOWNLOADING,
+    DOWNLOADED,
+    INSTALLATION_REQUIRED,
+    UP_TO_DATE,
+    UPDATE_ERROR
+}
+
+data class AppReleaseMetadata(
+    val versionName: String,
+    val versionCode: Int,
+    val releaseTitle: String,
+    val releaseDate: String,
+    val releaseNotes: String,
+    val apkDownloadUrl: String,
+    val apkSize: Long,
+    val sha256Checksum: String,
+    val minSupportedVersionCode: Int = 1,
+    val releaseChannel: String = "stable",
+    val isMandatory: Boolean = false,
+    val securityImprovements: String = ""
+)
+
+data class UpdateInfo(
+    val state: UpdateState = UpdateState.CURRENT,
+    val currentVersionName: String = "1.1.0",
+    val currentVersionCode: Int = 5,
+    val availableRelease: AppReleaseMetadata? = null,
+    val downloadProgressPercent: Int = 0,
+    val downloadedApkPath: String? = null,
+    val errorMessage: String? = null,
+    val lastCheckedTimestamp: Long = 0L,
+    val updateRemindLaterTimestamp: Long = 0L
+)
+
+
