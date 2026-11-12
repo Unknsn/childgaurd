@@ -399,8 +399,9 @@ class BleSafetyManager(private val context: Context) {
     private var currentAdvertiseCallback: AdvertiseCallback? = null
     private var currentScanCallback: ScanCallback? = null
     private val scope = CoroutineScope(Dispatchers.Main)
+    private var advertisingRotationJob: Job? = null
 
-    // v3.0.0: Reassembled over-the-air bio and contact cache per child device
+    // v3.0.0 / v3.1.0: Reassembled over-the-air bio and contact cache per child device
     val incomingBioCache = ConcurrentHashMap<String, ChildBioProfile>()
     val incomingContactsCache = ConcurrentHashMap<String, MutableList<TrustedContact>>()
 
@@ -436,56 +437,103 @@ class BleSafetyManager(private val context: Context) {
             .setTimeout(0)
             .build()
 
-        // Privacy: Broadcast only minimal telemetry with ephemeral ID.
-        // Public packet contains NO child name, medical condition, allergies, or phone numbers.
+        // Base Telemetry Payload
         val telemetryPayload = encodePayload(deviceId, riskLevel, lat, lon, ephemeralId)
 
-        val mainData = AdvertiseData.Builder()
-            .setIncludeDeviceName(false)
-            .setIncludeTxPowerLevel(false)
-            .addServiceUuid(ParcelUuid(SAFEBAND_SERVICE_UUID))
-            .addManufacturerData(MANUFACTURER_ID, telemetryPayload)
-            .build()
+        // v3.1.0: Bio and Emergency Contact Payloads for Over-The-Air Broadcast
+        val bioCorePayload = if (childBioProfile != null) encodeBioCorePayload(deviceId, childBioProfile) else null
+        val phonePayload = if (!childBioProfile?.primaryParentPhone.isNullOrBlank()) {
+            encodeBioPhonePayload(deviceId, childBioProfile?.primaryParentPhone)
+        } else if (contacts.isNotEmpty()) {
+            encodeContactPayload(deviceId, contacts.first().phoneNumber)
+        } else null
+        val medicalPayload = if (!childBioProfile?.medicalConditions.isNullOrBlank()) {
+            encodeBioMedicalPayload(deviceId, childBioProfile?.medicalConditions)
+        } else null
 
-        // v3.0.0: If high/critical risk emergency, include child bio core in scan response
-        val scanResponseBuilder = AdvertiseData.Builder()
-            .setIncludeDeviceName(false)
-            .setIncludeTxPowerLevel(false)
+        // Build burst rotation pairs: Pair(MainDataPayload, ScanResponsePayload?)
+        val bursts = mutableListOf<Pair<ByteArray, ByteArray?>>()
+        bursts.add(Pair(telemetryPayload, bioCorePayload ?: phonePayload))
 
-        if ((riskLevel == RiskLevel.CRITICAL || riskLevel == RiskLevel.HIGH) && childBioProfile != null) {
-            val bioCorePayload = encodeBioCorePayload(deviceId, childBioProfile)
-            scanResponseBuilder.addManufacturerData(MANUFACTURER_ID, bioCorePayload)
+        if (bioCorePayload != null) {
+            bursts.add(Pair(bioCorePayload, phonePayload ?: telemetryPayload))
         }
-        val scanResponse = scanResponseBuilder.build()
-
-        val callback = object : AdvertiseCallback() {
-            override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                super.onStartSuccess(settingsInEffect)
-                Log.d(TAG, "BLE advertising started successfully with ephemeral ID $ephemeralId")
-                _isAdvertising.value = true
-            }
-
-            override fun onStartFailure(errorCode: Int) {
-                super.onStartFailure(errorCode)
-                Log.e(TAG, "BLE advertising failed with error code: $errorCode")
-                _isAdvertising.value = false
-            }
+        if (phonePayload != null) {
+            bursts.add(Pair(phonePayload, medicalPayload ?: telemetryPayload))
         }
 
-        try {
-            advertiser?.startAdvertising(settings, mainData, scanResponse, callback)
-            currentAdvertiseCallback = callback
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Missing permission for BLE advertising", e)
-            _isAdvertising.value = false
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception starting advertising", e)
-            _isAdvertising.value = false
+        fun buildAdvertiseData(payload: ByteArray): AdvertiseData {
+            return AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .setIncludeTxPowerLevel(false)
+                .addServiceUuid(ParcelUuid(SAFEBAND_SERVICE_UUID))
+                .addManufacturerData(MANUFACTURER_ID, payload)
+                .build()
+        }
+
+        fun buildScanResponseData(payload: ByteArray?): AdvertiseData? {
+            if (payload == null) return null
+            return AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .setIncludeTxPowerLevel(false)
+                .addManufacturerData(MANUFACTURER_ID, payload)
+                .build()
+        }
+
+        // Launch interleaved advertising rotation coroutine
+        advertisingRotationJob = scope.launch {
+            var burstIndex = 0
+            while (isActive) {
+                val (mainBytes, scanBytes) = bursts[burstIndex % bursts.size]
+                val mainData = buildAdvertiseData(mainBytes)
+                val scanResponse = buildScanResponseData(scanBytes)
+
+                val prevCallback = currentAdvertiseCallback
+                if (prevCallback != null) {
+                    try {
+                        advertiser?.stopAdvertising(prevCallback)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error cycling advertisement callback", e)
+                    }
+                }
+
+                val callback = object : AdvertiseCallback() {
+                    override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                        super.onStartSuccess(settingsInEffect)
+                        _isAdvertising.value = true
+                    }
+
+                    override fun onStartFailure(errorCode: Int) {
+                        super.onStartFailure(errorCode)
+                        Log.e(TAG, "BLE advertising burst failed with code: $errorCode")
+                    }
+                }
+                currentAdvertiseCallback = callback
+
+                try {
+                    if (scanResponse != null) {
+                        advertiser?.startAdvertising(settings, mainData, scanResponse, callback)
+                    } else {
+                        advertiser?.startAdvertising(settings, mainData, callback)
+                    }
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "Missing permission during BLE advertising burst", e)
+                    _isAdvertising.value = false
+                    break
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception starting advertising burst", e)
+                }
+
+                burstIndex++
+                delay(1200L) // 1.2-second interleaved burst cycle
+            }
         }
     }
 
     @SuppressLint("MissingPermission")
     fun stopAdvertising() {
+        advertisingRotationJob?.cancel()
+        advertisingRotationJob = null
         try {
             currentAdvertiseCallback?.let {
                 advertiser?.stopAdvertising(it)

@@ -12,6 +12,17 @@ val ObsidianContainerHigh = Color(0xFF2A2A2A)
 val ObsidianContainerHighest = Color(0xFF353534)
 val ObsidianSurfaceBright = Color(0xFF393939)
 
+// Frosted Glass Monochrome UI Tokens (v3.1.0)
+val GlassSurface = Color(0x18FFFFFF)             // ~9.4% white frosted glass acrylic
+val GlassSurfaceElevated = Color(0x28FFFFFF)     // ~15.7% white frosted glass
+val GlassSurfaceLowest = Color(0x0EFFFFFF)       // ~5.5% white frosted glass
+val GlassBorder = Color(0x30FFFFFF)              // ~18.8% white etched glass stroke
+val GlassBorderStrong = Color(0x55FFFFFF)        // ~33.3% white prominent glass stroke
+val GlassHazard = Color(0x33EF4444)              // translucent frosted emergency red
+val GlassHazardBorder = Color(0x80EF4444)
+val GlassSuccess = Color(0x3310B981)
+val GlassSuccessBorder = Color(0x8010B981)
+
 val ObsidianEtchedBorder = Color(0xFF444748)
 val ObsidianOutline = Color(0xFF8E9192)
 

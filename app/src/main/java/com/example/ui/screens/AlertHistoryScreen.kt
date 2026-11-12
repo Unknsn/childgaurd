@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.GlassCard
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -199,33 +201,35 @@ fun AlertHistoryScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Secondary Hardware Status Header
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
-            color = ObsidianContainerLowest,
-            shape = RoundedCornerShape(2.dp)
+        // Secondary Hardware Status Header (Frosted Glass)
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            padding = 10.dp
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("BUFFER:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                    Text("128KB NVRAM", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
+                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF10B981)))
+                    Text(
+                        text = "BUFFER: 128KB NVRAM",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        color = PhosphorWhite
+                    )
                 }
                 Text(
-                    text = "TAMPER PROOF: SHA-256 VERIFIED",
+                    text = "SHA-256 VERIFIED",
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 8.sp,
+                    fontSize = 9.sp,
                     color = MilledSilver
                 )
             }

@@ -19,6 +19,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -26,10 +27,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.data.local.SafeBandDatabase
+import com.example.data.local.TrustedContact
 import com.example.data.preferences.SafeBandPreferences
 import com.example.data.repository.SafetyRepository
 import com.example.model.AlertFlag
 import com.example.model.BleBeaconPayload
+import com.example.model.ChildBioProfile
 import com.example.model.IncidentObservation
 import com.example.model.IncidentStage
 import com.example.model.MonitoringServiceState
@@ -48,9 +51,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Always-On Foreground Service for BLE Safety Monitoring (Phases 9, 10, 11, 12, 15, 16, 20).
@@ -143,6 +146,10 @@ class BleSafetyMonitorService : Service() {
 
     private var beaconWatchdogJob: Job? = null
     private var lastLoggedIncidentTime = 0L
+
+    // Over-the-air bio and contact cache per child node (v3.1.0)
+    val incomingBioCache = ConcurrentHashMap<String, ChildBioProfile>()
+    val incomingContactsCache = ConcurrentHashMap<String, MutableList<TrustedContact>>()
 
     private val bluetoothReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -309,22 +316,42 @@ class BleSafetyMonitorService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
         )
 
-        // Lockscreen safe version (No child PII or medical details exposed)
+        val cachedBio = incomingBioCache[incident.deviceId]
+        val childName = cachedBio?.childName?.takeIf { it.isNotBlank() } ?: "Child (${incident.deviceId})"
+        val guardianPhone = cachedBio?.primaryParentPhone?.takeIf { it.isNotBlank() }
+            ?: incomingContactsCache[incident.deviceId]?.firstOrNull()?.phoneNumber?.takeIf { it.isNotBlank() }
+
+        // Lockscreen safe version
         val publicNotification = NotificationCompat.Builder(this, CHANNEL_ID_EMERGENCY)
-            .setContentTitle("SafeBand")
-            .setContentText("SafeBand emergency alert received.")
+            .setContentTitle("SafeBand Emergency SOS")
+            .setContentText("Emergency alert from $childName.")
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .build()
 
+        val notifTitle = if (cachedBio != null && cachedBio.childName.isNotBlank()) {
+            "CHILD SOS: ${cachedBio.childName} Needs Immediate Assistance!"
+        } else {
+            "CHILD SOS: Emergency Alert from Node ${incident.deviceId}"
+        }
+
+        val bigTextContent = buildString {
+            append("Emergency SOS broadcast detected from child node (${incident.deviceId}).\n")
+            if (cachedBio != null && cachedBio.childName.isNotBlank()) {
+                append("Child: ${cachedBio.childName} • Age: ${cachedBio.age} • Blood Group: ${cachedBio.bloodType}\n")
+                if (!cachedBio.medicalConditions.isNullOrBlank()) {
+                    append("Medical Conditions: ${cachedBio.medicalConditions}\n")
+                }
+            }
+            if (!guardianPhone.isNullOrBlank()) {
+                append("Primary Guardian Contact: $guardianPhone\n")
+            }
+            append("Tap to open live proximity radar or assist immediately.")
+        }
+
         val emergencyNotification = NotificationCompat.Builder(this, CHANNEL_ID_EMERGENCY)
-            .setContentTitle("Child SOS Alert")
-            .setContentText("Emergency SOS received from physical SafeBand child node (${incident.deviceId}).")
-            .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    "Emergency SOS received from physical SafeBand child node (${incident.deviceId}).\n" +
-                    "Tap to view incident details, signal proximity, and emergency options."
-                )
-            )
+            .setContentTitle(notifTitle)
+            .setContentText("Emergency SOS from $childName. ${if (!guardianPhone.isNullOrBlank()) "Guardian: $guardianPhone" else "Tap to open radar."}")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigTextContent))
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -332,9 +359,25 @@ class BleSafetyMonitorService : Service() {
             .setAutoCancel(true)
             .setPublicVersion(publicNotification)
             .setContentIntent(pendingIntent)
-            .build()
 
-        notificationManager.notify(NOTIFICATION_ID_EMERGENCY, emergencyNotification)
+        if (!guardianPhone.isNullOrBlank()) {
+            val callIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$guardianPhone")).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val callPendingIntent = PendingIntent.getActivity(
+                this,
+                2,
+                callIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+            )
+            emergencyNotification.addAction(
+                android.R.drawable.ic_menu_call,
+                "Call Guardian",
+                callPendingIntent
+            )
+        }
+
+        notificationManager.notify(NOTIFICATION_ID_EMERGENCY, emergencyNotification.build())
     }
 
     private fun clearEmergencyNotification() {
@@ -482,12 +525,73 @@ class BleSafetyMonitorService : Service() {
 
         if (rawData == null) return
 
-        val payload = BleSafetyManager.decodePayload(rawData) ?: return
-        processBeacon(payload.copy(isSimulation = false), result.rssi)
+        val decoded = BleSafetyManager.decodePacket(rawData) ?: return
+        when (decoded) {
+            is BleSafetyManager.Companion.DecodedPacket.BioCore -> {
+                Log.i(TAG, "[MONITOR-SERVICE] BioCore received for ${decoded.deviceId}: name=${decoded.childName}, age=${decoded.age}, blood=${decoded.bloodType}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(
+                    childName = decoded.childName,
+                    age = decoded.age,
+                    bloodType = decoded.bloodType
+                )
+                val currentInc = _activeEmergencyIncident.value
+                if (currentInc != null && currentInc.stage == IncidentStage.ACTIVE && currentInc.deviceId == decoded.deviceId) {
+                    postEmergencyNotification(currentInc)
+                }
+            }
+            is BleSafetyManager.Companion.DecodedPacket.BioPhone -> {
+                Log.i(TAG, "[MONITOR-SERVICE] BioPhone received for ${decoded.deviceId}: ${decoded.phone}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(primaryParentPhone = decoded.phone)
+                val list = incomingContactsCache.getOrPut(decoded.deviceId) { mutableListOf() }
+                if (list.none { it.phoneNumber == decoded.phone }) {
+                    list.add(TrustedContact(name = "Child Guardian", phoneNumber = decoded.phone, relationship = "Guardian"))
+                }
+                val currentInc = _activeEmergencyIncident.value
+                if (currentInc != null && currentInc.stage == IncidentStage.ACTIVE && currentInc.deviceId == decoded.deviceId) {
+                    postEmergencyNotification(currentInc)
+                }
+            }
+            is BleSafetyManager.Companion.DecodedPacket.BioMedical -> {
+                Log.i(TAG, "[MONITOR-SERVICE] BioMedical received for ${decoded.deviceId}: ${decoded.medicalInfo}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(medicalConditions = decoded.medicalInfo)
+            }
+            is BleSafetyManager.Companion.DecodedPacket.EmergencyContact -> {
+                Log.i(TAG, "[MONITOR-SERVICE] EmergencyContact received for ${decoded.deviceId}: ${decoded.phone}")
+                val list = incomingContactsCache.getOrPut(decoded.deviceId) { mutableListOf() }
+                if (list.none { it.phoneNumber == decoded.phone }) {
+                    list.add(TrustedContact(name = "Child Guardian", phoneNumber = decoded.phone, relationship = "Guardian"))
+                }
+            }
+            is BleSafetyManager.Companion.DecodedPacket.Telemetry -> {
+                val cachedBio = incomingBioCache[decoded.deviceId]
+                val cachedContacts = incomingContactsCache[decoded.deviceId]?.toList() ?: emptyList()
+                val payload = BleBeaconPayload(
+                    deviceId = decoded.deviceId,
+                    riskLevel = decoded.riskLevel,
+                    timestamp = decoded.timestamp,
+                    latitude = decoded.lat,
+                    longitude = decoded.lon,
+                    ephemeralId = if (decoded.deviceId.startsWith("EP-")) decoded.deviceId else "",
+                    isSimulation = false,
+                    childBioProfile = cachedBio,
+                    emergencyContacts = cachedContacts
+                )
+                processBeacon(payload, result.rssi)
+            }
+        }
     }
 
     fun processBeacon(payload: BleBeaconPayload, rssi: Int = -70) {
-        _latestBeacon.value = payload
+        val cachedBio = incomingBioCache[payload.deviceId] ?: payload.childBioProfile
+        val cachedContacts = incomingContactsCache[payload.deviceId]?.toList() ?: payload.emergencyContacts
+        val enrichedPayload = payload.copy(
+            childBioProfile = cachedBio,
+            emergencyContacts = cachedContacts
+        )
+        _latestBeacon.value = enrichedPayload
 
         // Update node registry
         val now = System.currentTimeMillis()

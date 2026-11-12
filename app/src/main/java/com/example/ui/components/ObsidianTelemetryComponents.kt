@@ -29,7 +29,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import com.example.ui.theme.CarbonChassis
+import com.example.ui.theme.GlassBorder
+import com.example.ui.theme.GlassBorderStrong
+import com.example.ui.theme.GlassHazard
+import com.example.ui.theme.GlassHazardBorder
+import com.example.ui.theme.GlassSurface
+import com.example.ui.theme.GlassSurfaceElevated
 import com.example.ui.theme.MilledSilver
 import com.example.ui.theme.ObsidianContainer
 import com.example.ui.theme.ObsidianContainerLowest
@@ -222,6 +230,84 @@ fun InvertedHazardBanner(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black.copy(alpha = 0.85f)
+            )
+        }
+    }
+}
+
+/**
+ * Frosted Glassmorphic Panel (v3.1.0)
+ * Translucent dark acrylic surface with smooth 16dp radius and razor-sharp etched glass border.
+ */
+@Composable
+fun GlassCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(16.dp),
+    backgroundColor: Color = GlassSurface,
+    borderColor: Color = GlassBorder,
+    borderWidth: Dp = 0.75.dp,
+    padding: Dp = 14.dp,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.border(borderWidth, borderColor, shape),
+        shape = shape,
+        color = backgroundColor,
+        shadowElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(padding),
+            content = content
+        )
+    }
+}
+
+/**
+ * Frosted Glass Button (v3.1.0)
+ * Tactile glass action button with subtle highlight and high-contrast retro monospace text.
+ */
+@Composable
+fun GlassButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    isDestructive: Boolean = false,
+    fontSize: Int = 11
+) {
+    val bg = if (isDestructive) GlassHazard else GlassSurfaceElevated
+    val border = if (isDestructive) GlassHazardBorder else GlassBorder
+    val textCol = if (isDestructive) Color(0xFFFF6B6B) else PhosphorWhite
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier.border(0.75.dp, border, RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = bg
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = textCol,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+            Text(
+                text = text.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = fontSize.sp,
+                color = textCol,
+                letterSpacing = 0.5.sp,
+                maxLines = 1
             )
         }
     }

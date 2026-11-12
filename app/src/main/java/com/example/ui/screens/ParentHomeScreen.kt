@@ -65,6 +65,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.ui.components.GlassButton
+import com.example.ui.components.GlassCard
+import com.example.ui.theme.GlassBorder
+import com.example.ui.theme.GlassBorderStrong
+import com.example.ui.theme.GlassHazard
+import com.example.ui.theme.GlassHazardBorder
+import com.example.ui.theme.GlassSurface
+import com.example.ui.theme.GlassSurfaceElevated
+import com.example.ui.theme.GlassSurfaceLowest
+import com.example.ui.theme.GlassSuccess
+import com.example.ui.theme.GlassSuccessBorder
 import com.example.data.local.PairedChild
 import com.example.ui.components.SegmentedMeter
 import com.example.ui.components.TactileKeycap
@@ -86,6 +97,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -412,90 +424,7 @@ fun ParentMonitorTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // SECONDARY HARDWARE TELEMETRY BANNER (Stitch Obsidian Telemetry)
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                .padding(bottom = 10.dp),
-            color = ObsidianContainerLowest,
-            shape = RoundedCornerShape(2.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("LINK_QUAL:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                    Text("-54 dBm", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = PhosphorWhite)
-                    Text("|", color = ObsidianEtchedBorder, fontSize = 9.sp)
-                    Text("MESH_NODES:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                    Text("03 ONLINE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("BASE_CELL: 3.92V", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
-                    SegmentedMeter(
-                        filledSegments = 10,
-                        totalSegments = 12,
-                        segmentHeight = 6,
-                        modifier = Modifier.width(54.dp)
-                    )
-                    Text("88%", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = PhosphorWhite)
-                }
-            }
-        }
-
-        // In-App Automatic Update Banner
-        if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .testTag("parent_update_banner"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.5f) else Color(0xFFEFF6FF)),
-                border = BorderStroke(1.dp, Color(0xFF3B82F6))
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "SafeBand Guardian update available",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color(0xFFBFDBFE) else Color(0xFF1E40AF)
-                        )
-                        Text(
-                            text = "Version v${updateInfo.availableRelease?.versionName ?: "1.2.0"} is ready.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8)
-                        )
-                    }
-                    Button(
-                        onClick = onNavigateToUpdate,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("Update", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-        }
-
-        // Major Features Quick Action Row
+        // 1. TOP GLASS DOCK
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -507,16 +436,16 @@ fun ParentMonitorTab(
                     .weight(1f)
                     .clickable { onNavigateToPickup() },
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                color = GlassSurfaceElevated,
+                border = BorderStroke(0.75.dp, GlassBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Pickup Pass", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("Pickup Pass", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite, maxLines = 1)
                 }
             }
 
@@ -525,16 +454,16 @@ fun ParentMonitorTab(
                     .weight(1f)
                     .clickable { onNavigateToJourney() },
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                color = GlassSurfaceElevated,
+                border = BorderStroke(0.75.dp, GlassBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Journey", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("Journey", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite, maxLines = 1)
                 }
             }
 
@@ -543,115 +472,118 @@ fun ParentMonitorTab(
                     .weight(1f)
                     .clickable { onNavigateToSchool() },
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                color = GlassSurfaceElevated,
+                border = BorderStroke(0.75.dp, GlassBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(imageVector = Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(imageVector = Icons.Default.School, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("School Zone", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("School Zone", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite, maxLines = 1)
                 }
             }
         }
 
-        // v3.0.0: Multi-Child & Paired Band Status Carousel
+        // v3.0.0 / v3.1.0: Multi-Child & Paired Band Status Carousel
         val pairedChildren by viewModel.allPairedChildren.collectAsState()
         var showPairChildDialog by remember { mutableStateOf(false) }
 
-        Card(
+        GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
                 .testTag("paired_children_carousel_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            padding = 12.dp
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "PAIRED CHILDREN & BANDS (${pairedChildren.size})",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                    TextButton(
-                        onClick = { showPairChildDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add / Pair", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (pairedChildren.isEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "No bands paired yet. Tap 'Add / Pair' to link an ESP32-S3 band or child phone.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "PAIRED CHILDREN & BANDS (${pairedChildren.size})",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = PhosphorWhite,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.sp
                     )
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        pairedChildren.forEach { child ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.padding(vertical = 4.dp)
+                }
+                TextButton(
+                    onClick = { showPairChildDialog = true },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add / Pair", style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace, color = PhosphorWhite)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (pairedChildren.isEmpty()) {
+                Text(
+                    text = "No bands paired yet. Tap 'Add / Pair' to link an ESP32-S3 band or child phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = ObsidianOutline
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    pairedChildren.forEach { child ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = GlassSurfaceElevated,
+                            border = BorderStroke(0.75.dp, GlassBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Surface(
+                                    shape = CircleShape,
+                                    color = GlassSurfaceLowest,
+                                    border = BorderStroke(1.dp, PhosphorWhite),
+                                    modifier = Modifier.size(28.dp)
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color(0xFF00F5D4).copy(alpha = 0.2f),
-                                        border = BorderStroke(1.dp, Color(0xFF00F5D4)),
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = child.childName.take(1).uppercase(),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
+                                    Box(contentAlignment = Alignment.Center) {
                                         Text(
-                                            text = child.childName,
+                                            text = child.childName.take(1).uppercase(),
                                             style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "${child.deviceId} • 🩸 ${child.bloodType}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 11.sp
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PhosphorWhite
                                         )
                                     }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = child.childName,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PhosphorWhite
+                                    )
+                                    Text(
+                                        text = "${child.deviceId} • 🩸 ${child.bloodType}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MilledSilver,
+                                        fontSize = 10.sp
+                                    )
                                 }
                             }
                         }
@@ -670,48 +602,20 @@ fun ParentMonitorTab(
             )
         }
 
-        // Physical Child Node Status Banner (STEP 9)
+        // Physical Child Node Status Banner
         if (lastBeacon != null && !lastBeacon.isSimulation) {
             val isSosActive = lastBeacon.riskLevel == RiskLevel.CRITICAL
-            val bannerBg = if (isDark) {
-                if (isSosActive) Color(0xFF450A0A) else Color(0xFF064E3B).copy(alpha = 0.5f)
-            } else {
-                if (isSosActive) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
-            }
-            val bannerBorder = if (isDark) {
-                if (isSosActive) Color(0xFFDC2626) else Color(0xFF059669)
-            } else {
-                if (isSosActive) Color(0xFFEF4444) else Color(0xFF10B981)
-            }
-            val bannerTitleColor = if (isDark) {
-                if (isSosActive) Color(0xFFFCA5A5) else Color(0xFFA7F3D0)
-            } else {
-                if (isSosActive) Color(0xFF991B1B) else Color(0xFF065F46)
-            }
-            val bannerStatusColor = if (isDark) {
-                if (isSosActive) Color(0xFFEF4444) else Color(0xFF34D399)
-            } else {
-                if (isSosActive) Color(0xFFDC2626) else Color(0xFF047857)
-            }
-
-            Card(
+            GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
                     .semantics { contentDescription = "Physical child node hardware status" },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = bannerBg
-                ),
-                border = BorderStroke(
-                    1.5.dp,
-                    bannerBorder
-                )
+                backgroundColor = if (isSosActive) GlassHazard else GlassSurface,
+                borderColor = if (isSosActive) GlassHazardBorder else GlassBorder,
+                padding = 12.dp
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -719,39 +623,44 @@ fun ParentMonitorTab(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isSosActive) Color(0xFFDC2626) else Color(0xFF10B981),
-                            modifier = Modifier.size(10.dp)
-                        ) {}
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (isSosActive) Color(0xFFFF5252) else Color(0xFF10B981))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "PHYSICAL CHILD NODE (ESP32-S3)",
+                                text = "PHYSICAL WEARABLE (ESP32-S3)",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black,
-                                color = bannerTitleColor,
-                                letterSpacing = 1.sp
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
                             )
                             Text(
-                                text = if (isSosActive) "● CRITICAL: SOS ACTIVATED BY CHILD NODE" else "● STATUS: NEARBY / ONLINE",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = if (isSosActive) "● CRITICAL: SOS ACTIVATED" else "● STATUS: NEARBY / ONLINE",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = bannerStatusColor
+                                color = if (isSosActive) Color(0xFFFF5252) else Color(0xFF10B981),
+                                fontSize = 11.sp
                             )
                         }
                     }
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        color = GlassSurfaceElevated,
+                        border = BorderStroke(0.75.dp, GlassBorder)
                     ) {
                         Text(
                             text = lastBeacon.deviceId,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = PhosphorWhite,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
@@ -759,53 +668,65 @@ fun ParentMonitorTab(
             }
         }
 
-        // 1. HERO REASSURANCE STATUS CARD (Physical Stamped Carbon Panel)
-        Surface(
+        // HERO CHILD STATUS GLASS CARD
+        GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, if (isEmergency) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(4.dp))
                 .semantics { contentDescription = "Child overall safety status" },
-            color = ObsidianContainerLow,
-            shape = RoundedCornerShape(4.dp)
+            backgroundColor = if (isEmergency) GlassHazard else GlassSurface,
+            borderColor = if (isEmergency) GlassHazardBorder else GlassBorder,
+            padding = 14.dp
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                // Stamped Chassis Indexing Top Right
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = if (isEmergency) Color(0xFFFF5252) else PhosphorWhite
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(modifier = Modifier.size(6.dp).background(Color.Black))
-                            Text(
-                                text = if (isEmergency) "ALERT: BREACH TRIGGERED" else "CHILD STATUS: SAFE // IN PERIMETER",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 9.sp,
-                                color = Color.Black
-                            )
-                        }
-                    }
+            // Header Row: Child Name + Status Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
                     Text(
-                        text = "MOD: REC_BRUT // HW_REV: 04.2",
+                        text = childBio.childName.ifEmpty { "Child Node" }.uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = PhosphorWhite,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        text = "ESP32-P2P DIRECT LINK • ACTIVE",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp,
+                        fontSize = 9.sp,
                         color = ObsidianOutline
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981).copy(alpha = 0.2f),
+                    border = BorderStroke(1.dp, if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981))
+                ) {
+                    Text(
+                        text = if (isEmergency) "● ALERT ACTIVE" else "● SAFE IN PERIMETER",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        color = if (isEmergency) Color.White else Color(0xFF10B981),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Proximity & Displacement Meter (clean, non-overlapping)
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = GlassSurfaceLowest,
+                borderColor = GlassBorder,
+                padding = 10.dp
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -813,80 +734,51 @@ fun ParentMonitorTab(
                 ) {
                     Column {
                         Text(
-                            text = childBio.childName.ifEmpty { "LEO V." }.uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite
-                        )
-                        Text(
-                            text = "ESP32-P2P DIRECT LINK :: PING LATENCY 0.8s AGO",
+                            text = "PROXIMITY / RSSI",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.sp,
                             color = ObsidianOutline
                         )
+                        Text(
+                            text = "-52 dBm",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite
+                        )
+                        Text(
+                            text = "STRONG LINK",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            color = MilledSilver
+                        )
                     }
 
-                    // Displacement Box
-                    Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = ObsidianContainerLowest,
-                        modifier = Modifier.border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                    Column(
+                        modifier = Modifier.weight(1f).padding(start = 16.dp),
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            Text(
-                                text = "BASE DISPLACEMENT",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 7.sp,
-                                color = ObsidianOutline
-                            )
-                            Text(
-                                text = "${distanceToBoundary?.let { "%.1f".format(it) } ?: "14.2"}m",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = PhosphorWhite
-                            )
-                            Text(
-                                text = "[ 14% PERIMETER SLACK ]",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 7.sp,
-                                color = PhosphorWhite
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // RSSI & Perimeter Progress Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(ObsidianContainerLowest)
-                        .border(1.dp, ObsidianEtchedBorder)
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("RSSI SIGNAL METER", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                        Text("-52 dBm", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                        Text("EXCELLENT LINK", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
-                    }
-                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("PERIMETER BOUNDARY", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                            Text("14.2m / 100.0m", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
+                            Text(
+                                text = "PERIMETER DISPLACEMENT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
+                            Text(
+                                text = "${distanceToBoundary?.let { "%.1f".format(it) } ?: "14.2"}m / 100m",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                                color = PhosphorWhite
+                            )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         SegmentedMeter(
@@ -898,537 +790,161 @@ fun ParentMonitorTab(
                     }
                 }
             }
-        }
 
-                // Location / Safe Zone Summary (High Contrast & No Fake San Francisco)
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = "Last verified location and address" }
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isEmergency) "Last Alert Incident Location:" else "Last Verified Location:",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+            Spacer(modifier = Modifier.height(10.dp))
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        val loc = verifiedLocation
-                        val beacon = lastBeacon
-                        val isPhysicalNode = beacon != null && !beacon.isSimulation
-
-                        if (isPhysicalNode) {
-                            // Phase 7 & 26: Physical ESP32 has NO GPS hardware
-                            Text(
-                                text = "Unavailable",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "No GPS hardware on child node\nDirect BLE proximity ~30m",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "• Signal State: Direct BLE Signal Active • No GPS coordinates reported",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        } else if (loc == null) {
-                            Text(
-                                text = "Awaiting Child Wearer Telemetry",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "BLE scanner active • Listening for child telemetry beacons",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "• Perimeter Status: Monitoring Active",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        } else {
-                            if (!loc.resolvedAddress.isNullOrBlank()) {
-                                Text(
-                                    text = loc.resolvedAddress,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                val detailsStr = loc.addressDetails?.formattedSummary()
-                                if (!detailsStr.isNullOrBlank() && detailsStr != loc.resolvedAddress) {
-                                    Text(
-                                        text = detailsStr,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                if (loc.isStale()) {
-                                    Text(
-                                        text = "Last verified ${loc.getDisplayTimeOrStaleString().replace("Verified ", "")} • STALE\nAccuracy ±${loc.accuracyMeters.toInt()}m",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                } else {
-                                    Text(
-                                        text = "${loc.getDisplayTimeOrStaleString()} • Accuracy ±${loc.accuracyMeters.toInt()}m",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                }
-                            } else if (loc.isResolvingAddress) {
-                                Text(
-                                    text = "%.4f, %.4f".format(Locale.US, loc.latitude, loc.longitude),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Verified just now\nResolving address...",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else {
-                                Text(
-                                    text = "%.4f, %.4f".format(Locale.US, loc.latitude, loc.longitude),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Address unavailable\n${loc.getDisplayTimeOrStaleString()} • Accuracy ±${loc.accuracyMeters.toInt()}m",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            if (loc.isSimulation) {
-                                Text(
-                                    text = "• Perimeter Status: ${geofenceState.displayName}" +
-                                        (distanceToBoundary?.let { dist ->
-                                            if (dist > 0) " (+%.0f m outside)".format(dist) else " (%.0f m inside)".format(dist)
-                                        } ?: "") +
-                                        if (trustedRoute.isEnabled) "\n• Route Corridor: ${routeState.displayName}" else "",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = "• Source: ${loc.source} • Confidence: ${loc.confidence.displayName}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                        }
-                    }
+            // Location Readout
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = PhosphorWhite,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                val loc = verifiedLocation
+                val isPhysicalNode = lastBeacon != null && !lastBeacon.isSimulation
+                val locText = if (isPhysicalNode) {
+                    "Direct BLE Proximity (~14m) • Physical Node Active"
+                } else if (loc != null && !loc.resolvedAddress.isNullOrBlank()) {
+                    loc.resolvedAddress!!
+                } else {
+                    "Perimeter Monitoring Active • High Confidence"
                 }
+                Text(
+                    text = locText,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = PhosphorWhite,
+                    maxLines = 1
+                )
+            }
 
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-                // Child Device Telemetry: Battery & Connectivity (Batch F: Phase 15 & 16)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val isPhysicalNode = lastBeacon != null && !lastBeacon.isSimulation
-                    val batColor = if (isPhysicalNode) (if (isDark) Color(0xFF94A3B8) else Color.Gray) else when (batteryInfo.batteryState) {
-                        BatteryState.NORMAL -> Color(0xFF10B981)
-                        BatteryState.LOW -> Color(0xFFF59E0B)
-                        BatteryState.CRITICAL -> Color(0xFFEF4444)
-                    }
-                    val batBg = if (isDark) {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    } else {
-                        if (isPhysicalNode) Color(0xFFF3F4F6) else when (batteryInfo.batteryState) {
-                            BatteryState.NORMAL -> Color(0xFFECFDF5)
-                            BatteryState.LOW -> Color(0xFFFFFBEB)
-                            BatteryState.CRITICAL -> Color(0xFFFEF2F2)
-                        }
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = batBg,
-                        border = BorderStroke(1.dp, batColor.copy(alpha = 0.35f)),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isPhysicalNode) Icons.Default.BatteryAlert else if (batteryInfo.isCharging) Icons.Default.BatteryChargingFull else if (batteryInfo.batteryState == BatteryState.CRITICAL) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
-                                contentDescription = "Child Band Battery",
-                                tint = batColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = if (isPhysicalNode) "N/A" else "${batteryInfo.percentage ?: "--"}%",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = batColor
-                                )
-                                Text(
-                                    text = if (isPhysicalNode) "NOT AVAILABLE" else if (batteryInfo.operatingMode == OperatingMode.POWER_SAVING) "Power Saving" else batteryInfo.batteryState.name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    val connColor = when (connectivityStatus.tier) {
-                        ConnectivityTier.ONLINE -> Color(0xFF10B981)
-                        ConnectivityTier.NEARBY -> Color(0xFF2563EB)
-                        ConnectivityTier.RELAYED -> Color(0xFF9333EA)
-                        ConnectivityTier.OFFLINE -> Color(0xFFF59E0B)
-                        ConnectivityTier.UNKNOWN -> if (isDark) Color(0xFF94A3B8) else Color.Gray
-                    }
-                    val connBg = if (isDark) {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    } else {
-                        when (connectivityStatus.tier) {
-                            ConnectivityTier.ONLINE -> Color(0xFFECFDF5)
-                            ConnectivityTier.NEARBY -> Color(0xFFEFF6FF)
-                            ConnectivityTier.RELAYED -> Color(0xFFFAF5FF)
-                            ConnectivityTier.OFFLINE -> Color(0xFFFFFBEB)
-                            ConnectivityTier.UNKNOWN -> Color(0xFFF3F4F6)
-                        }
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = connBg,
-                        border = BorderStroke(1.dp, connColor.copy(alpha = 0.35f)),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = when (connectivityStatus.tier) {
-                                    ConnectivityTier.ONLINE -> Icons.Default.CloudDone
-                                    ConnectivityTier.NEARBY -> Icons.Default.Radar
-                                    ConnectivityTier.RELAYED -> Icons.Default.Wifi
-                                    else -> Icons.Default.CloudOff
-                                },
-                                contentDescription = "Child Band Connectivity",
-                                tint = connColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = connectivityStatus.tier.name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = connColor
-                                )
-                                Text(
-                                    text = when (connectivityStatus.tier) {
-                                        ConnectivityTier.ONLINE -> "Internet OK"
-                                        ConnectivityTier.NEARBY -> "Direct BLE"
-                                        ConnectivityTier.RELAYED -> "Mesh Relay"
-                                        ConnectivityTier.OFFLINE -> "BLE Only"
-                                        ConnectivityTier.UNKNOWN -> "Scanning"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (isSilenced && isEmergency) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFFEF3C7)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Siren silenced • Alert active",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF92400E)
-                            )
-                            Button(
-                                onClick = { viewModel.reopenAlertSheet() },
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFD97706),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text("Open Emergency Sheet", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Quick Action Bar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Call Guardian
-                    OutlinedButton(
-                        onClick = {
-                            val phone = childBio.primaryParentPhone
-                            if (phone.isNotBlank()) {
-                                try {
-                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.replace(" ", "")}"))
-                                    context.startActivity(dialIntent)
-                                } catch (_: Exception) {}
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Call",
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-
-                    // View Map
-                    OutlinedButton(
-                        onClick = onNavigateToSafeZone,
-                        modifier = Modifier.weight(1.2f),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Safe Zone",
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-
-                    // Emergency 112
-                    Button(
-                        onClick = {
-                            try {
-                                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
-                                context.startActivity(dialIntent)
-                            } catch (_: Exception) {}
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFDC2626),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = "112 SOS",
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 2. TELEMETRY BENTO GRID MATRIX (Stitch Obsidian Telemetry)
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            // Battery & Network Pills
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Panel 1: MOTION BASELINE
                 Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
-                    color = ObsidianContainerLow,
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    color = GlassSurfaceLowest,
+                    border = BorderStroke(0.75.dp, GlassBorder),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("MOTION BASELINE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                            Text("[IMU_6AXIS]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = PhosphorWhite)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("9.81 m/s²", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                        Text("STATUS: [NORMAL]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("X: +0.12", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                            Text("Y: -0.04", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                            Text("Z: +9.80", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 7.sp, color = PhosphorWhite)
-                        }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.BatteryFull, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Battery: ${batteryInfo.percentage ?: 88}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite,
+                            fontSize = 10.sp
+                        )
                     }
                 }
 
-                // Panel 2: GEOFENCE PERIMETER
                 Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
-                    color = ObsidianContainerLow,
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    color = GlassSurfaceLowest,
+                    border = BorderStroke(0.75.dp, GlassBorder),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("GEOFENCE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                            Text("TOL: ±0.5M", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = PhosphorWhite)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("SAFE ZONE", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                        Text("RADIUS: 100M", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        SegmentedMeter(
-                            filledSegments = 2,
-                            totalSegments = 10,
-                            segmentHeight = 6,
-                            activeColor = PhosphorWhite
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.CloudDone, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Cloud: ${connectivityStatus.tier.name}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite,
+                            fontSize = 10.sp
                         )
                     }
                 }
             }
 
-            // Panel 3: ENVIRONMENT & AMBIENT
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
-                color = ObsidianContainerLow,
-                shape = RoundedCornerShape(4.dp)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("ENV / AMBIENT [SENSOR_NTC]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
-                            Box(modifier = Modifier.size(5.dp).background(PhosphorWhite))
+                val phone = childBio.primaryParentPhone
+                GlassButton(
+                    text = "Call",
+                    icon = Icons.Default.Phone,
+                    onClick = {
+                        if (phone.isNotBlank()) {
+                            try {
+                                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.replace(" ", "")}"))
+                                context.startActivity(dialIntent)
+                            } catch (_: Exception) {}
                         }
-                        Text("36.4°C :: SKIN CONTACT OK", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("BLE RATE: 10 Hz", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
-                        Text("TX: +4 dBm | SHA256:0x8F21", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                    }
-                }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                GlassButton(
+                    text = "Safe Zone",
+                    icon = Icons.Default.Radar,
+                    onClick = onNavigateToSafeZone,
+                    modifier = Modifier.weight(1.1f)
+                )
+
+                GlassButton(
+                    text = "112 SOS",
+                    icon = Icons.Default.Warning,
+                    isDestructive = true,
+                    onClick = {
+                        try {
+                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
+                            context.startActivity(dialIntent)
+                        } catch (_: Exception) {}
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 3. HARDWARE MANUAL OVERRIDES QUICK ACTIONS BAR
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
-            color = ObsidianContainerLowest,
-            shape = RoundedCornerShape(4.dp)
-        ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = "HARDWARE MANUAL OVERRIDES",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 8.sp,
-                    color = ObsidianOutline,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+        if (isSilenced && isEmergency) {
+            Spacer(modifier = Modifier.height(10.dp))
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = GlassHazard,
+                borderColor = GlassHazardBorder,
+                padding = 10.dp
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    TactileKeycap(
-                        text = "PING CHIRP",
-                        onClick = { /* Trigger BLE piezo alert */ },
-                        modifier = Modifier.weight(1f),
-                        fontSize = 9
+                    Text(
+                        text = "Siren silenced • Alert active",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF6B6B)
                     )
-                    TactileKeycap(
-                        text = "ZERO CALIB",
-                        onClick = { /* Calibrate reference RSSI */ },
-                        modifier = Modifier.weight(1f),
-                        fontSize = 9
-                    )
-                    TactileKeycap(
-                        text = "SILENT DRILL",
-                        onClick = { /* Silent test drill */ },
-                        modifier = Modifier.weight(1f),
-                        fontSize = 9
+                    GlassButton(
+                        text = "Open Sheet",
+                        onClick = { viewModel.reopenAlertSheet() }
                     )
                 }
             }

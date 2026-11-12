@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.safeband.xqmt"
     minSdk = 24
     targetSdk = 36
-    versionCode = 7
-    versionName = "3.0.0"
+    versionCode = 8
+    versionName = "3.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -738,9 +738,14 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 repository.updatePairedChildTelemetry(payload.deviceId, 100)
             } else if (payload.childBioProfile != null) {
                 _incomingChildProfile.value = payload.childBioProfile
-                if (payload.emergencyContacts.isNotEmpty()) {
-                    _incomingChildContacts.value = payload.emergencyContacts
+                val contacts = if (payload.emergencyContacts.isNotEmpty()) {
+                    payload.emergencyContacts
+                } else if (!payload.childBioProfile.primaryParentPhone.isNullOrBlank()) {
+                    listOf(TrustedContact(name = "Child Guardian", phoneNumber = payload.childBioProfile.primaryParentPhone, relationship = "Guardian"))
+                } else {
+                    emptyList()
                 }
+                _incomingChildContacts.value = contacts
             } else {
                 _incomingChildProfile.value = ChildBioProfile(
                     childName = "Child (${payload.deviceId})",
