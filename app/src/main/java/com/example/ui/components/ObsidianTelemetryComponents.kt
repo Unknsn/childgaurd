@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -312,4 +313,81 @@ fun GlassButton(
         }
     }
 }
+
+/**
+ * HardwarePrerequisiteBanner (v3.2.0)
+ * Sticky warning banner displayed when Bluetooth or Location (GPS) is turned off.
+ * Features 1-tap activation triggers to enforce life-safety radio and geofencing availability.
+ */
+@Composable
+fun HardwarePrerequisiteBanner(
+    isBluetoothEnabled: Boolean,
+    isLocationEnabled: Boolean,
+    onEnableBluetooth: () -> Unit,
+    onEnableLocation: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (isBluetoothEnabled && isLocationEnabled) return
+
+    val message = when {
+        !isBluetoothEnabled && !isLocationEnabled -> "BT & GPS OFF"
+        !isBluetoothEnabled -> "BLUETOOTH OFF"
+        else -> "LOCATION OFF"
+    }
+
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        backgroundColor = GlassHazard,
+        borderColor = GlassHazardBorder,
+        padding = 10.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF5252))
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF6B6B),
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (!isBluetoothEnabled) {
+                    GlassButton(
+                        text = "Turn On BT",
+                        onClick = onEnableBluetooth,
+                        isDestructive = true,
+                        fontSize = 9
+                    )
+                }
+                if (!isLocationEnabled) {
+                    GlassButton(
+                        text = "Turn On GPS",
+                        onClick = onEnableLocation,
+                        isDestructive = true,
+                        fontSize = 9
+                    )
+                }
+            }
+        }
+    }
+}
+
 

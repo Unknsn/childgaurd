@@ -8,6 +8,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -345,7 +346,10 @@ fun SafeZoneMapView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
@@ -357,19 +361,21 @@ fun SafeZoneMapView(
                                 text = "Safe Zone Physical Address",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF38BDF8)
+                                color = Color(0xFF38BDF8),
+                                maxLines = 1
                             )
                         }
 
                         if (resolvedAddress != null && (resolvedAddress.street.isNotBlank() || resolvedAddress.fullAddress.length > 50)) {
                             Text(
-                                text = if (isExpanded) "Show Less" else "View Full Address",
+                                text = if (isExpanded) "Show Less" else "View Full",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF38BDF8),
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier
                                     .clickable { isExpanded = !isExpanded }
-                                    .padding(start = 8.dp)
+                                    .padding(start = 8.dp),
+                                maxLines = 1
                             )
                         }
                     }
@@ -427,34 +433,36 @@ fun SafeZoneMapView(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Structured Lat / Lon / Radius Row
+                    // Structured Lat / Lon & Radius (Non-overlapping layout)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Lat: %.5f".format(java.util.Locale.US, safeZone.latitude),
+                            text = "Lat: %.5f • Lon: %.5f".format(java.util.Locale.US, safeZone.latitude, safeZone.longitude),
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 11.sp
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            maxLines = 1
                         )
-                        Text(
-                            text = "Lon: %.5f".format(java.util.Locale.US, safeZone.longitude),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "Radius: %.0f m".format(java.util.Locale.US, safeZone.radiusMeters),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF34D399),
-                            fontSize = 11.sp
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF10B981).copy(alpha = 0.18f),
+                            border = BorderStroke(0.75.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "Radius: %.0fm".format(java.util.Locale.US, safeZone.radiusMeters),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF34D399),
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }

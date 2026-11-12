@@ -117,6 +117,9 @@ import com.example.model.RouteState
 import com.example.model.TrustedRoute
 import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
+import com.example.ui.components.GlassButton
+import com.example.ui.components.GlassCard
+import com.example.ui.components.HardwarePrerequisiteBanner
 import com.example.ui.components.SegmentedMeter
 import com.example.ui.components.TactileKeycap
 import com.example.ui.theme.CarbonChassis
@@ -168,6 +171,7 @@ fun ChildHomeScreen(
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var holdState by remember { mutableStateOf(SosHoldState.IDLE) }
     val hapticFeedback = LocalHapticFeedback.current
+    val context = LocalContext.current
 
     // Pulse animation for SOS button
     val infiniteTransition = rememberInfiniteTransition(label = "SosPulse")
@@ -270,6 +274,23 @@ fun ChildHomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            val isBtOn by viewModel.isBluetoothHardwareEnabled.collectAsState()
+            val isLocOn by viewModel.isLocationHardwareEnabled.collectAsState()
+
+            if (!isBtOn || !isLocOn) {
+                HardwarePrerequisiteBanner(
+                    isBluetoothEnabled = isBtOn,
+                    isLocationEnabled = isLocOn,
+                    onEnableBluetooth = {
+                        try { context.startActivity(viewModel.getEnableBluetoothIntent()) } catch (_: Exception) {}
+                    },
+                    onEnableLocation = {
+                        try { context.startActivity(viewModel.getEnableLocationIntent()) } catch (_: Exception) {}
+                    },
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+            }
 
             // 1. REASSURANCE GLASS CARD
             val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
@@ -543,7 +564,6 @@ fun ChildHomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Quick Actions: Call Guardian & Sound Siren
-            val context = LocalContext.current
             val guardianPhone = childProfile.primaryParentPhone
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -1,12 +1,13 @@
-# SafeBand (ChildGuard) 🛡️
+# SafeBand Guardian (ChildGuard) 🛡️
 
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20Clean-orange)](#system-architecture)
+[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Frosted%20Glass-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![ESP32-S3 Hardware](https://img.shields.io/badge/Hardware-ESP32--S3%20Wearable-E7352C?logo=espressif&logoColor=white)](#hardware-integration)
+[![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20Clean%20%2B%20Offline%20P2P-orange)](#system-architecture)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SafeBand (ChildGuard)** is a peer-to-peer child-safety early-warning prototype built natively for Android. It combines **Bluetooth Low Energy (BLE) direct peer beaconing**, **real-time motion anomaly detection**, **customizable geofencing**, and a **multi-tier on-device risk assessment engine** to deliver immediate emergency alerts between child and parent devices—**completely offline without requiring cellular internet or centralized cloud servers**.
+**SafeBand Guardian** is a peer-to-peer child-safety early-warning system built natively for Android and custom wearable hardware (ESP32-S3). It combines **Bluetooth Low Energy (BLE) direct peer beaconing**, **real-time motion anomaly detection**, **customizable geofencing**, **interleaved bio-telemetry broadcasting**, and an **always-on background safety monitor** to deliver immediate emergency alerts between child and parent devices—**completely offline without requiring cellular internet or centralized cloud servers**.
 
 ---
 
@@ -14,25 +15,31 @@
 
 Directly install the latest pre-compiled Android APK on any Android 7.0+ (API 24+) smartphone:
 
-👉 **[Download SafeBand v1.1.0 Debug APK (Direct .apk)](https://github.com/Unknsn/childgaurd/releases/download/v1.1.0/app-debug.apk)**
+👉 **[Download SafeBand Guardian v3.2.0 Release APK (.apk)](https://github.com/Unknsn/childgaurd/releases/download/v3.2.0/app-debug.apk)**
 
-> Or visit the **[v1.1.0 GitHub Release Page](https://github.com/Unknsn/childgaurd/releases/tag/v1.1.0)** to view release notes and checksums.
+> Or visit the **[v3.2.0 GitHub Release Page](https://github.com/Unknsn/childgaurd/releases/tag/v3.2.0)** to view release notes, checksums, and assets.
 
 ---
 
-## 📌 Key Highlights (v1.1.0 Release)
+## 📌 What's New in v3.2.0
 
-- **🛡️ Authoritative Incident Lifecycle Engine**: Refactored fragmented alert flags into an authoritative `SafetyIncident` and `IncidentStage` state machine (`NONE` ➔ `WARNING` ➔ `CONFIRMATION_PENDING` ➔ `CONFIRMED` ➔ `BROADCASTING` ➔ `ACTIVE` ➔ `SILENCED` ➔ `CANCELLED` ➔ `RESOLVED`). Parents can silence sirens without accidentally erasing active incidents, and child cancellations only resolve matching incidents.
-- **👨‍👩‍👧 Reassurance-First Parent Dashboard**: Replaced raw technical scanner logs with a parent-first answering card (*"Is my child safe?"*), showing child name, verified physical address, safe-zone status, recent activity timeline, and 1-tap quick actions (Call, Safe Zone Map, 112 SOS).
-- **👶 Calm Child Experience**: Simple, reassuring status cards (Safe / Check Required / Help Requested) with large tactile circular SOS panic button, 10s false-alarm confirmation window, and demo controls cleanly cordoned off into an expandable drawer.
-- **📋 Interactive Alert History with Severity Filters**: Full event log with interactive modal dialogs for incident audit details, filter chips (`ALL`, `EMERGENCY`, `WARNING`, `RESOLVED`), and back navigation.
-- **👶 Alerting Child's Identity & Emergency Contacts Sent to Parents**: When a child triggers an alert, the nearby parent node receives the **alerting child's bio data** (name, age, blood group badge, primary parent phone, medical conditions, allergies, notes) and child's emergency contacts peer-to-peer offline over BLE.
-- **🗺️ Interactive Real Street Map in Safe Zone (OpenStreetMap / Leaflet)**: Real interactive street map with safe zone perimeter, center pin, live child marker, tap-to-set repositioning, and clean WebView lifecycle disposal on release.
-- **📍 Detailed Physical Address Resolution**: Automatically reverse geocodes coordinates to display **Street, Area/Locality, City, State, and PIN code** in emergency alerts, SMS dispatches, safe zone banners, and incident history.
-- **🚨 Indian Emergency Services (Police 112 & Childline 1098)**: Pre-seeded National Emergency (112) and Childline India (1098) with 1-tap direct call buttons built into the emergency screen.
-- **📡 Thread-Safe BLE Protocol**: Multi-packet rotation cadence stabilized to 1500ms, buffer capacities expanded to 24 bytes, null-byte padding stripped, and scan caches synchronized against concurrent IPC binder threads.
-- **🧠 Multi-Tier On-Device Risk Engine**: Dynamically calculates risk levels (`NORMAL`, `LOW`, `WARNING/MEDIUM`, `EMERGENCY/HIGH`) from sensor anomalies to minimize false alarms.
-- **🔒 Privacy-Preserving by Design**: All safety event logs, bio data, and contact data are persisted locally using **Room Database** and encrypted DataStore; zero user tracking or telemetry.
+- **✨ Frosted Glass Monochrome UI Styling**:
+  - Deep OLED carbon chassis (`#0A0A0A`) with dark frosted translucent panels (`Color(0x18FFFFFF)`), etched razor-sharp glass borders (`Color(0x26FFFFFF)`), and phosphor white typography.
+  - Reusable `GlassCard`, `GlassButton`, and `HardwarePrerequisiteBanner` components with haptic feedback.
+- **🧹 Complete Screen De-cluttering & Non-Overlapping Layouts**:
+  - Eliminated text collisions across all screen densities.
+  - Fixed perimeter displacement wrapping (`14.2m / 100m`) and safe zone coordinates (`Lat • Lon` vs `Radius`).
+  - Removed engineering mock jargon (`MOD_09`, `IMU 9.81 m/s²`, `36.4°C`), duplicate battery indicators, and broken void cards.
+- **🚨 Reliable Background & Lockscreen Emergency Alerts**:
+  - Android `ForegroundService` with `connectedDevice|location` and `START_STICKY` ensures alerts arrive even when the app is closed or killed.
+  - `WakeLock` wakes the screen and CPU immediately upon receiving an emergency packet.
+  - `USE_FULL_SCREEN_INTENT`, public lockscreen notifications, and high-priority siren alarm audio attributes (`USAGE_ALARM`).
+- **📡 Interleaved BLE Bio & Contact Broadcasting**:
+  - Multi-packet rotation cycling every 1200ms across `Telemetry`, `BioCore` (name, age, blood type), and `BioPhone` (guardian contact).
+  - Passive background scanners reassemble the child's identity and primary guardian phone number. Surrounding bystanders receive emergency alerts with a **1-tap [ Call Guardian ]** action button.
+- **⚡ Bluetooth & Location Hardware Enforcer**:
+  - Actively checks if Bluetooth hardware or Location services (GPS) are turned off in Android system settings.
+  - Features sticky Frosted Glass warning banners and 1-tap activation triggers (`BluetoothAdapter.ACTION_REQUEST_ENABLE`, `Settings.ACTION_LOCATION_SOURCE_SETTINGS`).
 
 ---
 
@@ -40,41 +47,55 @@ Directly install the latest pre-compiled Android APK on any Android 7.0+ (API 24
 
 ```mermaid
 graph TD
-    subgraph Sensors ["Sensor & Input Layer"]
-        ACCEL["Accelerometer (Motion Anomaly)"]
-        GPS["Fused Location Provider (Geofence)"]
-        SOS["Manual SOS / Tamper Button"]
+    subgraph Hardware ["Physical Wearable (ESP32-S3)"]
+        ESP_BTN["Hardware SOS Button (GPIO 0)"]
+        ESP_LED["WS2812 Status Neopixel (GPIO 48)"]
+        ESP_BLE["ESP-IDF BLE Transmitter (0x5AFE)"]
+        ESP_BTN --> ESP_BLE
+        ESP_BLE --> ESP_LED
     end
 
-    subgraph CoreEngine ["On-Device Core"]
-        MAD["MotionAnomalyDetector (Threshold > 21 m/s²)"]
-        LSH["LocationSafetyHelper (Distance Calculation)"]
+    subgraph Sensors ["Child Phone Sensors (Child Mode)"]
+        ACCEL["Accelerometer (Motion / Fall Anomaly)"]
+        GPS["Fused Location Provider (Geofence Engine)"]
+        SOS_DIAL["Tactile Frosted Glass SOS Dial"]
+    end
+
+    subgraph CoreEngine ["On-Device Android Core"]
+        MAD["MotionAnomalyDetector (> 21 m/s²)"]
+        LSH["LocationSafetyHelper (Geofence Engine)"]
+        HSE["HardwareSafetyEnforcer (BT & GPS Check)"]
         RE["RiskEngine (Multi-Tier Assessment)"]
         VM["SafeBandViewModel (StateFlow & Orchestration)"]
     end
 
-    subgraph Communication ["Peer-to-Peer BLE"]
-        ADV["BleSafetyManager (Advertiser - 0x5AFE)"]
-        SCAN["BleSafetyManager (Scanner - Low Latency)"]
+    subgraph BackgroundService ["Always-On Background Monitor"]
+        SRV["BleSafetyMonitorService (Foreground Service)"]
+        WAKE["PowerManager WakeLock (Screen On)"]
+        NOTIF["NotificationManager (Lockscreen Full-Screen SOS)"]
+        SRV --> WAKE
+        SRV --> NOTIF
     end
 
-    subgraph UI ["Jetpack Compose UI"]
-        CHILD_UI["ChildHomeScreen (Status, Countdown, SOS)"]
-        PARENT_UI["ParentHomeScreen (Radar, Beacon Feed, Call)"]
-        CANVAS["SafeZoneCanvas (Interactive Map / Radar)"]
-        SETTINGS["Settings & Trusted Contacts Screen"]
+    subgraph UI ["Frosted Glass Monochrome UI"]
+        CHILD_UI["ChildHomeScreen (Glass SOS Dial, Reassurance Pill)"]
+        PARENT_UI["ParentHomeScreen (Hero Child Card, Proximity Meter)"]
+        RADAR_UI["SafeZoneMapView (OpenStreetMap / Leaflet, Safe Radius)"]
+        HISTORY_UI["AlertHistoryScreen (Blackbox Audit Log, SHA-256)"]
     end
 
+    ESP_BLE -. "10 Hz Direct BLE Beacons" .-> SRV
     ACCEL --> MAD --> RE
     GPS --> LSH --> RE
-    SOS --> RE
+    SOS_DIAL --> RE
+    HSE --> VM
     RE --> VM
-    VM --> ADV
-    ADV -. "22-Byte BLE Beacon" .-> SCAN
-    SCAN --> VM
+    VM -. "Interleaved Bio Packets" .-> SRV
+    SRV --> VM
     VM --> CHILD_UI
     VM --> PARENT_UI
-    VM --> CANVAS
+    VM --> RADAR_UI
+    VM --> HISTORY_UI
 ```
 
 ---
@@ -85,140 +106,81 @@ The `RiskEngine` evaluates concurrent sensor flags to prevent panic while ensuri
 
 | Risk Level | Trigger Condition | System Action | Broadcast Behavior |
 | :--- | :--- | :--- | :--- |
-| **NORMAL** (`#10B981`) | No anomalies active | Nominal monitoring | Standby / No broadcast |
-| **LOW** (`#3B82F6`) | Exactly 1 anomaly (e.g. motion spike *or* safe zone exit) | Logged locally to Room audit log | **No BLE broadcast** (preserves battery & privacy) |
+| **NORMAL** (`#10B981`) | No anomalies active | Nominal monitoring | Standby / Periodic heartbeat |
+| **LOW** (`#3B82F6`) | Exactly 1 anomaly (e.g. motion spike *or* safe zone departure) | Logged locally to Room audit log | **No BLE broadcast** (preserves battery & privacy) |
 | **MEDIUM (Warning)** (`#F59E0B`) | Exactly 2 concurrent anomalies (e.g. safe zone exit *and* motion spike) | Initiates 10-second confirmation countdown; escalates if uncancelled | **BLE broadcast enabled** upon confirmation |
-| **HIGH (Emergency)** (`#EF4444`) | Manual SOS button triggered **or** $\ge 3$ concurrent anomalies | Immediate acoustic alarm, full haptic pulse, emergency contact action | **Instant BLE broadcast** (countdown bypassed) |
+| **HIGH / CRITICAL (Emergency)** (`#EF4444`) | Physical band SOS hold **or** in-app SOS dial triggered | Immediate siren, screen wake, full-screen notification, guardian call | **Instant 10 Hz BLE broadcast** (countdown bypassed) |
 
 ---
 
 ## 📡 BLE Protocol Specification
 
-When transmitting an emergency beacon, SafeBand broadcasts custom manufacturer data under identifier `0x5AFE`:
+SafeBand broadcasts custom manufacturer data under identifier `0x5AFE`:
 
+### Packet Type 0x01: Core Telemetry (22 Bytes)
 ```
-+--------+--------+------------------+-----------+--------------------+-------------------+-------------------+
-| Byte 0 | Byte 1 |    Bytes 2-8     |  Byte 9   |    Bytes 10-13     |    Bytes 14-17    |    Bytes 18-21    |
-|  0x53  |  0x42  |    Device ID     | Risk Byte |   Timestamp (s)    |   Latitude (f)    |   Longitude (f)   |
-|  ('S') |  ('B') | ASCII (7 chars)  | (0,1,2,3) | 32-bit Int (epoch) | IEEE 754 Float32  | IEEE 754 Float32  |
-+--------+--------+------------------+-----------+--------------------+-------------------+-------------------+
++--------+--------+-------------+-----------+--------------------+-------------------+-------------------+
+| Byte 0 | Byte 1 |  Bytes 2-8  |  Byte 9   |    Bytes 10-13     |    Bytes 14-17    |    Bytes 18-21    |
+|  0x53  |  0x42  |  Device ID  | Risk Byte |   Timestamp (s)    |   Latitude (f)    |   Longitude (f)   |
+|  ('S') |  ('B') | ASCII (7B)  | (0,1,2,3) | 32-bit Int (epoch) | IEEE 754 Float32  | IEEE 754 Float32  |
++--------+--------+-------------+-----------+--------------------+-------------------+-------------------+
 ```
 
-- **Manufacturer ID**: `0x5AFE`
-- **Service UUID**: `00005afe-0000-1000-8000-00805f9b34fb`
-- **Total Payload Size**: 22 bytes (well within the legacy 24-byte BLE advertisement limit)
-
----
-
-## 📱 Application Modes & Screens
-
-### 1. Child Mode
-- **Status Dashboard**: Live risk level banner, active anomaly tags, and real-time safe zone distance meter.
-- **Interactive Safe Zone Canvas**: Visual representation of the child's position relative to the configured geofence radius.
-- **Manual SOS / Tamper Button**: One-tap instant emergency trigger.
-- **Countdown Alert Card**: 10-second cancellation timer for non-SOS alerts with an immediate dismiss option.
-- **Simulation Controls**: Built-in debug controls to simulate motion anomalies and geofence departures for demonstration.
-
-### 2. Parent / Guardian Mode
-- **Radar & Beacon Listener**: Continuously listens for child device BLE advertisements.
-- **Emergency Alert Bottom Sheet**: Pops up immediately upon receiving a MEDIUM or HIGH risk beacon with timestamps and coordinates.
-- **Emergency Call Trigger**: Direct dial intent to designated trusted contacts.
-- **Alert Timer**: Tracks the active duration of the ongoing incident.
-
-### 3. Settings & History
-- **Safe Zone Configurator**: Customize center latitude, longitude, and safety radius (in meters).
-- **Trusted Contacts Manager**: Add and manage emergency contact names, phone numbers, and guardian relationships.
-- **Alert History Screen**: Chronological audit trail of all safety events, cancellations, and escalations stored in local SQLite via Room.
-
----
-
-## 📁 Project Structure
-
+### Packet Type 0x02: Child Bio Core (Name, Age, Blood Group)
 ```
-d:/sip/
-├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── AndroidManifest.xml          # Permissions & activity declarations
-│   │   │   ├── java/com/example/
-│   │   │   │   ├── MainActivity.kt          # Main Compose entry & permission flows
-│   │   │   │   ├── data/
-│   │   │   │   │   ├── local/               # Room Database, SafetyEvent & TrustedContact DAOs
-│   │   │   │   │   ├── preferences/         # Jetpack DataStore preferences
-│   │   │   │   │   └── repository/          # SafetyRepository abstraction
-│   │   │   │   ├── engine/
-│   │   │   │   │   └── RiskEngine.kt        # Pure risk scoring & evaluation rules
-│   │   │   │   ├── model/
-│   │   │   │   │   └── SafetyModels.kt      # RiskLevel, AlertFlag, SafeZone, BlePayload
-│   │   │   │   ├── service/
-│   │   │   │   │   ├── AlertNotifier.kt     # Haptic vibration & tone generator
-│   │   │   │   │   ├── BleSafetyManager.kt  # BLE Advertiser & Scanner
-│   │   │   │   │   ├── LocationSafetyHelper.kt # GPS & geofence distance logic
-│   │   │   │   │   └── MotionAnomalyDetector.kt # Accelerometer spike detection
-│   │   │   │   └── ui/
-│   │   │   │       ├── SafeBandViewModel.kt # Central state holder & event pipeline
-│   │   │   │       ├── components/          # Reusable Compose widgets (Canvas, Cards, Sheets)
-│   │   │   │       ├── screens/             # ModeSelection, ChildHome, ParentHome, Settings
-│   │   │   │       └── theme/               # Material 3 Color, Type, and Theme definitions
-│   │   │   └── res/                         # App icons, strings, and XML configs
-│   │   └── test/                            # Unit tests, Robolectric & Roborazzi screenshot tests
-│   └── build.gradle.kts                     # App module dependencies & configuration
-├── gradle/                                  # Version catalog (libs.versions.toml) & wrapper
-├── metadata.json                            # Prototype descriptor
-└── README.md
++--------+--------+-------------+-----------+---------------------+----------+-------------+
+| Byte 0 | Byte 1 |  Bytes 2-8  |  Byte 9   |     Bytes 10-21     | Byte 22  | Bytes 23-25 |
+|  0x53  |  0x42  |  Device ID  | Type 0x02 |   Child Name (12B)  | Age (1B) |  Blood (3B) |
++--------+--------+-------------+-----------+---------------------+----------+-------------+
+```
+
+### Packet Type 0x03: Primary Guardian Contact Phone
+```
++--------+--------+-------------+-----------+------------------------------------+
+| Byte 0 | Byte 1 |  Bytes 2-8  |  Byte 9   |            Bytes 10-25             |
+|  0x53  |  0x42  |  Device ID  | Type 0x03 | Primary Guardian Phone ASCII (16B) |
++--------+--------+-------------+-----------+------------------------------------+
 ```
 
 ---
 
-## 🛠️ Getting Started
+## 🔌 Hardware Integration (ESP32-S3 Physical Node)
+
+The repository includes ready-to-flash firmware for the physical ESP32-S3 wearable child node under `hardware/esp32_child_node/`:
+- **Hardware Trigger**: Push button connected to GPIO 0 (BOOT button). Hold 2 seconds to initiate SOS.
+- **Visual Feedback**: Onboard WS2812 RGB addressable LED on GPIO 48:
+  - Green pulse: Standby / Armed.
+  - Blinking red siren: Critical SOS Broadcasting.
+  - Cyan flash: Handshake / Paired.
+- **Battery Optimization**: Deep sleep mode with GPIO wake-up interrupts for extended battery life.
+
+---
+
+## 🛠️ Building & Testing
 
 ### Prerequisites
-- **Android Studio** Ladybug (2024.2.1) or newer
-- **Android SDK**: `minSdk = 24` (Android 7.0), `targetSdk = 36`
-- **Physical Device Recommended**: Testing Bluetooth Low Energy advertising and hardware accelerometer triggers works best on physical Android devices. A single-device simulation mode is also included in the UI.
+- JDK 17 or higher
+- Android SDK 36 (Android 15)
+- Gradle 9.3.1 (included via wrapper)
 
-### Building & Running
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Unknsn/childgaurd.git
-   cd childgaurd
-   ```
-2. Open the project in **Android Studio**.
-3. Allow Gradle to sync dependencies.
-4. Run on your connected device or emulator:
-   ```bash
-   ./gradlew installDebug
-   ```
+### Build Debug APK
+```bash
+./gradlew assembleDebug
+```
+The resulting APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
-### Running Tests
-Execute the local unit test suite (including `RiskEngineTest` and payload serialization tests):
+### Run Test Suite
 ```bash
 ./gradlew testDebugUnitTest
 ```
-
----
-
-## 🔒 Permissions & Privacy
-
-SafeBand requires the following Android permissions strictly for local on-device operation:
-- `ACCESS_FINE_LOCATION` & `ACCESS_COARSE_LOCATION`: Required for computing distance from the user-defined safe zone and BLE discovery.
-- `BLUETOOTH_SCAN` & `BLUETOOTH_ADVERTISE` (`API 31+`): Required for direct peer-to-peer child-to-parent beacon transmission without an internet connection.
-- `VIBRATE` & `POST_NOTIFICATIONS`: Required for high-priority local emergency alerts.
-
-> **Data Sovereignty Guarantee**: No audio, biometric, or location coordinates are uploaded to any external server. All logs and preferences are stored exclusively on the device's private SQLite sandbox.
-
----
-
-## 📋 Out of Scope / Future Roadmap
-
-This software prototype demonstrates early-warning detection and local peer communication. The following capabilities are reserved for future hardware/cloud integration phases:
-- Dedicated external wearable hardware with physical anti-tamper wrist switches
-- Long-range relay via fixed LoRa/cellular community hubs
-- Cloud-based municipal 911/emergency authority escalation
-- Multi-hop mesh relay beyond direct peer BLE range
+Executes all Robolectric unit tests, verifying:
+- Risk engine state machine
+- Hardware prerequisite enforcer (Bluetooth & GPS)
+- Background emergency alert generation & wake lock
+- Layout collision-free constraints
+- Offline multi-packet BLE decoding and reassembly.
 
 ---
 
 ## 📄 License
-
-This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.

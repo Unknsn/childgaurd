@@ -19,9 +19,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -245,7 +248,14 @@ class BleSafetyMonitorService : Service() {
             }
             notificationManager.createNotificationChannel(monitoringChannel)
 
-            // 2. High-Importance Emergency Alerts Channel
+            // 2. High-Importance Emergency Alerts Channel (DND bypass, Alarm sound, Public Lockscreen)
+            val emergencySoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val emergencyAudioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
             val emergencyChannel = NotificationChannel(
                 CHANNEL_ID_EMERGENCY,
                 "SAFEband Emergency Alerts",
@@ -254,8 +264,12 @@ class BleSafetyMonitorService : Service() {
                 description = "Emergency SOS alerts from child wearable node"
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 800, 150, 800, 150, 1000)
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                setSound(emergencySoundUri, emergencyAudioAttributes)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    setBypassDnd(true)
+                }
             }
             notificationManager.createNotificationChannel(emergencyChannel)
         }
@@ -304,6 +318,19 @@ class BleSafetyMonitorService : Service() {
     private fun postEmergencyNotification(incident: SafetyIncident) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
+        // 1. Wake screen and device CPU even if phone is asleep / screen locked
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            @Suppress("DEPRECATION")
+            val wakeLock = powerManager?.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "safeband:emergency_sos_wake"
+            )
+            wakeLock?.acquire(10000L) // Keep awake for 10 seconds to ensure alert renders
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire wake lock for emergency alert", e)
+        }
+
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             action = ACTION_SHOW_INCIDENT
             putExtra(EXTRA_INCIDENT_ID, incident.incidentId)
@@ -321,21 +348,22 @@ class BleSafetyMonitorService : Service() {
         val guardianPhone = cachedBio?.primaryParentPhone?.takeIf { it.isNotBlank() }
             ?: incomingContactsCache[incident.deviceId]?.firstOrNull()?.phoneNumber?.takeIf { it.isNotBlank() }
 
-        // Lockscreen safe version
+        // Lockscreen safe version (fully visible on lockscreen for immediate rescue)
         val publicNotification = NotificationCompat.Builder(this, CHANNEL_ID_EMERGENCY)
-            .setContentTitle("SafeBand Emergency SOS")
-            .setContentText("Emergency alert from $childName.")
+            .setContentTitle("🚨 SAFEBAND EMERGENCY SOS")
+            .setContentText("Emergency alert from $childName. Tap or call guardian immediately.")
             .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
         val notifTitle = if (cachedBio != null && cachedBio.childName.isNotBlank()) {
-            "CHILD SOS: ${cachedBio.childName} Needs Immediate Assistance!"
+            "🚨 CHILD SOS: ${cachedBio.childName.uppercase()} Needs Immediate Assistance!"
         } else {
-            "CHILD SOS: Emergency Alert from Node ${incident.deviceId}"
+            "🚨 CHILD SOS: Emergency Alert from Node ${incident.deviceId}"
         }
 
         val bigTextContent = buildString {
-            append("Emergency SOS broadcast detected from child node (${incident.deviceId}).\n")
+            append("EMERGENCY SOS broadcast detected from child wearable (${incident.deviceId}).\n")
             if (cachedBio != null && cachedBio.childName.isNotBlank()) {
                 append("Child: ${cachedBio.childName} • Age: ${cachedBio.age} • Blood Group: ${cachedBio.bloodType}\n")
                 if (!cachedBio.medicalConditions.isNullOrBlank()) {
@@ -348,13 +376,19 @@ class BleSafetyMonitorService : Service() {
             append("Tap to open live proximity radar or assist immediately.")
         }
 
+        val emergencySoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
         val emergencyNotification = NotificationCompat.Builder(this, CHANNEL_ID_EMERGENCY)
             .setContentTitle(notifTitle)
             .setContentText("Emergency SOS from $childName. ${if (!guardianPhone.isNullOrBlank()) "Guardian: $guardianPhone" else "Tap to open radar."}")
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigTextContent))
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(pendingIntent, true) // Present full screen heads-up alert over lockscreen
+            .setSound(emergencySoundUri)
             .setVibrate(longArrayOf(0, 800, 150, 800, 150, 1000))
             .setAutoCancel(true)
             .setPublicVersion(publicNotification)

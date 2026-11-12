@@ -50,6 +50,7 @@ import com.example.service.ConnectivitySafetyManager
 import com.example.service.LocationAddressResolver
 import com.example.service.LocationSafetyHelper
 import com.example.service.MotionAnomalyDetector
+import com.example.service.HardwareSafetyEnforcer
 import com.example.engine.EvaluationScenarioRunner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -114,6 +115,17 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val schoolManager = SchoolSafetyManager(repository, viewModelScope)
     val journeyManager = JourneySafetyManager(repository, viewModelScope)
     val updateManager = UpdateManager(application, viewModelScope)
+    val hardwareEnforcer = HardwareSafetyEnforcer(application)
+
+    val isBluetoothHardwareEnabled: StateFlow<Boolean> = hardwareEnforcer.isBluetoothEnabled
+    val isLocationHardwareEnabled: StateFlow<Boolean> = hardwareEnforcer.isLocationEnabled
+
+    fun refreshHardwarePrerequisites() {
+        hardwareEnforcer.refreshStatus()
+    }
+
+    fun getEnableBluetoothIntent(): Intent = hardwareEnforcer.getEnableBluetoothIntent()
+    fun getEnableLocationIntent(): Intent = hardwareEnforcer.getEnableLocationIntent()
 
     val batteryInfo: StateFlow<BatteryInfo> = batteryManager.batteryInfo
     val connectivityStatus: StateFlow<ConnectivityStatus> = connectivityManager.connectivityStatus
@@ -1924,6 +1936,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         motionDetector.stop()
         locationHelper.stopLocationUpdates()
         batteryManager.unregisterBatteryReceiver()
+        hardwareEnforcer.destroy()
         scenarioRunner.stopScenario()
         replayJob?.cancel()
     }

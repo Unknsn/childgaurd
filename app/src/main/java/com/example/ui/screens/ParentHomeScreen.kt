@@ -67,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
+import com.example.ui.components.HardwarePrerequisiteBanner
 import com.example.ui.theme.GlassBorder
 import com.example.ui.theme.GlassBorderStrong
 import com.example.ui.theme.GlassHazard
@@ -105,6 +106,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -424,6 +426,24 @@ fun ParentMonitorTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Enforce Bluetooth & Location Hardware Requirements
+        val isBtHardwareEnabled by viewModel.isBluetoothHardwareEnabled.collectAsState()
+        val isLocHardwareEnabled by viewModel.isLocationHardwareEnabled.collectAsState()
+
+        if (!isBtHardwareEnabled || !isLocHardwareEnabled) {
+            HardwarePrerequisiteBanner(
+                isBluetoothEnabled = isBtHardwareEnabled,
+                isLocationEnabled = isLocHardwareEnabled,
+                onEnableBluetooth = {
+                    try { context.startActivity(viewModel.getEnableBluetoothIntent()) } catch (_: Exception) {}
+                },
+                onEnableLocation = {
+                    try { context.startActivity(viewModel.getEnableLocationIntent()) } catch (_: Exception) {}
+                },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+        }
+
         // 1. TOP GLASS DOCK
         Row(
             modifier = Modifier
@@ -677,112 +697,131 @@ fun ParentMonitorTab(
             borderColor = if (isEmergency) GlassHazardBorder else GlassBorder,
             padding = 14.dp
         ) {
-            // Header Row: Child Name + Status Badge
+            // Header Row: Child Name + Status Badge (Non-wrapping bounds)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = childBio.childName.ifEmpty { "Child Node" }.uppercase(),
                         style = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         color = PhosphorWhite,
-                        fontSize = 15.sp
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "ESP32-P2P DIRECT LINK • ACTIVE",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
-                        color = ObsidianOutline
+                        color = ObsidianOutline,
+                        maxLines = 1
                     )
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981).copy(alpha = 0.2f),
                     border = BorderStroke(1.dp, if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981))
                 ) {
                     Text(
-                        text = if (isEmergency) "● ALERT ACTIVE" else "● SAFE IN PERIMETER",
+                        text = if (isEmergency) "● ALERT ACTIVE" else "● IN SAFE ZONE",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         fontSize = 9.sp,
                         color = if (isEmergency) Color.White else Color(0xFF10B981),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        maxLines = 1
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Proximity & Displacement Meter (clean, non-overlapping)
+            // Proximity & Displacement Meter (clean 2-column layout, zero text wrapping)
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 backgroundColor = GlassSurfaceLowest,
                 borderColor = GlassBorder,
-                padding = 10.dp
+                padding = 12.dp
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    // Left Column: Proximity / RSSI
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "PROXIMITY / RSSI",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.sp,
-                            color = ObsidianOutline
+                            color = ObsidianOutline,
+                            maxLines = 1
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "-52 dBm",
                             style = MaterialTheme.typography.titleSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite
+                            color = PhosphorWhite,
+                            maxLines = 1
                         )
                         Text(
-                            text = "STRONG LINK",
+                            text = "DIRECT LINK",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.sp,
-                            color = MilledSilver
+                            color = MilledSilver,
+                            maxLines = 1
                         )
                     }
 
-                    Column(
-                        modifier = Modifier.weight(1f).padding(start = 16.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
+                    // Vertical Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(36.dp)
+                            .background(GlassBorder)
+                    )
+
+                    // Right Column: Perimeter Displacement & Progress
+                    Column(modifier = Modifier.weight(1.3f)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "PERIMETER DISPLACEMENT",
+                                text = "DISPLACEMENT",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.sp,
-                                color = ObsidianOutline
+                                color = ObsidianOutline,
+                                maxLines = 1
                             )
                             Text(
                                 text = "${distanceToBoundary?.let { "%.1f".format(it) } ?: "14.2"}m / 100m",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp,
-                                color = PhosphorWhite
+                                fontSize = 10.sp,
+                                color = PhosphorWhite,
+                                maxLines = 1
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val filledSegs = ((distanceToBoundary ?: 14.2f) / 10f).toInt().coerceIn(1, 10)
                         SegmentedMeter(
-                            filledSegments = 2,
+                            filledSegments = filledSegs,
                             totalSegments = 10,
                             segmentHeight = 6,
                             activeColor = PhosphorWhite
@@ -1113,68 +1152,94 @@ fun ParentMonitorTab(
             }
         }
 
-        // 4. Recent Safety Timeline
+        // 4. Recent Safety Timeline (Frosted Glass with non-overlapping entries)
         val recentEvents by viewModel.allEvents.collectAsState()
         if (recentEvents.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Card(
+            Spacer(modifier = Modifier.height(14.dp))
+            GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                padding = 14.dp
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "RECENT SAFETY TIMELINE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.outline,
-                            letterSpacing = 1.sp
-                        )
-                        TextButton(onClick = onNavigateToHistory) {
-                            Text("View All Log", style = MaterialTheme.typography.labelSmall)
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECENT SAFETY TIMELINE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = ObsidianOutline,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "View All Log",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = PhosphorWhite,
+                        modifier = Modifier.clickable { onNavigateToHistory() }
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                recentEvents.take(3).forEach { ev ->
+                    val cleanFlag = when (ev.flagType) {
+                        "MANUAL_SOS" -> "Manual SOS"
+                        "CONFIRMATION_RESOLVED_REENTRY" -> "Safe Re-entry"
+                        "GEOFENCE_EXIT" -> "Perimeter Exit"
+                        "BLE_BEACON_TIMEOUT" -> "Beacon Timeout"
+                        "FALL_DETECTED" -> "Fall Anomaly"
+                        else -> ev.flagType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    recentEvents.take(3).forEach { ev ->
+                    val cleanOutcome = when {
+                        ev.outcome.contains("CANCELLED") -> "Cancelled"
+                        ev.outcome.contains("CONFIRMED") -> "Confirmed SOS"
+                        ev.outcome.contains("RESOLVED") -> "Resolved"
+                        else -> ev.outcome.replace("_", " ").take(18)
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = when (ev.riskLevel) {
-                                        "HIGH" -> Color(0xFFDC2626)
-                                        "MEDIUM" -> Color(0xFFD97706)
-                                        else -> Color(0xFF10B981)
-                                    },
-                                    modifier = Modifier.size(8.dp)
-                                ) {}
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = ev.flagType,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when (ev.riskLevel) {
+                                            "CRITICAL", "HIGH" -> Color(0xFFFF5252)
+                                            "MEDIUM" -> Color(0xFFF59E0B)
+                                            else -> Color(0xFF10B981)
+                                        }
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = ev.outcome.replace("_", " "),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
+                                text = cleanFlag,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+                        Text(
+                            text = cleanOutcome.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MilledSilver,
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
                     }
                 }
             }

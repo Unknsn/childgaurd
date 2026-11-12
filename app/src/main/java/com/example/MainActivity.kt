@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.model.AppMode
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.PermissionRationaleDialog
@@ -121,6 +125,24 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
             } else {
                 viewModel.onPermissionsGranted()
             }
+        }
+    }
+
+    // Hardware state observer & refresh on app resume
+    val isBtHardwareEnabled by viewModel.isBluetoothHardwareEnabled.collectAsState()
+    val isLocHardwareEnabled by viewModel.isLocationHardwareEnabled.collectAsState()
+    var showHardwarePrompt by remember { mutableStateOf(true) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshHardwarePrerequisites()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -227,6 +249,37 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                         showRationaleDialog = false
                     }
                 )
+            }
+
+            // Hardware Prerequisite Dialog (Bluetooth & Location Enforcer)
+            if (currentMode != AppMode.UNSELECTED && showHardwarePrompt && !showRationaleDialog) {
+                if (!isBtHardwareEnabled) {
+                    PermissionRationaleDialog(
+                        title = "Bluetooth Is Turned Off",
+                        rationale = "SafeBand requires Bluetooth Low Energy to scan for child wearable bands and receive emergency SOS signals. Please enable Bluetooth to keep protection active.",
+                        onConfirm = {
+                            showHardwarePrompt = false
+                            try {
+                                context.startActivity(viewModel.getEnableBluetoothIntent())
+                            } catch (_: Exception) {}
+                        },
+                        onDismiss = { showHardwarePrompt = false },
+                        iconType = "bluetooth"
+                    )
+                } else if (!isLocHardwareEnabled) {
+                    PermissionRationaleDialog(
+                        title = "Location Services Turned Off",
+                        rationale = "Android requires device Location to be turned ON for Bluetooth beacon discovery and geofence tracking. Please enable Location in system settings.",
+                        onConfirm = {
+                            showHardwarePrompt = false
+                            try {
+                                context.startActivity(viewModel.getEnableLocationIntent())
+                            } catch (_: Exception) {}
+                        },
+                        onDismiss = { showHardwarePrompt = false },
+                        iconType = "location"
+                    )
+                }
             }
         }
     }
