@@ -173,7 +173,14 @@ class BleSafetyMonitorService : Service() {
         repository = SafetyRepository(
             database.safetyEventDao(),
             database.trustedContactDao(),
-            preferences
+            preferences,
+            database.pickupHandoverDao(),
+            database.escalationDao(),
+            database.schoolDao(),
+            database.journeyDao(),
+            database.coordinationDao(),
+            database.pairedChildDao(),
+            database.playbookDao()
         )
 
         createNotificationChannels()

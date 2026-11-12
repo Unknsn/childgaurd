@@ -11,6 +11,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,15 +27,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContactPhone
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -55,10 +60,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.data.local.PairedChild
+import com.example.ui.components.SegmentedMeter
+import com.example.ui.components.TactileKeycap
+import com.example.ui.components.PhysicalRockerSwitch
+import com.example.ui.theme.CarbonChassis
+import com.example.ui.theme.MilledSilver
+import com.example.ui.theme.ObsidianContainer
+import com.example.ui.theme.ObsidianContainerLow
+import com.example.ui.theme.ObsidianContainerLowest
+import com.example.ui.theme.ObsidianEtchedBorder
+import com.example.ui.theme.ObsidianOutline
+import com.example.ui.theme.PhosphorWhite
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -187,43 +205,34 @@ fun ParentHomeScreen(
                         else -> if (isDark) Color(0xFF94A3B8) else Color.Gray
                     }
 
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "SafeBand Guardian",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = pillBg
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = pillDotColor,
-                                        modifier = Modifier.size(6.dp)
-                                    ) {}
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = pillText,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = pillTextColor
-                                    )
-                                }
-                            }
-                        }
-                        Text(
-                            text = "Guarding: ${childBioProfile.childName.ifEmpty { "Child ($deviceId)" }} • ${safeZone.name}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Radar,
+                            contentDescription = null,
+                            tint = PhosphorWhite,
+                            modifier = Modifier.size(20.dp)
                         )
+                        Column {
+                            Text(
+                                text = "SAFEBAND // BLE_P2P",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "0x5AFE ACTIVE [P2P MESH]",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline,
+                                letterSpacing = 1.sp
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -231,11 +240,11 @@ fun ParentHomeScreen(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("parent_settings_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = PhosphorWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = CarbonChassis
                 )
             )
         },
@@ -243,35 +252,36 @@ fun ParentHomeScreen(
             NavigationBar(
                 modifier = Modifier
                     .navigationBarsPadding()
+                    .border(BorderStroke(1.dp, ObsidianEtchedBorder))
                     .testTag("parent_navigation_bar"),
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = CarbonChassis
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
                     icon = { Icon(Icons.Default.Security, contentDescription = "Monitor") },
-                    label = { Text("Monitor") },
+                    label = { Text("MONITOR", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("tab_monitor")
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     icon = { Icon(Icons.Default.Radar, contentDescription = "Safe Zone") },
-                    label = { Text("Safe Zone") },
+                    label = { Text("RADAR", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("tab_safezone")
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     icon = { Icon(Icons.Default.History, contentDescription = "History") },
-                    label = { Text("History") },
+                    label = { Text("AUDIT_LOG", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("tab_history")
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
                     icon = { Icon(Icons.Default.ContactPhone, contentDescription = "Contacts") },
-                    label = { Text("Contacts") },
+                    label = { Text("CONTACTS", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("tab_contacts")
                 )
             }
@@ -315,7 +325,8 @@ fun ParentHomeScreen(
             childName = "Child (${lastBeacon!!.deviceId})",
             primaryParentPhone = ""
         )
-        val activeContacts = if (incomingContacts.isNotEmpty()) incomingContacts else contacts
+        // v3.0.0: Strictly isolate child contacts - zero parent contact book leakage
+        val activeContacts = incomingContacts
         val activeAddress = incomingAddress ?: lastBeacon!!.address
 
         EmergencyAlertSheet(
@@ -351,7 +362,7 @@ fun ParentHomeScreen(
                 } catch (_: Exception) {}
             },
             onUpdateBioProfile = { updated ->
-                viewModel.updateChildBioProfile(updated)
+                viewModel.updateChildBioProfileForDevice(lastBeacon!!.deviceId, updated)
             }
         )
     }
@@ -396,10 +407,53 @@ fun ParentMonitorTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(CarbonChassis)
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // SECONDARY HARDWARE TELEMETRY BANNER (Stitch Obsidian Telemetry)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                .padding(bottom = 10.dp),
+            color = ObsidianContainerLowest,
+            shape = RoundedCornerShape(2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("LINK_QUAL:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                    Text("-54 dBm", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = PhosphorWhite)
+                    Text("|", color = ObsidianEtchedBorder, fontSize = 9.sp)
+                    Text("MESH_NODES:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                    Text("03 ONLINE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("BASE_CELL: 3.92V", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                    SegmentedMeter(
+                        filledSegments = 10,
+                        totalSegments = 12,
+                        segmentHeight = 6,
+                        modifier = Modifier.width(54.dp)
+                    )
+                    Text("88%", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = PhosphorWhite)
+                }
+            }
+        }
+
         // In-App Automatic Update Banner
         if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) {
             Card(
@@ -502,6 +556,120 @@ fun ParentMonitorTab(
                 }
             }
         }
+
+        // v3.0.0: Multi-Child & Paired Band Status Carousel
+        val pairedChildren by viewModel.allPairedChildren.collectAsState()
+        var showPairChildDialog by remember { mutableStateOf(false) }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .testTag("paired_children_carousel_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "PAIRED CHILDREN & BANDS (${pairedChildren.size})",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    TextButton(
+                        onClick = { showPairChildDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add / Pair", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (pairedChildren.isEmpty()) {
+                    Text(
+                        text = "No bands paired yet. Tap 'Add / Pair' to link an ESP32-S3 band or child phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        pairedChildren.forEach { child ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFF00F5D4).copy(alpha = 0.2f),
+                                        border = BorderStroke(1.dp, Color(0xFF00F5D4)),
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = child.childName.take(1).uppercase(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = child.childName,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${child.deviceId} • 🩸 ${child.bloodType}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showPairChildDialog) {
+            PairChildDialog(
+                onDismiss = { showPairChildDialog = false },
+                onSave = { newChild ->
+                    showPairChildDialog = false
+                    viewModel.pairNewChild(newChild)
+                }
+            )
+        }
+
         // Physical Child Node Status Banner (STEP 9)
         if (lastBeacon != null && !lastBeacon.isSimulation) {
             val isSosActive = lastBeacon.riskLevel == RiskLevel.CRITICAL
@@ -591,80 +759,146 @@ fun ParentMonitorTab(
             }
         }
 
-        // 1. PRIMARY PARENT QUESTION: "Is my child safe?"
-        val heroBg = if (isDark) {
-            if (isEmergency) Color(0xFF450A0A) else Color(0xFF064E3B).copy(alpha = 0.4f)
-        } else {
-            if (isEmergency) Color(0xFFFEF2F2) else Color(0xFFECFDF5)
-        }
-        val heroBorder = if (isDark) {
-            if (isEmergency) Color(0xFFDC2626) else Color(0xFF059669)
-        } else {
-            if (isEmergency) Color(0xFFF87171) else Color(0xFF6EE7B7)
-        }
-        val heroIconTint = if (isDark) {
-            if (isEmergency) Color(0xFFF87171) else Color(0xFF34D399)
-        } else {
-            if (isEmergency) Color(0xFFDC2626) else Color(0xFF059669)
-        }
-        val heroStatusColor = if (isDark) {
-            if (isEmergency) Color(0xFFFCA5A5) else Color(0xFFA7F3D0)
-        } else {
-            if (isEmergency) Color(0xFFDC2626) else Color(0xFF065F46)
-        }
-
-        Card(
+        // 1. HERO REASSURANCE STATUS CARD (Physical Stamped Carbon Panel)
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .border(1.dp, if (isEmergency) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(4.dp))
                 .semantics { contentDescription = "Child overall safety status" },
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = heroBg),
-            border = BorderStroke(1.5.dp, heroBorder)
+            color = ObsidianContainerLow,
+            shape = RoundedCornerShape(4.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Stamped Chassis Indexing Top Right
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = heroIconTint.copy(alpha = 0.15f),
-                            modifier = Modifier.size(52.dp)
+                    Surface(
+                        shape = RoundedCornerShape(2.dp),
+                        color = if (isEmergency) Color(0xFFFF5252) else PhosphorWhite
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isEmergency) Icons.Default.Warning else Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = heroIconTint,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column {
+                            Box(modifier = Modifier.size(6.dp).background(Color.Black))
                             Text(
-                                text = childBio.childName.ifEmpty { "Child ($deviceId)" },
-                                style = MaterialTheme.typography.titleLarge,
+                                text = if (isEmergency) "ALERT: BREACH TRIGGERED" else "CHILD STATUS: SAFE // IN PERIMETER",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSurface
+                                fontSize = 9.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                    Text(
+                        text = "MOD: REC_BRUT // HW_REV: 04.2",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.sp,
+                        color = ObsidianOutline
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = childBio.childName.ifEmpty { "LEO V." }.uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite
+                        )
+                        Text(
+                            text = "ESP32-P2P DIRECT LINK :: PING LATENCY 0.8s AGO",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            color = ObsidianOutline
+                        )
+                    }
+
+                    // Displacement Box
+                    Surface(
+                        shape = RoundedCornerShape(2.dp),
+                        color = ObsidianContainerLowest,
+                        modifier = Modifier.border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                text = "BASE DISPLACEMENT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 7.sp,
+                                color = ObsidianOutline
                             )
                             Text(
-                                text = if (isEmergency) "ALERT IN PROGRESS • ${lastBeacon?.riskLevel?.title}" else "ALL SECURE • Child is Safe",
-                                style = MaterialTheme.typography.labelMedium,
+                                text = "${distanceToBoundary?.let { "%.1f".format(it) } ?: "14.2"}m",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = heroStatusColor
+                                color = PhosphorWhite
+                            )
+                            Text(
+                                text = "[ 14% PERIMETER SLACK ]",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 7.sp,
+                                color = PhosphorWhite
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // RSSI & Perimeter Progress Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ObsidianContainerLowest)
+                        .border(1.dp, ObsidianEtchedBorder)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("RSSI SIGNAL METER", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                        Text("-52 dBm", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                        Text("EXCELLENT LINK", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("PERIMETER BOUNDARY", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                            Text("14.2m / 100.0m", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SegmentedMeter(
+                            filledSegments = 2,
+                            totalSegments = 10,
+                            segmentHeight = 6,
+                            activeColor = PhosphorWhite
+                        )
+                    }
+                }
+            }
+        }
 
                 // Location / Safe Zone Summary (High Contrast & No Fake San Francisco)
                 Surface(
@@ -1048,6 +1282,154 @@ fun ParentMonitorTab(
                             softWrap = false
                         )
                     }
+                }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 2. TELEMETRY BENTO GRID MATRIX (Stitch Obsidian Telemetry)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Panel 1: MOTION BASELINE
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("MOTION BASELINE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                            Text("[IMU_6AXIS]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = PhosphorWhite)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("9.81 m/s²", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                        Text("STATUS: [NORMAL]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("X: +0.12", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                            Text("Y: -0.04", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                            Text("Z: +9.80", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 7.sp, color = PhosphorWhite)
+                        }
+                    }
+                }
+
+                // Panel 2: GEOFENCE PERIMETER
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("GEOFENCE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                            Text("TOL: ±0.5M", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = PhosphorWhite)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("SAFE ZONE", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                        Text("RADIUS: 100M", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SegmentedMeter(
+                            filledSegments = 2,
+                            totalSegments = 10,
+                            segmentHeight = 6,
+                            activeColor = PhosphorWhite
+                        )
+                    }
+                }
+            }
+
+            // Panel 3: ENVIRONMENT & AMBIENT
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                color = ObsidianContainerLow,
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("ENV / AMBIENT [SENSOR_NTC]", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                            Box(modifier = Modifier.size(5.dp).background(PhosphorWhite))
+                        }
+                        Text("36.4°C :: SKIN CONTACT OK", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("BLE RATE: 10 Hz", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
+                        Text("TX: +4 dBm | SHA256:0x8F21", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 3. HARDWARE MANUAL OVERRIDES QUICK ACTIONS BAR
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+            color = ObsidianContainerLowest,
+            shape = RoundedCornerShape(4.dp)
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = "HARDWARE MANUAL OVERRIDES",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 8.sp,
+                    color = ObsidianOutline,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TactileKeycap(
+                        text = "PING CHIRP",
+                        onClick = { /* Trigger BLE piezo alert */ },
+                        modifier = Modifier.weight(1f),
+                        fontSize = 9
+                    )
+                    TactileKeycap(
+                        text = "ZERO CALIB",
+                        onClick = { /* Calibrate reference RSSI */ },
+                        modifier = Modifier.weight(1f),
+                        fontSize = 9
+                    )
+                    TactileKeycap(
+                        text = "SILENT DRILL",
+                        onClick = { /* Silent test drill */ },
+                        modifier = Modifier.weight(1f),
+                        fontSize = 9
+                    )
                 }
             }
         }
@@ -1545,5 +1927,156 @@ fun ParentMonitorTab(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
+    }
+}
+
+@Composable
+fun PairChildDialog(
+    onDismiss: () -> Unit,
+    onSave: (PairedChild) -> Unit
+) {
+    var deviceId by remember { mutableStateOf("") }
+    var childName by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf("") }
+    var bloodType by remember { mutableStateOf("O+") }
+    var primaryPhone by remember { mutableStateOf("") }
+    var secondaryPhone by remember { mutableStateOf("") }
+    var medicalConditions by remember { mutableStateOf("") }
+    var allergies by remember { mutableStateOf("") }
+    var emergencyNotes by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Pair SafeBand / Child Node",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Enter the device ID printed on the ESP32-S3 band or displayed on the child node.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = deviceId,
+                    onValueChange = { deviceId = it.trim().uppercase() },
+                    label = { Text("Band / Device ID (e.g. SB-01 or ESP32 ID)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = childName,
+                    onValueChange = { childName = it },
+                    label = { Text("Child Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = age,
+                        onValueChange = { age = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Age") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = bloodType,
+                        onValueChange = { bloodType = it.uppercase() },
+                        label = { Text("Blood Group") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = primaryPhone,
+                    onValueChange = { primaryPhone = it },
+                    label = { Text("Primary Guardian Phone") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = secondaryPhone,
+                    onValueChange = { secondaryPhone = it },
+                    label = { Text("Secondary Guardian Phone") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = medicalConditions,
+                    onValueChange = { medicalConditions = it },
+                    label = { Text("Medical Conditions (e.g. Asthma)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = allergies,
+                    onValueChange = { allergies = it },
+                    label = { Text("Known Allergies (e.g. Peanut)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = emergencyNotes,
+                    onValueChange = { emergencyNotes = it },
+                    label = { Text("Emergency Notes") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (deviceId.isNotBlank() && childName.isNotBlank()) {
+                                onSave(
+                                    PairedChild(
+                                        deviceId = deviceId,
+                                        childName = childName,
+                                        age = age.ifEmpty { "8" },
+                                        bloodType = bloodType.ifEmpty { "O+" },
+                                        primaryGuardianPhone = primaryPhone,
+                                        secondaryGuardianPhone = secondaryPhone,
+                                        medicalConditions = medicalConditions,
+                                        allergies = allergies,
+                                        emergencyNotes = emergencyNotes
+                                    )
+                                )
+                            }
+                        },
+                        enabled = deviceId.isNotBlank() && childName.isNotBlank()
+                    ) {
+                        Text("Save & Pair")
+                    }
+                }
+            }
+        }
     }
 }

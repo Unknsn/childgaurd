@@ -20,9 +20,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SchoolVerificationLog::class,
         SupervisedJourney::class,
         JourneyEvent::class,
-        IncidentCoordinationRecord::class
+        IncidentCoordinationRecord::class,
+        PairedChild::class,
+        ChildSpecificContact::class,
+        PlaybookActionLog::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class SafeBandDatabase : RoomDatabase() {
@@ -33,6 +36,8 @@ abstract class SafeBandDatabase : RoomDatabase() {
     abstract fun schoolDao(): SchoolDao
     abstract fun journeyDao(): JourneyDao
     abstract fun coordinationDao(): CoordinationDao
+    abstract fun pairedChildDao(): PairedChildDao
+    abstract fun playbookDao(): PlaybookDao
 
     companion object {
         @Volatile
@@ -215,6 +220,58 @@ abstract class SafeBandDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Non-destructive migration from Schema v3 to v4 (v3.0.0 Major Update).
+         * Adds tables for Multi-Child & Paired Band Manager, Child-Specific Contacts,
+         * and Emergency Playbook Audit Logs.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Paired Children Table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS paired_children (
+                        deviceId TEXT PRIMARY KEY NOT NULL,
+                        childName TEXT NOT NULL,
+                        age TEXT NOT NULL,
+                        bloodType TEXT NOT NULL,
+                        primaryGuardianPhone TEXT NOT NULL,
+                        secondaryGuardianPhone TEXT NOT NULL,
+                        medicalConditions TEXT NOT NULL,
+                        allergies TEXT NOT NULL,
+                        emergencyNotes TEXT NOT NULL,
+                        avatarColorHex TEXT NOT NULL DEFAULT '#00F5D4',
+                        isPhysicalEsp32 INTEGER NOT NULL DEFAULT 1,
+                        lastSeenTimestamp INTEGER NOT NULL DEFAULT 0,
+                        batteryLevel INTEGER NOT NULL DEFAULT 100
+                    )
+                """.trimIndent())
+
+                // 2. Child-Specific Contacts Table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS child_specific_contacts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        childDeviceId TEXT NOT NULL,
+                        contactName TEXT NOT NULL,
+                        phoneNumber TEXT NOT NULL,
+                        relationship TEXT NOT NULL
+                    )
+                """.trimIndent())
+
+                // 3. Incident Playbook Audit Logs
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS playbook_action_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        incidentId TEXT NOT NULL,
+                        stepNumber INTEGER NOT NULL,
+                        stepTitle TEXT NOT NULL,
+                        actionTimestamp INTEGER NOT NULL,
+                        actionSummary TEXT NOT NULL,
+                        actor TEXT NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): SafeBandDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -222,7 +279,7 @@ abstract class SafeBandDatabase : RoomDatabase() {
                     SafeBandDatabase::class.java,
                     "safeband_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 INSTANCE = instance
                 instance

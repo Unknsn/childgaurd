@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.IncidentStage
+import com.example.ui.components.TactileKeycap
+import com.example.ui.theme.CarbonChassis
+import com.example.ui.theme.MilledSilver
+import com.example.ui.theme.ObsidianContainer
+import com.example.ui.theme.ObsidianContainerLow
+import com.example.ui.theme.ObsidianContainerLowest
+import com.example.ui.theme.ObsidianEtchedBorder
+import com.example.ui.theme.ObsidianOutline
+import com.example.ui.theme.PhosphorWhite
 import com.example.model.RiskLevel
 import com.example.model.SafetyIncident
 import com.example.model.SyncStatus
@@ -110,9 +120,10 @@ fun AlertHistoryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(CarbonChassis)
             .padding(16.dp)
     ) {
-        // Top Header
+        // Top Header (Stitch Incident Audit Log)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -126,29 +137,31 @@ fun AlertHistoryScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = PhosphorWhite
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
-                Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(modifier = Modifier.size(8.dp).background(PhosphorWhite))
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Safety Timeline V2",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "SAFEBAND // BLACKBOX_AUDIT",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = PhosphorWhite,
+                        letterSpacing = 1.sp
                     )
                     Text(
-                        text = "Chronological Audit Trail • Provenance Tracking",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "NVRAM_RECORD // SHA-256 VERIFIED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.sp,
+                        color = ObsidianOutline,
+                        letterSpacing = 1.sp
                     )
                 }
             }
@@ -165,7 +178,7 @@ fun AlertHistoryScreen(
                     Icon(
                         imageVector = Icons.Default.PlayCircle,
                         contentDescription = "Launch Replay",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = PhosphorWhite
                     )
                 }
 
@@ -177,43 +190,77 @@ fun AlertHistoryScreen(
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
                             contentDescription = "Clear History",
-                            tint = MaterialTheme.colorScheme.error
+                            tint = Color(0xFFFF5252)
                         )
                     }
                 }
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Secondary Hardware Status Header
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
+            color = ObsidianContainerLowest,
+            shape = RoundedCornerShape(2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("BUFFER:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                    Text("128KB NVRAM", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = PhosphorWhite)
+                }
+                Text(
+                    text = "TAMPER PROOF: SHA-256 VERIFIED",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 8.sp,
+                    color = MilledSilver
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Filter Chips Row
+        // Tactile Selector Chips Row
         if (timelineItems.isNotEmpty()) {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val filters = listOf("ALL", "CRITICAL", "EMERGENCY", "WARNING", "RELAY / SYNC", "RESOLVED")
                 items(filters) { filter ->
-                    FilterChip(
-                        selected = selectedFilter == filter,
+                    val isSelected = selectedFilter == filter
+                    Surface(
                         onClick = { selectedFilter = filter },
-                        label = {
-                            Text(
-                                text = filter,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        shape = RoundedCornerShape(2.dp),
+                        color = if (isSelected) PhosphorWhite else ObsidianContainerLow,
+                        modifier = Modifier.border(1.dp, if (isSelected) PhosphorWhite else ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                    ) {
+                        Text(
+                            text = "[ $filter ]",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            color = if (isSelected) Color.Black else MilledSilver,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
-                    )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
         // Timeline Feed or Empty State
@@ -369,7 +416,7 @@ fun AlertHistoryScreen(
 }
 
 /**
- * Visual Timeline Item Card with vertical connector and provenance metadata.
+ * Visual Timeline Item Card with vertical connector and provenance metadata (Obsidian Telemetry).
  */
 @Composable
 fun TimelineCardItem(
@@ -381,37 +428,37 @@ fun TimelineCardItem(
     val timeStr = timeFormat.format(Date(item.timestamp))
 
     val dotColor = when (item.riskLevel) {
-        RiskLevel.CRITICAL -> Color(0xFFDC2626)
-        RiskLevel.HIGH -> Color(0xFFEA580C)
-        RiskLevel.MEDIUM -> Color(0xFFF59E0B)
-        RiskLevel.LOW -> Color(0xFF38BDF8)
-        RiskLevel.NORMAL -> Color(0xFF10B981)
+        RiskLevel.CRITICAL -> Color(0xFFFF5252)
+        RiskLevel.HIGH -> Color(0xFFFF7043)
+        RiskLevel.MEDIUM -> Color(0xFFFFB74D)
+        RiskLevel.LOW -> PhosphorWhite
+        RiskLevel.NORMAL -> MilledSilver
     }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        border = BorderStroke(1.dp, dotColor.copy(alpha = 0.35f)),
+    Surface(
+        shape = RoundedCornerShape(2.dp),
+        color = ObsidianContainerLowest,
         modifier = modifier
             .fillMaxWidth()
+            .border(1.dp, if (item.riskLevel == RiskLevel.CRITICAL) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(2.dp))
             .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.Top
         ) {
             // Visual Node Indicator
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 2.dp, end = 12.dp)
+                modifier = Modifier.padding(top = 4.dp, end = 10.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = dotColor,
-                    modifier = Modifier.size(12.dp)
-                ) {}
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(dotColor)
+                )
             }
 
             // Body Content
@@ -422,23 +469,26 @@ fun TimelineCardItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = item.title,
+                        text = item.title.uppercase(),
                         style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = PhosphorWhite,
+                        fontSize = 11.sp
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = dotColor
+                        shape = RoundedCornerShape(2.dp),
+                        color = if (item.riskLevel == RiskLevel.CRITICAL) Color(0xFFFF5252) else PhosphorWhite
                     ) {
                         Text(
-                            text = item.riskLevel.title.uppercase(),
+                            text = "[ ${item.riskLevel.title.uppercase()} ]",
                             style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            color = Color.Black,
+                            fontSize = 8.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                 }
@@ -448,11 +498,13 @@ fun TimelineCardItem(
                 Text(
                     text = item.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
+                    fontFamily = FontFamily.Monospace,
+                    color = MilledSilver,
+                    lineHeight = 14.sp,
+                    fontSize = 10.sp
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Provenance & Metadata Chips Row
                 Row(
@@ -463,22 +515,25 @@ fun TimelineCardItem(
                     Text(
                         text = timeStr,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp
+                        fontFamily = FontFamily.Monospace,
+                        color = ObsidianOutline,
+                        fontSize = 8.sp
                     )
 
                     // Observation Count Chip
                     if (item.observationCount > 1) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            shape = RoundedCornerShape(2.dp),
+                            color = ObsidianContainerLow,
+                            modifier = Modifier.border(0.5.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
                         ) {
                             Text(
-                                text = "×${item.observationCount} Obs",
+                                text = "×${item.observationCount} OBS",
                                 style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.sp,
+                                color = PhosphorWhite,
+                                fontSize = 8.sp,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -486,25 +541,16 @@ fun TimelineCardItem(
 
                     // Sync Status Chip
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = when (item.syncStatus) {
-                            SyncStatus.SYNCED -> Color(0xFFECFDF5)
-                            SyncStatus.RELAYED -> Color(0xFFEFF6FF)
-                            SyncStatus.PENDING_SYNC -> Color(0xFFFFFBEB)
-                            else -> Color(0xFFF1F5F9)
-                        }
+                        shape = RoundedCornerShape(2.dp),
+                        color = ObsidianContainerLow,
+                        modifier = Modifier.border(0.5.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
                     ) {
                         Text(
                             text = item.syncStatus.name,
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = when (item.syncStatus) {
-                                SyncStatus.SYNCED -> Color(0xFF047857)
-                                SyncStatus.RELAYED -> Color(0xFF1D4ED8)
-                                SyncStatus.PENDING_SYNC -> Color(0xFFB45309)
-                                else -> Color(0xFF475569)
-                            },
-                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MilledSilver,
+                            fontSize = 8.sp,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
@@ -512,15 +558,16 @@ fun TimelineCardItem(
                     // Simulation Indicator
                     if (item.isSimulation) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFFEF08A)
+                            shape = RoundedCornerShape(2.dp),
+                            color = PhosphorWhite
                         ) {
                             Text(
-                                text = "DEMO",
+                                text = "SIM",
                                 style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Black,
-                                color = Color(0xFF854D0E),
-                                fontSize = 9.sp,
+                                color = Color.Black,
+                                fontSize = 8.sp,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }

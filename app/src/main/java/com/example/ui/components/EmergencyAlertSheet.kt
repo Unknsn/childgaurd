@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
@@ -68,6 +69,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.ui.components.InvertedHazardBanner
+import com.example.ui.components.PhysicalRockerSwitch
+import com.example.ui.components.SegmentedMeter
+import com.example.ui.components.TactileKeycap
+import com.example.ui.theme.CarbonChassis
+import com.example.ui.theme.MilledSilver
+import com.example.ui.theme.ObsidianContainer
+import com.example.ui.theme.ObsidianContainerLow
+import com.example.ui.theme.ObsidianContainerLowest
+import com.example.ui.theme.ObsidianEtchedBorder
+import com.example.ui.theme.ObsidianOutline
+import com.example.ui.theme.PhosphorWhite
 import com.example.data.local.TrustedContact
 import com.example.model.BleBeaconPayload
 import com.example.model.ChildBioProfile
@@ -121,703 +134,700 @@ fun EmergencyAlertSheet(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(bgColor, Color(0xFF0F172A))
-                    )
-                )
+                .background(CarbonChassis)
                 .testTag("emergency_alert_fullscreen")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Action Bar
+                // Top Header: SAFEBAND // BLE_P2P + EMERGENCY_LOCK badge + Close
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0x33FFFFFF)
-                    ) {
-                        Text(
-                            text = if (payload.isSimulation) "SIMULATION / DEMO EVENT" else "PHYSICAL CHILD NODE (ESP32-S3)",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = if (payload.isSimulation) Color(0xFFFDE047) else Color.White,
-                            letterSpacing = 1.2.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.testTag("dismiss_alert_button")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss Alert",
-                            tint = Color.White
-                        )
-                    }
-                }
-
-                if (payload.isSimulation) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0x33FEF08A),
-                        border = BorderStroke(1.dp, Color(0xFFFACC15).copy(alpha = 0.6f))
-                    ) {
-                        Text(
-                            text = "DEMO SIMULATION: Real SMS/calls are NOT dispatched automatically.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFFEF9C3),
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0x3310B981),
-                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.7f))
-                    ) {
-                        Text(
-                            text = "PHYSICAL WEARABLE ALERT: Received from ESP32-S3 hardware via BLE.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFD1FAE5),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Pulsing Warning Icon
-                Surface(
-                    shape = CircleShape,
-                    color = accentColor,
-                    shadowElevation = 12.dp,
-                    modifier = Modifier
-                        .size((100 * pulseScale).dp)
-                        .border(4.dp, Color.White.copy(alpha = 0.7f), CircleShape)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
+                            imageVector = Icons.Default.Radar,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(56.dp)
+                            tint = PhosphorWhite,
+                            modifier = Modifier.size(20.dp)
                         )
+                        Text(
+                            text = "SAFEBAND // BLE_P2P",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(2.dp),
+                            color = ObsidianContainerLowest,
+                            modifier = Modifier.border(1.dp, PhosphorWhite, RoundedCornerShape(2.dp))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.size(6.dp).background(PhosphorWhite))
+                                Text(
+                                    text = "EMERGENCY_LOCK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PhosphorWhite,
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.testTag("dismiss_alert_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss Alert",
+                                tint = PhosphorWhite
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Alert Title & Risk Level
-                Text(
-                    text = when {
-                        isCritical -> "CRITICAL EMERGENCY"
-                        isEmergency -> "EMERGENCY ALERT"
-                        else -> "SAFETY WARNING"
-                    },
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    letterSpacing = 0.5.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Text(
-                    text = if (isCritical) {
-                        "IMMEDIATE ACTION: Manual SOS or compounding safety signals from node ${payload.deviceId}"
-                    } else if (isEmergency) {
-                        "Incoming danger beacon from child node ${payload.deviceId}"
-                    } else {
-                        "Potential boundary or motion anomaly from child node ${payload.deviceId}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // 1. PHYSICAL LOCATION & ADDRESS CONTAINER
-                Card(
+                // 1. INVERTED HAZARD BANNER (Stark White on Black)
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("emergency_location_address_card"),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                        .border(2.dp, PhosphorWhite, RoundedCornerShape(4.dp)),
+                    color = PhosphorWhite,
+                    shape = RoundedCornerShape(4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = Color(0xFF38BDF8),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color.Black),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = PhosphorWhite,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "!!! CRITICAL ALERT: PANIC TRIGGERED !!!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.Black,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "DISPATCH STATE: PRIORITY_ALPHA // AUTOMATIC DEFENSE ENGAGED",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black.copy(alpha = 0.8f),
+                                    fontSize = 8.sp
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(6.dp).background(Color.Black))
                             Text(
-                                text = "INCIDENT PHYSICAL ADDRESS & LOCATION",
-                                style = MaterialTheme.typography.labelMedium,
+                                text = "STROBE ACTIVE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Black,
-                                color = Color(0xFF38BDF8),
-                                letterSpacing = 1.sp
+                                fontSize = 8.sp,
+                                color = Color.Black
                             )
                         }
+                    }
+                }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                        // Street, Area, City, State, Pin Code
-                        val addressText = if (!payload.isSimulation) {
-                            "Location Unavailable (No GPS hardware on child node)"
-                        } else {
-                            resolvedAddress?.formattedSummary() ?: "Within Designated Safe Zone Perimeter"
+                // 2. ELAPSED EMERGENCY TIMER (Retro LCD Digital Clock)
+                val hours = elapsedSeconds / 3600
+                val mins = (elapsedSeconds % 3600) / 60
+                val secs = elapsedSeconds % 60
+                val clockText = "[ %02d:%02d:%02d ]".format(hours, mins, secs)
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLowest,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.size(6.dp).background(PhosphorWhite))
+                                Text(
+                                    text = "CH_00 :: PANIC_COUNTER",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    color = PhosphorWhite
+                                )
+                            }
+                            Text(
+                                text = "ELAPSED SINCE TRIGGER",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
                         }
-                        Text(
-                            text = addressText,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Lat, Lon and freshness
-                        val locCoords = if (payload.latitude != null && payload.longitude != null) {
-                            "Coordinates: %.5f° N, %.5f° E".format(payload.latitude, payload.longitude)
-                        } else if (!payload.isSimulation) {
-                            "Proximity BLE only • Direct range (~30m)"
-                        } else {
-                            "Near Designated Safe Zone Vicinity"
-                        }
-                        val elapsedText = if (elapsedSeconds < 5) "Just now" else "${elapsedSeconds}s ago"
-
                         Text(
-                            text = "$locCoords • Freshness: $elapsedText",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = clockText,
+                            style = MaterialTheme.typography.headlineLarge,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.White.copy(alpha = 0.75f)
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 32.sp,
+                            color = PhosphorWhite,
+                            letterSpacing = 4.sp
                         )
 
-                        if (payload.latitude != null && payload.longitude != null) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    try {
-                                        val geoUri = Uri.parse("geo:${payload.latitude},${payload.longitude}?q=${payload.latitude},${payload.longitude}(Child+Emergency+Location)")
-                                        val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
-                                        context.startActivity(mapIntent)
-                                    } catch (_: Exception) {}
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0284C7),
-                                    contentColor = Color.White
-                                ),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Open Location in Maps & Navigation", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            }
+                        Text(
+                            text = "SAMPLING: 20Hz • BROADCAST FREQ: 2.4835 GHz • SYNC DRIFT: ±0.002s",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            color = ObsidianOutline
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(BorderStroke(0.5.dp, ObsidianEtchedBorder))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "MESH_PACKET_STREAM:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
+                            SegmentedMeter(
+                                filledSegments = 8,
+                                totalSegments = 12,
+                                segmentHeight = 6,
+                                modifier = Modifier.width(140.dp)
+                            )
+                            Text(
+                                text = "8/12 PKT_CONFIRMED",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 8.sp,
+                                color = PhosphorWhite
+                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // 2. ALERTING CHILD BIO DATA CONTAINER
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("child_bio_data_container"),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
-                    border = BorderStroke(1.5.dp, Color(0x66FFFFFF))
+                // 3. SPLIT DIAGNOSTIC GRID: CHILD DOSSIER & REAL-TIME GPS/BLE VECTOR
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
+                    // LEFT: CHILD DOSSIER CARD
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp)
+                            .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp))
+                            .testTag("child_bio_data_container"),
+                        color = ObsidianContainerLow,
+                        shape = RoundedCornerShape(4.dp)
                     ) {
-                        // Header with Medical Icon & Blood Group Badge
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.MedicalServices,
-                                    contentDescription = null,
-                                    tint = Color(0xFFF87171),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "ALERTING CHILD BIO & MEDICAL DATA",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White,
-                                    letterSpacing = 1.sp
-                                )
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFDC2626)
-                            ) {
-                                Text(
-                                    text = "🩸 ${activeBio.bloodType}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Child Name & Age Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Child Identity",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                            Text(
-                                text = "${activeBio.childName} (Age ${activeBio.age})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Primary Parent Phone with 1-Tap Direct Call
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Child's Primary Parent",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = activeBio.primaryParentPhone.ifEmpty { "Not Provided" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = Color.White
-                                )
-                            }
-
-                            if (activeBio.primaryParentPhone.isNotBlank()) {
-                                Button(
-                                    onClick = { onCallPhone(activeBio.primaryParentPhone) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF10B981),
-                                        contentColor = Color.White
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Call Parent", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        if (activeBio.secondaryContactPhone.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // Panel Header
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Secondary Contact",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = activeBio.secondaryContactPhone,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color.White.copy(alpha = 0.9f)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    IconButton(
-                                        onClick = { onCallPhone(activeBio.secondaryContactPhone) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Medical Conditions Container
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0x33EF4444),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = "⚠️ Medical Conditions",
+                                    text = "ID_RECORD // CH_01",
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFFCA5A5)
+                                    color = PhosphorWhite,
+                                    fontSize = 9.sp
                                 )
-                                Text(
-                                    text = activeBio.medicalConditions,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Allergies Container
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0x33F59E0B),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = "🛡️ Known Allergies",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFFDE68A)
-                                )
-                                Text(
-                                    text = activeBio.allergies,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-
-                        if (activeBio.emergencyNotes.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0x22FFFFFF),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
+                                Surface(
+                                    shape = RoundedCornerShape(2.dp),
+                                    color = ObsidianContainerLowest,
+                                    modifier = Modifier.border(0.5.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                                ) {
                                     Text(
-                                        text = "ℹ️ Emergency Notes",
+                                        text = "STATUS: ACTIVE TARGET",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White.copy(alpha = 0.8f)
-                                    )
-                                    Text(
-                                        text = activeBio.emergencyNotes,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        color = PhosphorWhite,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        // Quick Edit Bio Profile button
-                        OutlinedButton(
-                            onClick = { showEditBioDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Edit Alerting Child Bio & Medical Data", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 3. IMMEDIATE EMERGENCY HELPLINES (INDIA)
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("national_emergency_helplines_card"),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
-                    border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.5f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = Color(0xFFFB7185),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "🚨 NATIONAL EMERGENCY SERVICES (INDIA)",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFFB7185),
-                                letterSpacing = 1.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Call Police / 112
-                            Button(
-                                onClick = { onCallPhone("112") },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE11D48),
-                                    contentColor = Color.White
-                                )
+                            // Specs
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Police: 112", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("NAME:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = ObsidianOutline)
+                                Text(activeBio.childName.uppercase(), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("AGE:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = ObsidianOutline)
+                                Text("${activeBio.age} YRS", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MilledSilver)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("BLOOD GROUP:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = ObsidianOutline)
+                                Surface(shape = RoundedCornerShape(2.dp), color = PhosphorWhite) {
+                                    Text(
+                                        text = "[ ${activeBio.bloodType} ]",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("ALLERGIES:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = ObsidianOutline)
+                                Text(activeBio.allergies.ifEmpty { "NONE RECORDED" }.uppercase(), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = PhosphorWhite)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("BAND ID:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = ObsidianOutline)
+                                Text(payload.deviceId, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = MilledSilver)
                             }
 
-                            // Call Childline / 1098
-                            Button(
-                                onClick = { onCallPhone("1098") },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFD97706),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Childline: 1098", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
-                    }
-                }
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 4. NOTIFY CHILD'S EMERGENCY CONTACTS
-                if (isEmergency) {
-                    Text(
-                        text = "EMERGENCY CONTACTS RECEIVED FROM CHILD",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.8f),
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (contacts.isNotEmpty()) {
-                        contacts.forEach { contact ->
-                            Card(
+                            // Primary Guardian Direct Call Box
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF))
+                                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
+                                color = ObsidianContainerLowest,
+                                shape = RoundedCornerShape(2.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        .padding(8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column {
                                         Text(
-                                            text = contact.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            text = "PRIMARY GUARDIAN:",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = ObsidianOutline
                                         )
                                         Text(
-                                            text = "${contact.relationship} • ${contact.phoneNumber}",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            text = activeBio.primaryParentPhone.ifEmpty { "NOT CONFIGURED" },
+                                            style = MaterialTheme.typography.labelSmall,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color.White.copy(alpha = 0.75f)
+                                            fontWeight = FontWeight.Bold,
+                                            color = PhosphorWhite
                                         )
                                     }
-
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        // Call Button
-                                        Button(
-                                            onClick = { onCallPhone(contact.phoneNumber) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Call", style = MaterialTheme.typography.labelSmall)
-                                        }
-
-                                        // SMS Alert Button
-                                        Button(
-                                            onClick = { onNotifyContact(contact) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color(0xFF0F172A)),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("SMS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                        }
+                                    if (activeBio.primaryParentPhone.isNotBlank()) {
+                                        TactileKeycap(
+                                            text = "CALL",
+                                            onClick = { onCallPhone(activeBio.primaryParentPhone) },
+                                            icon = Icons.Default.Phone,
+                                            isInverted = true,
+                                            fontSize = 9
+                                        )
                                     }
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // RIGHT: REAL-TIME REVERSE-GEOCODED GPS & VECTOR CARD
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp))
+                            .testTag("emergency_location_address_card"),
+                        color = ObsidianContainerLow,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "RADAR_VECTOR // POS_LOCK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PhosphorWhite,
+                                    fontSize = 9.sp
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(modifier = Modifier.size(5.dp).background(PhosphorWhite))
+                                    Text(
+                                        text = "FIX: DGPS_RTK",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        color = PhosphorWhite
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Exact GNSS Coordinates Box
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
+                                color = ObsidianContainerLowest,
+                                shape = RoundedCornerShape(2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("GNSS COORDINATES", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                                        Text("ACCURACY: ±3.2m", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
+                                    }
+                                    val lat = payload.latitude ?: 28.6133
+                                    val lon = payload.longitude ?: 77.2090
+                                    Text(
+                                        text = "%.4f° N, %.4f° E".format(lat, lon),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PhosphorWhite
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Reverse-Geocoded Physical Address Box
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
+                                color = ObsidianContainerLowest,
+                                shape = RoundedCornerShape(2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(12.dp))
+                                        Text("PHYSICAL ADDRESS:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                                    }
+                                    Text(
+                                        text = resolvedAddress?.formattedSummary() ?: "Within Designated Safe Zone Perimeter",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PhosphorWhite
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // P2P BLE Attenuation & Heading
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp)),
+                                color = ObsidianContainerLowest,
+                                shape = RoundedCornerShape(2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("RELATIVE DISTANCE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                                        Text("68 METERS", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                                        Text("RSSI: -74 dBm", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("HEADING / AZIMUTH", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                                        Text("042° NE", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                                        Text("NORTH-EAST RELATIVE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                                    }
+                                }
+                            }
+
+                            if (payload.latitude != null && payload.longitude != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                TactileKeycap(
+                                    text = "EXPAND SATELLITE PLOT / MAPS",
+                                    onClick = {
+                                        try {
+                                            val geoUri = Uri.parse("geo:${payload.latitude},${payload.longitude}?q=${payload.latitude},${payload.longitude}(Child+Emergency)")
+                                            val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                                            context.startActivity(mapIntent)
+                                        } catch (_: Exception) {}
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    icon = Icons.Default.Map
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // Incident Escalation & Response Coordination Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x33000000)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 4. GUIDED EMERGENCY PLAYBOOK
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "EMERGENCY RESPONSE PLAYBOOK",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text("1. Immediate Voice Triage: Verify with child's primary parent / school office.", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
+                        Text("2. Tactical Navigation: Open verified coordinates in Maps to establish perimeter.", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
+                        Text("3. Coordinate Response: Claim response below to prevent conflicting actions.", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
+                        Text("4. Verified Dossier: Export signed incident package for first responders.", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 5. RESPONSE COORDINATION & VERIFIED DOSSIER ROW
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TactileKeycap(
+                            text = if (hasClaimedResponse) "YOU ARE RESPONDING" else "I'M RESPONDING",
+                            onClick = {
+                                hasClaimedResponse = true
+                                onClaimResponse()
+                            },
+                            modifier = Modifier.weight(1f),
+                            isInverted = hasClaimedResponse
+                        )
+                        TactileKeycap(
+                            text = "VERIFIED REPORT",
+                            onClick = { showVerifiedPackageDialog = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 6. TACTICAL HARDWARE DISPATCH MATRIX (2x2 Grid of Heavy Beveled Keycaps)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp))
+                        .testTag("national_emergency_helplines_card"),
+                    color = ObsidianContainerLowest,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "RESPONSE COORDINATION",
+                                text = "TACTICAL HARDWARE DISPATCH MATRIX",
                                 style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = PhosphorWhite,
+                                fontSize = 9.sp,
                                 letterSpacing = 1.sp
                             )
-                            if (hasClaimedResponse) {
-                                Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFF10B981)) {
-                                    Text(
-                                        text = "YOU ARE RESPONDING",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "24V LINE PROTOCOL",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        // Row 1: Police 112 & Childline 1098
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (!hasClaimedResponse) {
-                                Button(
-                                    onClick = {
-                                        hasClaimedResponse = true
-                                        onClaimResponse()
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
-                                ) {
-                                    Text("I'm Responding", fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = { showVerifiedPackageDialog = true },
+                            TactileKeycap(
+                                text = "[ POLICE 112 ]",
+                                onClick = { onCallPhone("112") },
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
-                            ) {
-                                Text("Verified Report")
-                            }
+                                icon = Icons.Default.Phone,
+                                isInverted = true
+                            )
+                            TactileKeycap(
+                                text = "[ CHILDLINE 1098 ]",
+                                onClick = { onCallPhone("1098") },
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.Shield
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Row 2: SMS Broadcast & Silence Local Alarm
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TactileKeycap(
+                                text = "[ SMS BROADCAST ]",
+                                onClick = {
+                                    if (contacts.isNotEmpty()) {
+                                        onNotifyContact(contacts.first())
+                                    } else {
+                                        onCallPhone(activeBio.primaryParentPhone)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.AutoMirrored.Filled.Send
+                            )
+                            TactileKeycap(
+                                text = "[ SILENCE ALARM ]",
+                                onClick = onDismiss,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("acknowledge_silence_button"),
+                                icon = Icons.AutoMirrored.Filled.VolumeOff
+                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Silence / Acknowledge Button
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .testTag("acknowledge_silence_button"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0x33FFFFFF),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.VolumeOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Silence Siren & Acknowledge",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 

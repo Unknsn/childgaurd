@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.local.ChildSpecificContact
 import com.example.data.local.CoordinationDao
 import com.example.data.local.EscalationConfigEntity
 import com.example.data.local.EscalationDao
@@ -8,8 +9,12 @@ import com.example.data.local.HandoverRecord
 import com.example.data.local.IncidentCoordinationRecord
 import com.example.data.local.JourneyDao
 import com.example.data.local.JourneyEvent
+import com.example.data.local.PairedChild
+import com.example.data.local.PairedChildDao
 import com.example.data.local.PickupAuthorization
 import com.example.data.local.PickupHandoverDao
+import com.example.data.local.PlaybookActionLog
+import com.example.data.local.PlaybookDao
 import com.example.data.local.SchoolDao
 import com.example.data.local.SchoolProfile
 import com.example.data.local.SchoolScheduleException
@@ -35,7 +40,9 @@ class SafetyRepository(
     private val escalationDao: EscalationDao? = null,
     private val schoolDao: SchoolDao? = null,
     private val journeyDao: JourneyDao? = null,
-    private val coordinationDao: CoordinationDao? = null
+    private val coordinationDao: CoordinationDao? = null,
+    private val pairedChildDao: PairedChildDao? = null,
+    private val playbookDao: PlaybookDao? = null
 ) {
     val allEvents: Flow<List<SafetyEvent>> = eventDao.getAllEvents()
     val allContacts: Flow<List<TrustedContact>> = contactDao.getAllContacts()
@@ -65,6 +72,49 @@ class SafetyRepository(
 
     // Feature E: Coordination
     val allCoordinations: Flow<List<IncidentCoordinationRecord>> = coordinationDao?.getAllCoordinations() ?: flowOf(emptyList())
+
+    // v3.0.0: Multi-Child & Paired Band Manager
+    val allPairedChildren: Flow<List<PairedChild>> = pairedChildDao?.getAllPairedChildren() ?: flowOf(emptyList())
+
+    suspend fun getPairedChildByDeviceId(deviceId: String): PairedChild? {
+        return pairedChildDao?.findChildByDeviceId(deviceId)
+    }
+
+    suspend fun savePairedChild(child: PairedChild): Long {
+        return pairedChildDao?.insertOrUpdateChild(child) ?: -1L
+    }
+
+    suspend fun deletePairedChild(deviceId: String) {
+        pairedChildDao?.deleteChild(deviceId)
+    }
+
+    suspend fun updatePairedChildTelemetry(deviceId: String, battery: Int, timestamp: Long = System.currentTimeMillis()) {
+        pairedChildDao?.updateTelemetry(deviceId, battery, timestamp)
+    }
+
+    fun getContactsForChild(deviceId: String): Flow<List<ChildSpecificContact>> {
+        return pairedChildDao?.getContactsForChild(deviceId) ?: flowOf(emptyList())
+    }
+
+    suspend fun getContactsSnapshotForChild(deviceId: String): List<ChildSpecificContact> {
+        return pairedChildDao?.getContactsSnapshotForChild(deviceId) ?: emptyList()
+    }
+
+    suspend fun addContactForChild(contact: ChildSpecificContact): Long {
+        return pairedChildDao?.insertContact(contact) ?: -1L
+    }
+
+    suspend fun deleteContactForChild(id: Long) {
+        pairedChildDao?.deleteContact(id)
+    }
+
+    fun getPlaybookLogsForIncident(incidentId: String): Flow<List<PlaybookActionLog>> {
+        return playbookDao?.getLogsForIncident(incidentId) ?: flowOf(emptyList())
+    }
+
+    suspend fun logPlaybookAction(log: PlaybookActionLog): Long {
+        return playbookDao?.insertPlaybookLog(log) ?: -1L
+    }
 
 
     suspend fun setSafetyMonitoringEnabled(enabled: Boolean) {

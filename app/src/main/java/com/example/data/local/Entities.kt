@@ -197,3 +197,47 @@ data class IncidentCoordinationRecord(
     val resolutionReason: String? = null,
     val resolvedTimestamp: Long? = null
 )
+
+// =============================================================================
+// v3.0.0: Multi-Child & Paired Band Registry Entities
+// =============================================================================
+
+@Entity(tableName = "paired_children")
+data class PairedChild(
+    @PrimaryKey
+    val deviceId: String, // e.g. "SB-A1B2" or physical ESP32 MAC/salt
+    val childName: String,
+    val age: String,
+    val bloodType: String,
+    val primaryGuardianPhone: String,
+    val secondaryGuardianPhone: String = "",
+    val medicalConditions: String = "",
+    val allergies: String = "",
+    val emergencyNotes: String = "",
+    val avatarColorHex: String = "#00F5D4",
+    val isPhysicalEsp32: Boolean = true,
+    val lastSeenTimestamp: Long = 0L,
+    val batteryLevel: Int = 100
+)
+
+@Entity(tableName = "child_specific_contacts")
+data class ChildSpecificContact(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val childDeviceId: String,
+    val contactName: String,
+    val phoneNumber: String,
+    val relationship: String = "Guardian"
+)
+
+@Entity(tableName = "playbook_action_logs")
+data class PlaybookActionLog(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val incidentId: String,
+    val stepNumber: Int,
+    val stepTitle: String,
+    val actionTimestamp: Long = System.currentTimeMillis(),
+    val actionSummary: String,
+    val actor: String = "Primary Parent"
+)

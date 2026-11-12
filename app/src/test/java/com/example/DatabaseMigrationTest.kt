@@ -24,7 +24,7 @@ class DatabaseMigrationTest {
     fun testDatabaseSchemaInstantiationAndTables() {
         val db = Room.inMemoryDatabaseBuilder(context, SafeBandDatabase::class.java)
             .allowMainThreadQueries()
-            .addMigrations(SafeBandDatabase.MIGRATION_1_2, SafeBandDatabase.MIGRATION_2_3)
+            .addMigrations(SafeBandDatabase.MIGRATION_1_2, SafeBandDatabase.MIGRATION_2_3, SafeBandDatabase.MIGRATION_3_4)
             .build()
 
         assertNotNull(db.safetyEventDao())
@@ -34,6 +34,8 @@ class DatabaseMigrationTest {
         assertNotNull(db.schoolDao())
         assertNotNull(db.journeyDao())
         assertNotNull(db.coordinationDao())
+        assertNotNull(db.pairedChildDao())
+        assertNotNull(db.playbookDao())
 
         // Verify open helper executes migrations without crashing
         val openHelper = db.openHelper
@@ -62,6 +64,9 @@ class DatabaseMigrationTest {
         assertTrue("supervised_journeys table must exist", tableNames.contains("supervised_journeys"))
         assertTrue("journey_events table must exist", tableNames.contains("journey_events"))
         assertTrue("incident_coordination_records table must exist", tableNames.contains("incident_coordination_records"))
+        assertTrue("paired_children table must exist", tableNames.contains("paired_children"))
+        assertTrue("child_specific_contacts table must exist", tableNames.contains("child_specific_contacts"))
+        assertTrue("playbook_action_logs table must exist", tableNames.contains("playbook_action_logs"))
 
         db.close()
     }

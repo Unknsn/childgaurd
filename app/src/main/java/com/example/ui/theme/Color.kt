@@ -2,29 +2,54 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val SafeBandCyanLight = Color(0xFF0284C7)
-val SafeBandTealLight = Color(0xFF0D9488)
-val SafeBandAmberLight = Color(0xFFF59E0B)
+// Obsidian Telemetry Design System Tokens (Stitch 8567237654060793389)
+val CarbonChassis = Color(0xFF0A0A0A)
+val ObsidianSurface = Color(0xFF131313)
+val ObsidianContainerLowest = Color(0xFF0E0E0E)
+val ObsidianContainerLow = Color(0xFF1C1B1B)
+val ObsidianContainer = Color(0xFF201F1F)
+val ObsidianContainerHigh = Color(0xFF2A2A2A)
+val ObsidianContainerHighest = Color(0xFF353534)
+val ObsidianSurfaceBright = Color(0xFF393939)
+
+val ObsidianEtchedBorder = Color(0xFF444748)
+val ObsidianOutline = Color(0xFF8E9192)
+
+val PhosphorWhite = Color(0xFFFFFFFF)
+val MilledSilver = Color(0xFFC7C6C6)
+val MilledSilverLight = Color(0xFFE0E0E0)
+val OnSurfaceText = Color(0xFFE5E2E1)
+val OnSurfaceVariantText = Color(0xFFC4C7C8)
+
+// Emergency / Inverted Alert Tokens
+val InvertedHazardBg = Color(0xFFFFFFFF)
+val InvertedHazardText = Color(0xFF000000)
+val ErrorContainerDark = Color(0xFF93000A)
+val ErrorBright = Color(0xFFFFB4AB)
+
+// Legacy compatibility aliases
+val SafeBandCyanLight = PhosphorWhite
+val SafeBandTealLight = MilledSilver
+val SafeBandAmberLight = MilledSilverLight
 val SafeBandRedLight = Color(0xFFDC2626)
 
-val SafeBandCyanDark = Color(0xFF38BDF8)
-val SafeBandTealDark = Color(0xFF2DD4BF)
-val SafeBandAmberDark = Color(0xFFFBBF24)
-val SafeBandRedDark = Color(0xFFEF4444)
+val SafeBandCyanDark = PhosphorWhite
+val SafeBandTealDark = MilledSilver
+val SafeBandAmberDark = MilledSilverLight
+val SafeBandRedDark = Color(0xFFFFB4AB)
 
-val BackgroundLight = Color(0xFFF8FAFC)
+val BackgroundLight = Color(0xFFF4F4F4)
 val SurfaceLight = Color(0xFFFFFFFF)
-val OnSurfaceLight = Color(0xFF0F172A)
+val OnSurfaceLight = Color(0xFF131313)
 
-val BackgroundDark = Color(0xFF0F172A)
-val SurfaceDark = Color(0xFF1E293B)
-val OnSurfaceDark = Color(0xFFF8FAFC)
+val BackgroundDark = CarbonChassis
+val SurfaceDark = ObsidianSurface
+val OnSurfaceDark = OnSurfaceText
 
-// Retain legacy names for test compatibility
 val Purple80 = SafeBandCyanDark
-val PurpleGrey80 = Color(0xFF94A3B8)
+val PurpleGrey80 = ObsidianOutline
 val Pink80 = SafeBandTealDark
 
 val Purple40 = SafeBandCyanLight
-val PurpleGrey40 = Color(0xFF64748B)
+val PurpleGrey40 = ObsidianEtchedBorder
 val Pink40 = SafeBandTealLight

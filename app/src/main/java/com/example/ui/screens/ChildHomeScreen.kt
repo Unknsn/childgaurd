@@ -101,8 +101,16 @@ import com.example.model.RouteState
 import com.example.model.TrustedRoute
 import com.example.model.VerifiedLocation
 import com.example.ui.SafeBandViewModel
-import com.example.ui.components.CountdownAlertCard
-import com.example.ui.components.RiskStatusBanner
+import com.example.ui.components.SegmentedMeter
+import com.example.ui.components.TactileKeycap
+import com.example.ui.theme.CarbonChassis
+import com.example.ui.theme.MilledSilver
+import com.example.ui.theme.ObsidianContainer
+import com.example.ui.theme.ObsidianContainerLowest
+import com.example.ui.theme.ObsidianContainerLow
+import com.example.ui.theme.ObsidianEtchedBorder
+import com.example.ui.theme.ObsidianOutline
+import com.example.ui.theme.PhosphorWhite
 
 enum class SosHoldState {
     IDLE,
@@ -161,51 +169,76 @@ fun ChildHomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "SafeBand",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Text(
-                                    text = deviceId,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            text = childProfile.childName.ifEmpty { "Child Safety Wearable" },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Radar,
+                            contentDescription = null,
+                            tint = PhosphorWhite,
+                            modifier = Modifier.size(20.dp)
                         )
+                        Column {
+                            Text(
+                                text = "SAFEBAND // BLE_P2P",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "$deviceId // BLE LINKED",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                color = ObsidianOutline,
+                                letterSpacing = 1.sp
+                            )
+                        }
                     }
                 },
                 actions = {
+                    // Battery Segmented Meter
+                    Row(
+                        modifier = Modifier
+                            .background(ObsidianContainerLowest, RoundedCornerShape(2.dp))
+                            .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "${batteryInfo.percentage ?: 88}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = PhosphorWhite
+                        )
+                        SegmentedMeter(
+                            filledSegments = ((batteryInfo.percentage ?: 88) * 8) / 100,
+                            totalSegments = 8,
+                            segmentHeight = 8,
+                            modifier = Modifier.width(36.dp)
+                        )
+                    }
                     IconButton(
                         onClick = onNavigateToHistory,
                         modifier = Modifier.testTag("history_button")
                     ) {
-                        Icon(imageVector = Icons.Default.History, contentDescription = "Event Log")
+                        Icon(imageVector = Icons.Default.History, contentDescription = "Event Log", tint = MilledSilver)
                     }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("settings_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MilledSilver)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = CarbonChassis
                 )
             )
         },
@@ -214,117 +247,91 @@ fun ChildHomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(CarbonChassis)
                 .padding(innerPadding)
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // 1. Child Safety Reassurance Hero Card (Calm when normal, alerting during danger)
+            // 1. REASSURANCE BANNER (Machined Debossed Pill Card)
             val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
-            val heroBgColor = when {
-                isEmergency -> Color(0xFFFEF2F2)
-                isCountingDown -> Color(0xFFFFFBEB)
-                else -> Color(0xFFECFDF5)
-            }
-            val heroBorderColor = when {
-                isEmergency -> Color(0xFFF87171)
-                isCountingDown -> Color(0xFFFCD34D)
-                else -> Color(0xFF6EE7B7)
-            }
-            val heroIconTint = when {
-                isEmergency -> Color(0xFFDC2626)
-                isCountingDown -> Color(0xFFD97706)
-                else -> Color(0xFF059669)
-            }
-            val heroTitle = when {
-                isEmergency -> "HELP REQUESTED"
-                isCountingDown -> "CHECK REQUIRED"
-                else -> "YOU ARE SAFE"
-            }
-            val heroSubtitle = when {
-                isEmergency -> "Broadcasting emergency alert with your location to guardians."
-                isCountingDown -> "Movement or boundary notice detected. Confirm you are OK below."
-                else -> "SafeBand is active and protecting you. Inside ${safeZone.name}."
-            }
+            val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS) || holdState == SosHoldState.ACTIVATED
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = heroBgColor),
-                border = BorderStroke(1.5.dp, heroBorderColor)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, if (isEmergency) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                color = ObsidianContainerLowest,
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = heroIconTint.copy(alpha = 0.15f),
-                        modifier = Modifier.size(48.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = when {
-                                    isEmergency -> Icons.Default.Warning
-                                    isCountingDown -> Icons.Default.Security
-                                    else -> Icons.Default.CheckCircle
-                                },
-                                contentDescription = null,
-                                tint = heroIconTint,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = heroTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Black,
-                            color = heroIconTint,
-                            letterSpacing = 0.5.sp
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(if (isEmergency) Color(0xFFFF5252) else PhosphorWhite)
                         )
                         Text(
-                            text = heroSubtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 2.dp)
+                            text = if (isEmergency) "ALERT BROADCAST ACTIVE" else "PARENT GUARDIAN IN RANGE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isEmergency) Color(0xFFFF5252) else PhosphorWhite,
+                            letterSpacing = 1.sp
                         )
                     }
+                    Text(
+                        text = "14m [RSSI: -52 dBm]",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = ObsidianOutline,
+                        fontSize = 10.sp
+                    )
                 }
             }
 
             // Child Authorized Pickup Reassurance Badge
             if (activeAuthorizations.isNotEmpty()) {
                 val auth = activeAuthorizations.first()
-                Spacer(modifier = Modifier.height(10.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
-                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, PhosphorWhite, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = Color(0xFF1D4ED8), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Authorized Pickup: ${auth.authorizedPersonName}",
-                                style = MaterialTheme.typography.titleSmall,
+                                text = "AUTHORIZED PICKUP: ${auth.authorizedPersonName.uppercase()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E40AF)
+                                color = PhosphorWhite
                             )
                             Text(
-                                text = "Parent authorized ${auth.relationship} to pick you up. Pass Code: ${auth.verificationToken}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF1D4ED8)
+                                text = "REL: ${auth.relationship.uppercase()} // TOKEN: [ ${auth.verificationToken} ]",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                color = MilledSilver
                             )
                         }
                     }
@@ -333,139 +340,119 @@ fun ChildHomeScreen(
 
             // Child Supervised Journey Reassurance Badge
             if (activeJourney != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
-                    border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = Color(0xFF047857), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Supervised Journey: Heading to ${activeJourney!!.destLabel}",
-                                style = MaterialTheme.typography.titleSmall,
+                                text = "SUPERVISED JOURNEY: HEADING TO ${activeJourney!!.destLabel.uppercase()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF065F46)
+                                color = PhosphorWhite
                             )
                             Text(
-                                text = "Safe transit corridor active. Parents are monitoring your journey.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF047857)
+                                text = "CORRIDOR ACTIVE // PARENT TELEMETRY SYNCED",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                color = MilledSilver
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // 2. Risk Status Banner (Preserved for compatibility and indicator flags)
-            RiskStatusBanner(
-                riskLevel = currentRisk,
-                activeFlags = activeFlags,
-                isAdvertising = isAdvertising
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 3. Visible Countdown Card (False Alarm Mitigation Window: "I'm OK, Cancel")
-            CountdownAlertCard(
-                isVisible = isCountingDown,
-                secondsRemaining = countdownSeconds,
-                onCancelClicked = { viewModel.cancelConfirmationCountdown() }
-            )
-
-            if (isCountingDown) {
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-
-            // 4. Large Tactile SOS Panic Button (Phase 19: Press and Hold 2 Seconds)
-            val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS) || holdState == SosHoldState.ACTIVATED
-
-            Card(
+            // 2. CENTER HERO: MASSIVE CIRCULAR SOS PANIC TRIGGER (Stitch Brutalist Dial)
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSosActive) Color(0xFFFEF2F2) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                ),
-                border = BorderStroke(
-                    1.5.dp,
-                    if (isSosActive) Color(0xFFEF4444) else MaterialTheme.colorScheme.outlineVariant
-                )
+                    .border(1.dp, if (isSosActive) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                color = ObsidianContainerLow,
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = when {
-                            isSosActive -> "EMERGENCY SOS IS ACTIVE"
-                            holdState == SosHoldState.HOLDING -> "ACTIVATING SOS..."
-                            holdState == SosHoldState.CANCELLED -> "SOS CANCELLED (RELEASED EARLY)"
-                            else -> "MANUAL SOS PANIC BUTTON"
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Black,
-                        color = if (isSosActive || holdState == SosHoldState.HOLDING) Color(0xFFDC2626) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        letterSpacing = 1.sp
-                    )
+                    // Stamped Module Index Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(BorderStroke(0.5.dp, ObsidianEtchedBorder))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TACTICAL BEACON // MOD_09",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = ObsidianOutline,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = if (isSosActive) "TRANSMITTING" else "ARMED",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSosActive) Color(0xFFFF5252) else PhosphorWhite,
+                            fontSize = 9.sp
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = when {
-                            isSosActive -> "Broadcasting immediate high-risk emergency beacon to guardians. Tap button to cancel."
-                            holdState == SosHoldState.HOLDING -> "Keep holding... %.1fs remaining".format(2.0f * (1f - holdProgress))
-                            holdState == SosHoldState.CANCELLED -> "Press and hold continuously for 2 seconds to trigger emergency."
-                            else -> "Press and hold for 2 full seconds to trigger emergency alarm."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // 2-Second Hold SOS Interactive Container
+                    // Knurled Dial Housing with Hold Progress Ring
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(160.dp)
+                        modifier = Modifier
+                            .size(200.dp)
+                            .background(CarbonChassis, CircleShape)
+                            .border(2.dp, if (isSosActive) Color(0xFFFF5252) else ObsidianEtchedBorder, CircleShape)
                     ) {
-                        // Outer Progress Ring (Shows 2-second hold progress)
+                        // Hold Progress Indicator Ring
                         if (holdState == SosHoldState.HOLDING) {
                             CircularProgressIndicator(
                                 progress = { holdProgress },
-                                modifier = Modifier.size(158.dp),
-                                color = Color(0xFFDC2626),
-                                strokeWidth = 6.dp,
-                                trackColor = Color(0xFFFCA5A5).copy(alpha = 0.4f)
+                                modifier = Modifier.size(196.dp),
+                                color = PhosphorWhite,
+                                strokeWidth = 4.dp,
+                                trackColor = ObsidianEtchedBorder
                             )
                         } else if (isSosActive) {
                             CircularProgressIndicator(
                                 progress = { 1f },
-                                modifier = Modifier.size(158.dp),
-                                color = Color(0xFFDC2626),
+                                modifier = Modifier.size(196.dp),
+                                color = Color(0xFFFF5252),
                                 strokeWidth = 4.dp
                             )
                         }
 
-                        // Circular Tactile SOS Button
+                        // Tactile Physical Keycap SOS Dome
                         Surface(
                             shape = CircleShape,
-                            color = if (isSosActive) Color(0xFFB91C1C) else if (holdState == SosHoldState.HOLDING) Color(0xFFDC2626) else Color(0xFFDC2626),
-                            shadowElevation = if (isSosActive) 14.dp else 6.dp,
+                            color = if (isSosActive) PhosphorWhite else ObsidianContainerLowest,
+                            shadowElevation = 8.dp,
                             modifier = Modifier
-                                .size((136 * (if (isSosActive) pulseScale else 1.0f)).dp)
+                                .size(150.dp)
+                                .border(2.dp, if (isSosActive) Color(0xFFFF5252) else PhosphorWhite, CircleShape)
                                 .clip(CircleShape)
                                 .pointerInput(isSosActive) {
                                     if (isSosActive) {
@@ -511,27 +498,275 @@ fun ChildHomeScreen(
                                 }
                                 .testTag("manual_sos_button")
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
-                                        imageVector = Icons.Default.Sos,
-                                        contentDescription = "Emergency SOS Button. Press and hold 2 seconds to activate.",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(52.dp)
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Hold 2s for SOS",
+                                        tint = if (isSosActive) Color.Black else PhosphorWhite,
+                                        modifier = Modifier.size(34.dp)
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = when {
-                                            isSosActive -> "TAP TO CANCEL"
+                                            isSosActive -> "ALARM\nACTIVE"
                                             holdState == SosHoldState.HOLDING -> "${(holdProgress * 100).toInt()}%"
-                                            else -> "HOLD 2s"
+                                            else -> "HOLD 2s\nFOR SOS"
                                         },
-                                        fontSize = 12.sp,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Black,
-                                        color = Color.White.copy(alpha = 0.95f)
+                                        fontSize = 11.sp,
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = 13.sp,
+                                        color = if (isSosActive) Color.Black else PhosphorWhite
+                                    )
+                                    Text(
+                                        text = "[PUSH_ACTUATOR]",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        color = if (isSosActive) Color.Black.copy(alpha = 0.7f) else ObsidianOutline
                                     )
                                 }
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "EMERGENCY BEACON TRANSMITTER // ESP32-S3",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PhosphorWhite,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "DIRECT PACKET INJECTION // CH_06 LOW LATENCY ADVERT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.sp,
+                        color = ObsidianOutline
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 3. REAL-TIME SENSOR DIALS (Dual Panel Instrumentation)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Sensor 1: Accelerometer Motion Arc Gauge
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "CH_01 // ACCEL",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
+                            Text(
+                                text = "LIVE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PhosphorWhite
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "%.2f m/s²".format(accelMagnitude),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite
+                        )
+                        Text(
+                            text = if (isMotionActive) "ANOMALY MOTION" else "NOMINAL MOVEMENT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            color = if (isMotionActive) Color(0xFFFF5252) else ObsidianOutline
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("FALL_DETECTION:", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
+                            Text(
+                                text = if (isMotionActive) "TRIGGERED" else "ACTIVE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 7.sp,
+                                color = PhosphorWhite
+                            )
+                        }
+                    }
+                }
+
+                // Sensor 2: Geofence Boundary Meter
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLow,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "CH_02 // GEOFENCE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
+                            Text(
+                                text = if (isOutsideSafeZone) "BREACH" else "SECURE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isOutsideSafeZone) Color(0xFFFF5252) else PhosphorWhite
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "${safeZone.radiusMeters.toInt()}m",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite
+                        )
+                        Text(
+                            text = "PERIMETER BOUNDARY",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            color = ObsidianOutline
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SegmentedMeter(
+                            filledSegments = if (isOutsideSafeZone) 10 else 4,
+                            totalSegments = 10,
+                            segmentHeight = 6,
+                            activeColor = if (isOutsideSafeZone) Color(0xFFFF5252) else PhosphorWhite
+                        )
+                    }
+                }
+            }
+
+            // 4. FALSE-ALARM DISPATCH INTERCEPT TRAY (When Counting Down)
+            if (isCountingDown) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(2.dp, PhosphorWhite, RoundedCornerShape(4.dp)),
+                    color = ObsidianContainerLowest,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "DISPATCH INTERCEPT TRAY",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PhosphorWhite
+                                )
+                            }
+                            Text(
+                                text = "[AUTO_TIMEOUT]",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = ObsidianOutline
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Inset Chassis LCD Readout Box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CarbonChassis)
+                                .border(1.dp, ObsidianEtchedBorder)
+                                .padding(10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "BEACON ACKNOWLEDGMENT COUNTDOWN",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    color = ObsidianOutline
+                                )
+                                Text(
+                                    text = "[ 00:00:%02d ]".format(countdownSeconds),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp,
+                                    color = PhosphorWhite,
+                                    letterSpacing = 2.sp
+                                )
+                                Text(
+                                    text = "TO REMOTE DISPATCH BROADCAST",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    color = PhosphorWhite
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        TactileKeycap(
+                            text = "[ ABORT / CANCEL ALARM ]",
+                            onClick = { viewModel.cancelConfirmationCountdown() },
+                            modifier = Modifier.fillMaxWidth(),
+                            isInverted = true
+                        )
                     }
                 }
             }

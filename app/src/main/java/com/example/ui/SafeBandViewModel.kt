@@ -7,6 +7,9 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.PairedChild
+import com.example.data.local.ChildSpecificContact
+import com.example.data.local.PlaybookActionLog
 import com.example.data.local.SafeBandDatabase
 import com.example.data.local.SafetyEvent
 import com.example.data.local.TrustedContact
@@ -96,7 +99,9 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         escalationDao = database.escalationDao(),
         schoolDao = database.schoolDao(),
         journeyDao = database.journeyDao(),
-        coordinationDao = database.coordinationDao()
+        coordinationDao = database.coordinationDao(),
+        pairedChildDao = database.pairedChildDao(),
+        playbookDao = database.playbookDao()
     )
 
     val bleManager = BleSafetyManager(application)
@@ -187,6 +192,79 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     fun updateChildBioProfile(profile: ChildBioProfile) {
         viewModelScope.launch {
             repository.saveChildBioProfile(profile)
+        }
+    }
+
+    // v3.0.0: Multi-Child & Paired Band Manager
+    val allPairedChildren: StateFlow<List<PairedChild>> = repository.allPairedChildren.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        emptyList()
+    )
+
+    fun updateChildBioProfileForDevice(deviceId: String, profile: ChildBioProfile) {
+        viewModelScope.launch {
+            val existing = repository.getPairedChildByDeviceId(deviceId)
+            val updated = (existing ?: PairedChild(
+                deviceId = deviceId,
+                childName = profile.childName,
+                age = profile.age,
+                bloodType = profile.bloodType,
+                primaryGuardianPhone = profile.primaryParentPhone,
+                secondaryGuardianPhone = profile.secondaryContactPhone,
+                medicalConditions = profile.medicalConditions,
+                allergies = profile.allergies,
+                emergencyNotes = profile.emergencyNotes
+            )).copy(
+                childName = profile.childName,
+                age = profile.age,
+                bloodType = profile.bloodType,
+                primaryGuardianPhone = profile.primaryParentPhone,
+                secondaryGuardianPhone = profile.secondaryContactPhone,
+                medicalConditions = profile.medicalConditions,
+                allergies = profile.allergies,
+                emergencyNotes = profile.emergencyNotes
+            )
+            repository.savePairedChild(updated)
+            _incomingChildProfile.value = profile
+        }
+    }
+
+    fun pairNewChild(child: PairedChild) {
+        viewModelScope.launch {
+            repository.savePairedChild(child)
+        }
+    }
+
+    fun deletePairedChild(deviceId: String) {
+        viewModelScope.launch {
+            repository.deletePairedChild(deviceId)
+        }
+    }
+
+    fun addContactForChild(deviceId: String, name: String, phone: String, relationship: String) {
+        viewModelScope.launch {
+            repository.addContactForChild(
+                ChildSpecificContact(
+                    childDeviceId = deviceId,
+                    contactName = name,
+                    phoneNumber = phone,
+                    relationship = relationship
+                )
+            )
+        }
+    }
+
+    fun logPlaybookAction(incidentId: String, stepNumber: Int, stepTitle: String, actionSummary: String) {
+        viewModelScope.launch {
+            repository.logPlaybookAction(
+                PlaybookActionLog(
+                    incidentId = incidentId,
+                    stepNumber = stepNumber,
+                    stepTitle = stepTitle,
+                    actionSummary = actionSummary
+                )
+            )
         }
     }
 
@@ -638,12 +716,38 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         // Always store latest beacon so parent UI displays latest telemetry
         _incomingAlert.value = payload
 
-        // Update incoming child bio profile and contacts from the alerting child node
-        if (payload.childBioProfile != null) {
-            _incomingChildProfile.value = payload.childBioProfile
-        }
-        if (payload.emergencyContacts.isNotEmpty()) {
-            _incomingChildContacts.value = payload.emergencyContacts
+        // v3.0.0: Strict child profile and contacts resolution (Zero parent profile leakage)
+        viewModelScope.launch {
+            val paired = repository.getPairedChildByDeviceId(payload.deviceId)
+            if (paired != null) {
+                val childContacts = repository.getContactsSnapshotForChild(payload.deviceId)
+                val bio = ChildBioProfile(
+                    childName = paired.childName,
+                    age = paired.age,
+                    bloodType = paired.bloodType,
+                    primaryParentPhone = paired.primaryGuardianPhone,
+                    secondaryContactPhone = paired.secondaryGuardianPhone,
+                    medicalConditions = paired.medicalConditions,
+                    allergies = paired.allergies,
+                    emergencyNotes = paired.emergencyNotes
+                )
+                _incomingChildProfile.value = bio
+                _incomingChildContacts.value = childContacts.map {
+                    TrustedContact(name = it.contactName, phoneNumber = it.phoneNumber, relationship = it.relationship)
+                }
+                repository.updatePairedChildTelemetry(payload.deviceId, 100)
+            } else if (payload.childBioProfile != null) {
+                _incomingChildProfile.value = payload.childBioProfile
+                if (payload.emergencyContacts.isNotEmpty()) {
+                    _incomingChildContacts.value = payload.emergencyContacts
+                }
+            } else {
+                _incomingChildProfile.value = ChildBioProfile(
+                    childName = "Child (${payload.deviceId})",
+                    primaryParentPhone = ""
+                )
+                _incomingChildContacts.value = emptyList()
+            }
         }
 
         // Asynchronously resolve physical address for incoming beacon

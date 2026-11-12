@@ -209,3 +209,53 @@ interface CoordinationDao {
     @Query("UPDATE incident_coordination_records SET status = 'SAFE_RESOLVED', resolutionReason = :reason, resolvedTimestamp = :timestamp WHERE incidentId = :incidentId")
     suspend fun resolveCoordination(incidentId: String, reason: String, timestamp: Long = System.currentTimeMillis())
 }
+
+// =============================================================================
+// v3.0.0: Multi-Child & Paired Band DAOs
+// =============================================================================
+
+@Dao
+interface PairedChildDao {
+    @Query("SELECT * FROM paired_children ORDER BY childName ASC")
+    fun getAllPairedChildren(): Flow<List<PairedChild>>
+
+    @Query("SELECT * FROM paired_children ORDER BY childName ASC")
+    suspend fun getAllPairedChildrenSnapshot(): List<PairedChild>
+
+    @Query("SELECT * FROM paired_children WHERE deviceId = :deviceId LIMIT 1")
+    fun getChildByDeviceId(deviceId: String): Flow<PairedChild?>
+
+    @Query("SELECT * FROM paired_children WHERE deviceId = :deviceId LIMIT 1")
+    suspend fun findChildByDeviceId(deviceId: String): PairedChild?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateChild(child: PairedChild): Long
+
+    @Query("DELETE FROM paired_children WHERE deviceId = :deviceId")
+    suspend fun deleteChild(deviceId: String)
+
+    @Query("UPDATE paired_children SET batteryLevel = :battery, lastSeenTimestamp = :timestamp WHERE deviceId = :deviceId")
+    suspend fun updateTelemetry(deviceId: String, battery: Int, timestamp: Long = System.currentTimeMillis())
+
+    // Child-specific contacts
+    @Query("SELECT * FROM child_specific_contacts WHERE childDeviceId = :deviceId")
+    fun getContactsForChild(deviceId: String): Flow<List<ChildSpecificContact>>
+
+    @Query("SELECT * FROM child_specific_contacts WHERE childDeviceId = :deviceId")
+    suspend fun getContactsSnapshotForChild(deviceId: String): List<ChildSpecificContact>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContact(contact: ChildSpecificContact): Long
+
+    @Query("DELETE FROM child_specific_contacts WHERE id = :id")
+    suspend fun deleteContact(id: Long)
+}
+
+@Dao
+interface PlaybookDao {
+    @Query("SELECT * FROM playbook_action_logs WHERE incidentId = :incidentId ORDER BY actionTimestamp ASC")
+    fun getLogsForIncident(incidentId: String): Flow<List<PlaybookActionLog>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaybookLog(log: PlaybookActionLog): Long
+}

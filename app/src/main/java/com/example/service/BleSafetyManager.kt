@@ -400,6 +400,10 @@ class BleSafetyManager(private val context: Context) {
     private var currentScanCallback: ScanCallback? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
+    // v3.0.0: Reassembled over-the-air bio and contact cache per child device
+    val incomingBioCache = ConcurrentHashMap<String, ChildBioProfile>()
+    val incomingContactsCache = ConcurrentHashMap<String, MutableList<TrustedContact>>()
+
     @SuppressLint("MissingPermission")
     fun startAdvertising(
         deviceId: String,
@@ -443,11 +447,16 @@ class BleSafetyManager(private val context: Context) {
             .addManufacturerData(MANUFACTURER_ID, telemetryPayload)
             .build()
 
-        // Privacy: Scan response is empty to avoid exposing PII over unencrypted BLE
-        val scanResponse = AdvertiseData.Builder()
+        // v3.0.0: If high/critical risk emergency, include child bio core in scan response
+        val scanResponseBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .build()
+
+        if ((riskLevel == RiskLevel.CRITICAL || riskLevel == RiskLevel.HIGH) && childBioProfile != null) {
+            val bioCorePayload = encodeBioCorePayload(deviceId, childBioProfile)
+            scanResponseBuilder.addManufacturerData(MANUFACTURER_ID, bioCorePayload)
+        }
+        val scanResponse = scanResponseBuilder.build()
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
@@ -603,51 +612,82 @@ class BleSafetyManager(private val context: Context) {
         if (rawData == null) return
 
         val decoded = decodePacket(rawData) ?: return
-        if (decoded is DecodedPacket.Telemetry) {
-            val ephemeralOrRealId = decoded.deviceId
-            val realId = resolveRealDeviceId(ephemeralOrRealId)
-            val trustRole = resolveTrustRole(ephemeralOrRealId)
-
-            // Step 4: Clean BLE-SCAN debug logging (Zero child PII, redacted device address)
-            val rawAddr = result.device.address ?: "00:00:00:00:00:00"
-            val redactedAddr = if (rawAddr.length >= 8) rawAddr.take(5) + ":XX:XX" else "REDACTED"
-            val devName = try { result.device.name ?: record.deviceName ?: "SafeBand-Child" } catch (_: SecurityException) { "SafeBand-Child" }
-            val magicHex = "%02X%02X".format(rawData[0], rawData[1])
-            val coordStr = if (decoded.lat != null && decoded.lon != null) "%.4f,%.4f".format(decoded.lat, decoded.lon) else "UNKNOWN"
-
-            Log.i(TAG, "[BLE-SCAN] SafeBand packet detected: deviceAddress=$redactedAddr, deviceName=$devName, manufacturer=0x5AFE, length=${rawData.size}, magic=$magicHex, risk=${decoded.riskLevel.ordinal}, ephemeral=${decoded.deviceId}, physicalNode=true, location=$coordStr")
-
-            // Step 7: Trace logging
-            Log.d(TAG, "[PHYSICAL-NODE] advertisement received from ${decoded.deviceId} (RSSI: ${result.rssi})")
-            if (decoded.riskLevel == RiskLevel.CRITICAL) {
-                Log.w(TAG, "[PHYSICAL-NODE] SOS decoded: CRITICAL risk from physical child node ${decoded.deviceId}")
-                Log.w(TAG, "[PHYSICAL-NODE] MANUAL_SOS generated")
+        when (decoded) {
+            is DecodedPacket.BioCore -> {
+                Log.i(TAG, "[BLE-SCAN] BioCore received for ${decoded.deviceId}: name=${decoded.childName}, age=${decoded.age}, blood=${decoded.bloodType}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(
+                    childName = decoded.childName,
+                    age = decoded.age,
+                    bloodType = decoded.bloodType
+                )
             }
+            is DecodedPacket.BioPhone -> {
+                Log.i(TAG, "[BLE-SCAN] BioPhone received for ${decoded.deviceId}: ${decoded.phone}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(primaryParentPhone = decoded.phone)
+            }
+            is DecodedPacket.BioMedical -> {
+                Log.i(TAG, "[BLE-SCAN] BioMedical received for ${decoded.deviceId}: ${decoded.medicalInfo}")
+                val existing = incomingBioCache[decoded.deviceId] ?: ChildBioProfile()
+                incomingBioCache[decoded.deviceId] = existing.copy(medicalConditions = decoded.medicalInfo)
+            }
+            is DecodedPacket.EmergencyContact -> {
+                Log.i(TAG, "[BLE-SCAN] EmergencyContact received for ${decoded.deviceId}: ${decoded.phone}")
+                val list = incomingContactsCache.getOrPut(decoded.deviceId) { mutableListOf() }
+                if (list.none { it.phoneNumber == decoded.phone }) {
+                    list.add(TrustedContact(name = "Child Guardian", phoneNumber = decoded.phone, relationship = "Guardian"))
+                }
+            }
+            is DecodedPacket.Telemetry -> {
+                val ephemeralOrRealId = decoded.deviceId
+                val realId = resolveRealDeviceId(ephemeralOrRealId)
+                val trustRole = resolveTrustRole(ephemeralOrRealId)
 
-            recordNodeObservation(
-                nodeId = realId,
-                ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
-                rssi = result.rssi,
-                hopCount = 0
-            )
+                // Step 4: Clean BLE-SCAN debug logging (Zero child PII, redacted device address)
+                val rawAddr = result.device.address ?: "00:00:00:00:00:00"
+                val redactedAddr = if (rawAddr.length >= 8) rawAddr.take(5) + ":XX:XX" else "REDACTED"
+                val devName = try { result.device.name ?: record.deviceName ?: "SafeBand-Child" } catch (_: SecurityException) { "SafeBand-Child" }
+                val magicHex = "%02X%02X".format(rawData[0], rawData[1])
+                val coordStr = if (decoded.lat != null && decoded.lon != null) "%.4f,%.4f".format(decoded.lat, decoded.lon) else "UNKNOWN"
 
-            // Construct payload with trust-level access filtering (Physical hardware: isSimulation = false)
-            val payload = BleBeaconPayload(
-                deviceId = if (trustRole == TrustRole.TRUSTED_GUARDIAN || trustRole == TrustRole.OWNER) realId else ephemeralOrRealId,
-                riskLevel = decoded.riskLevel,
-                timestamp = decoded.timestamp,
-                latitude = decoded.lat,
-                longitude = decoded.lon,
-                ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
-                trustRole = trustRole,
-                hopCount = 0,
-                isSimulation = false,
-                childBioProfile = null,
-                emergencyContacts = emptyList()
-            )
+                Log.i(TAG, "[BLE-SCAN] SafeBand packet detected: deviceAddress=$redactedAddr, deviceName=$devName, manufacturer=0x5AFE, length=${rawData.size}, magic=$magicHex, risk=${decoded.riskLevel.ordinal}, ephemeral=${decoded.deviceId}, physicalNode=true, location=$coordStr")
 
-            _lastReceivedBeacon.value = payload
-            onBeaconFound(payload)
+                // Step 7: Trace logging
+                Log.d(TAG, "[PHYSICAL-NODE] advertisement received from ${decoded.deviceId} (RSSI: ${result.rssi})")
+                if (decoded.riskLevel == RiskLevel.CRITICAL) {
+                    Log.w(TAG, "[PHYSICAL-NODE] SOS decoded: CRITICAL risk from physical child node ${decoded.deviceId}")
+                    Log.w(TAG, "[PHYSICAL-NODE] MANUAL_SOS generated")
+                }
+
+                recordNodeObservation(
+                    nodeId = realId,
+                    ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
+                    rssi = result.rssi,
+                    hopCount = 0
+                )
+
+                val cachedBio = incomingBioCache[realId] ?: incomingBioCache[ephemeralOrRealId]
+                val cachedContacts = incomingContactsCache[realId] ?: incomingContactsCache[ephemeralOrRealId] ?: emptyList()
+
+                // Construct payload with trust-level access filtering (Physical hardware: isSimulation = false)
+                val payload = BleBeaconPayload(
+                    deviceId = if (trustRole == TrustRole.TRUSTED_GUARDIAN || trustRole == TrustRole.OWNER) realId else ephemeralOrRealId,
+                    riskLevel = decoded.riskLevel,
+                    timestamp = decoded.timestamp,
+                    latitude = decoded.lat,
+                    longitude = decoded.lon,
+                    ephemeralId = if (ephemeralOrRealId.startsWith("EP-")) ephemeralOrRealId else "",
+                    trustRole = trustRole,
+                    hopCount = 0,
+                    isSimulation = false,
+                    childBioProfile = cachedBio,
+                    emergencyContacts = cachedContacts.toList()
+                )
+
+                _lastReceivedBeacon.value = payload
+                onBeaconFound(payload)
+            }
         }
     }
 

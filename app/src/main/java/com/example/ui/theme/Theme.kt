@@ -12,28 +12,33 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SafeBandCyanDark,
-    secondary = SafeBandTealDark,
-    tertiary = SafeBandAmberDark,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceVariant = Color(0xFF334155),
-    onPrimary = Color(0xFF0F172A),
-    onSecondary = Color(0xFF0F172A),
+    primary = PhosphorWhite,
+    secondary = MilledSilver,
+    tertiary = MilledSilverLight,
+    background = CarbonChassis,
+    surface = ObsidianSurface,
+    surfaceVariant = ObsidianContainerHighest,
+    outline = ObsidianOutline,
+    outlineVariant = ObsidianEtchedBorder,
+    onPrimary = Color(0xFF131313),
+    onSecondary = Color(0xFF131313),
     onBackground = OnSurfaceDark,
     onSurface = OnSurfaceDark,
-    error = SafeBandRedDark
+    error = ErrorBright,
+    errorContainer = ErrorContainerDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = SafeBandCyanLight,
-    secondary = SafeBandTealLight,
-    tertiary = SafeBandAmberLight,
+    primary = Color(0xFF131313),
+    secondary = Color(0xFF444748),
+    tertiary = Color(0xFF64748B),
     background = BackgroundLight,
     surface = SurfaceLight,
-    surfaceVariant = Color(0xFFF1F5F9),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
+    surfaceVariant = Color(0xFFE5E5E5),
+    outline = Color(0xFF8E9192),
+    outlineVariant = Color(0xFFD4D4D4),
+    onPrimary = PhosphorWhite,
+    onSecondary = PhosphorWhite,
     onBackground = OnSurfaceLight,
     onSurface = OnSurfaceLight,
     error = SafeBandRedLight
