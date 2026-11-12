@@ -274,17 +274,20 @@ fun GlassButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     isDestructive: Boolean = false,
-    fontSize: Int = 11
+    fontSize: Int = 11,
+    enabled: Boolean = true
 ) {
+    val alpha = if (enabled) 1f else 0.4f
     val bg = if (isDestructive) GlassHazard else GlassSurfaceElevated
     val border = if (isDestructive) GlassHazardBorder else GlassBorder
     val textCol = if (isDestructive) Color(0xFFFF6B6B) else PhosphorWhite
 
     Surface(
         onClick = onClick,
-        modifier = modifier.border(0.75.dp, border, RoundedCornerShape(12.dp)),
+        enabled = enabled,
+        modifier = modifier.border(0.75.dp, border.copy(alpha = border.alpha * alpha), RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
-        color = bg
+        color = bg.copy(alpha = bg.alpha * alpha)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -295,7 +298,7 @@ fun GlassButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = textCol,
+                    tint = textCol.copy(alpha = alpha),
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -306,7 +309,7 @@ fun GlassButton(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 fontSize = fontSize.sp,
-                color = textCol,
+                color = textCol.copy(alpha = alpha),
                 letterSpacing = 0.5.sp,
                 maxLines = 1
             )

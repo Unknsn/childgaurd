@@ -17,6 +17,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.QrCode
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -54,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +93,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val currentMode by viewModel.appMode.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val activeChallenge by viewModel.activePairingChallenge.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
     val bioProfile by viewModel.childBioProfile.collectAsState()
     val safetyMonitoringEnabled by viewModel.safetyMonitoringEnabled.collectAsState()
@@ -89,6 +102,9 @@ fun SettingsScreen(
     var idSavedMessage by remember { mutableStateOf(false) }
     var showEditBioDialog by remember { mutableStateOf(false) }
     var isEmergencyProfileUnlocked by remember { mutableStateOf(false) }
+    var showLockChildDialog by remember { mutableStateOf(false) }
+    var showPairingDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -178,9 +194,93 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Mode Switch Card
+            // 1. Parent Account & Google Session Management Card (v3.3)
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("parent_account_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Parent Account",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = currentUser?.role?.name ?: "PRIMARY_PARENT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 8.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = currentUser?.displayName ?: "Verified Guardian",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = currentUser?.email ?: "Offline Parent Session (Local Node)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.signOutParent()
+                            onNavigateBack()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("parent_sign_out_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Sign Out Guardian Account", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. Child Device Provisioning & 6-Digit Code Generator Card (v3.3)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("provisioning_generator_card"),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -188,14 +288,14 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.SwapHoriz,
+                            imageVector = Icons.Default.QrCode,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Current App Role",
+                            text = "Pair Child Device",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -204,46 +304,127 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Active role: ${if (currentMode == AppMode.CHILD) "Child Device (Wearable Prototype)" else "Parent / Guardian Scanner"}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Generate a cryptographic 6-digit one-time code to link a child's phone to this parent account (15-min validity).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (activeChallenge != null && activeChallenge?.isExpired != true) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "ONE-TIME PAIRING CODE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 9.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = activeChallenge?.oneTimeCode ?: "------",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 6.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Valid for 15 minutes • Single use only",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("SafeBand Pairing Code", activeChallenge?.oneTimeCode)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Pairing code copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy Pairing Code", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                viewModel.generatePairingChallenge(deviceId)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("generate_pairing_code_button"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Generate 6-Digit Pairing Code", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3. Child Mode Lockdown Card (v3.3 Role Isolation)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("child_lockdown_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Lock into Child Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Transfer this phone into locked Child Mode. The app will broadcast safety beacons and restrict navigation. Exiting requires your 6-digit authorization code.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    OutlinedButton(
+                        onClick = { showLockChildDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("lock_into_child_mode_button"),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Button(
-                            onClick = { viewModel.selectAppMode(AppMode.CHILD) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("switch_to_child_mode_button"),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (currentMode == AppMode.CHILD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = if (currentMode == AppMode.CHILD) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        ) {
-                            Text("Child Mode", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                        }
-
-                        Button(
-                            onClick = { viewModel.selectAppMode(AppMode.PARENT) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("switch_to_parent_mode_button"),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (currentMode == AppMode.PARENT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = if (currentMode == AppMode.PARENT) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        ) {
-                            Text("Parent Mode", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                        }
+                        Text("Lock Device into Child Mode", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -863,6 +1044,42 @@ fun SettingsScreen(
                 onSave = { updated ->
                     showEditBioDialog = false
                     viewModel.updateChildBioProfile(updated)
+                }
+            )
+        }
+
+        if (showLockChildDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showLockChildDialog = false },
+                title = {
+                    Text(
+                        text = "LOCK INTO CHILD MODE",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Are you sure you want to lock this device into Child Mode? It will broadcast BLE beacons and restrict access to guardian settings until unlocked with your authorization code.",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showLockChildDialog = false
+                            viewModel.lockIntoChildMode(deviceId)
+                            onNavigateBack()
+                        }
+                    ) {
+                        Text("Confirm & Lock Device")
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showLockChildDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
             )
         }

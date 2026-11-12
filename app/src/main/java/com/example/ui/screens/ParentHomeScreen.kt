@@ -1,8 +1,11 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -176,6 +179,7 @@ fun ParentHomeScreen(
     val deviceId by viewModel.deviceId.collectAsState()
     val safeZone by viewModel.safeZone.collectAsState()
     val nearbyNodes by viewModel.nearbyNodes.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
 
     // Pulse animation for scanner
     val infiniteTransition = rememberInfiniteTransition(label = "RadarScanner")
@@ -250,6 +254,28 @@ fun ParentHomeScreen(
                     }
                 },
                 actions = {
+                    currentUser?.let { user ->
+                        Surface(
+                            shape = CircleShape,
+                            color = GlassSurfaceLowest,
+                            border = BorderStroke(1.dp, PhosphorWhite),
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable { onNavigateToSettings() }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = (user.displayName.take(1).ifEmpty { "P" }).uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PhosphorWhite,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("parent_settings_button")
@@ -614,6 +640,7 @@ fun ParentMonitorTab(
 
         if (showPairChildDialog) {
             PairChildDialog(
+                viewModel = viewModel,
                 onDismiss = { showPairChildDialog = false },
                 onSave = { newChild ->
                     showPairChildDialog = false
@@ -1513,9 +1540,17 @@ fun ParentMonitorTab(
 
 @Composable
 fun PairChildDialog(
+    viewModel: SafeBandViewModel,
     onDismiss: () -> Unit,
     onSave: (PairedChild) -> Unit
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val activeChallenge by viewModel.activePairingChallenge.collectAsState()
+    val context = LocalContext.current
+
+    var childPhoneName by remember { mutableStateOf("") }
+    var childPhoneDeviceId by remember { mutableStateOf("EP-C" + (100..999).random()) }
+
     var deviceId by remember { mutableStateOf("") }
     var childName by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
@@ -1541,120 +1576,242 @@ fun PairChildDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Pair SafeBand / Child Node",
+                    text = "Pair New Child / Wearable",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "Enter the device ID printed on the ESP32-S3 band or displayed on the child node.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
-                OutlinedTextField(
-                    value = deviceId,
-                    onValueChange = { deviceId = it.trim().uppercase() },
-                    label = { Text("Band / Device ID (e.g. SB-01 or ESP32 ID)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = childName,
-                    onValueChange = { childName = it },
-                    label = { Text("Child Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = age,
-                        onValueChange = { age = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("Age") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = bloodType,
-                        onValueChange = { bloodType = it.uppercase() },
-                        label = { Text("Blood Group") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = primaryPhone,
-                    onValueChange = { primaryPhone = it },
-                    label = { Text("Primary Guardian Phone") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = secondaryPhone,
-                    onValueChange = { secondaryPhone = it },
-                    label = { Text("Secondary Guardian Phone") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = medicalConditions,
-                    onValueChange = { medicalConditions = it },
-                    label = { Text("Medical Conditions (e.g. Asthma)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = allergies,
-                    onValueChange = { allergies = it },
-                    label = { Text("Known Allergies (e.g. Peanut)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = emergencyNotes,
-                    onValueChange = { emergencyNotes = it },
-                    label = { Text("Emergency Notes") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
+                // Tab Switcher
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = {
-                            if (deviceId.isNotBlank() && childName.isNotBlank()) {
-                                onSave(
-                                    PairedChild(
-                                        deviceId = deviceId,
-                                        childName = childName,
-                                        age = age.ifEmpty { "8" },
-                                        bloodType = bloodType.ifEmpty { "O+" },
-                                        primaryGuardianPhone = primaryPhone,
-                                        secondaryGuardianPhone = secondaryPhone,
-                                        medicalConditions = medicalConditions,
-                                        allergies = allergies,
-                                        emergencyNotes = emergencyNotes
-                                    )
-                                )
-                            }
-                        },
-                        enabled = deviceId.isNotBlank() && childName.isNotBlank()
+                        onClick = { selectedTab = 0 },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (selectedTab == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     ) {
-                        Text("Save & Pair")
+                        Text("Child Phone Code", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                    Button(
+                        onClick = { selectedTab = 1 },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (selectedTab == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("ESP32 Band", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                if (selectedTab == 0) {
+                    // TAB 0: 6-DIGIT PAIRING CHALLENGE FOR CHILD PHONE
+                    Text(
+                        text = "Generate a secure 6-digit code for your child's phone. The child enters this code during setup to pair permanently.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = childPhoneName,
+                        onValueChange = { childPhoneName = it },
+                        label = { Text("Child Name (e.g. Aarav)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (activeChallenge != null && activeChallenge?.isExpired != true) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "6-DIGIT ONE-TIME CODE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = activeChallenge?.oneTimeCode ?: "------",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 6.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Valid for 15 minutes",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("SafeBand Pairing Code", activeChallenge?.oneTimeCode)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Copy Code", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                viewModel.generatePairingChallenge(childPhoneDeviceId)
+                            },
+                            enabled = childPhoneName.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Generate 6-Digit Pairing Code", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Close")
+                        }
+                    }
+                } else {
+                    // TAB 1: PHYSICAL ESP32-S3 WEARABLE BAND
+                    Text(
+                        text = "Enter the device ID printed on the ESP32-S3 band or displayed on the child node.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = deviceId,
+                        onValueChange = { deviceId = it.trim().uppercase() },
+                        label = { Text("Band / Device ID (e.g. SB-01 or ESP32 ID)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = childName,
+                        onValueChange = { childName = it },
+                        label = { Text("Child Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = age,
+                            onValueChange = { age = it.filter { ch -> ch.isDigit() } },
+                            label = { Text("Age") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = bloodType,
+                            onValueChange = { bloodType = it.uppercase() },
+                            label = { Text("Blood Group") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = primaryPhone,
+                        onValueChange = { primaryPhone = it },
+                        label = { Text("Primary Guardian Phone") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = secondaryPhone,
+                        onValueChange = { secondaryPhone = it },
+                        label = { Text("Secondary Guardian Phone") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = medicalConditions,
+                        onValueChange = { medicalConditions = it },
+                        label = { Text("Medical Conditions (e.g. Asthma)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = allergies,
+                        onValueChange = { allergies = it },
+                        label = { Text("Known Allergies (e.g. Peanut)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = emergencyNotes,
+                        onValueChange = { emergencyNotes = it },
+                        label = { Text("Emergency Notes") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (deviceId.isNotBlank() && childName.isNotBlank()) {
+                                    onSave(
+                                        PairedChild(
+                                            deviceId = deviceId,
+                                            childName = childName,
+                                            age = age.ifEmpty { "8" },
+                                            bloodType = bloodType.ifEmpty { "O+" },
+                                            primaryGuardianPhone = primaryPhone,
+                                            secondaryGuardianPhone = secondaryPhone,
+                                            medicalConditions = medicalConditions,
+                                            allergies = allergies,
+                                            emergencyNotes = emergencyNotes
+                                        )
+                                    )
+                                }
+                            },
+                            enabled = deviceId.isNotBlank() && childName.isNotBlank()
+                        ) {
+                            Text("Save & Pair")
+                        }
                     }
                 }
             }

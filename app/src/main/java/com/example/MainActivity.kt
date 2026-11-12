@@ -40,6 +40,9 @@ import com.example.ui.components.PermissionRationaleDialog
 import com.example.ui.screens.AlertHistoryScreen
 import com.example.ui.screens.AppUpdateScreen
 import com.example.ui.screens.ChildHomeScreen
+import com.example.ui.screens.ChildProvisioningScreen
+import com.example.ui.screens.ChildSettingsScreen
+import com.example.ui.screens.FirstLaunchScreen
 import com.example.ui.screens.JourneySafetyScreen
 import com.example.ui.screens.ModeSelectionScreen
 import com.example.ui.screens.ParentHomeScreen
@@ -79,6 +82,7 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
     val context = LocalContext.current
     val currentMode by viewModel.appMode.collectAsState()
     var currentDestination by remember { mutableStateOf(AppDestination.HOME) }
+    var isChildProvisioning by remember { mutableStateOf(false) }
 
     // Permission handling state
     var showRationaleDialog by remember { mutableStateOf(false) }
@@ -155,28 +159,46 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
-                targetState = Pair(currentMode, currentDestination),
+                targetState = Triple(currentMode, currentDestination, isChildProvisioning),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "ScreenTransition"
-            ) { (mode, destination) ->
+            ) { (mode, destination, provisioning) ->
                 when {
                     mode == AppMode.UNSELECTED -> {
-                        ModeSelectionScreen(
-                            onSelectMode = { selected ->
-                                viewModel.selectAppMode(selected)
-                            }
-                        )
+                        if (provisioning) {
+                            ChildProvisioningScreen(
+                                viewModel = viewModel,
+                                onNavigateBack = { isChildProvisioning = false },
+                                onProvisioningComplete = {
+                                    isChildProvisioning = false
+                                    currentDestination = AppDestination.HOME
+                                }
+                            )
+                        } else {
+                            FirstLaunchScreen(
+                                viewModel = viewModel,
+                                onNavigateToChildProvisioning = { isChildProvisioning = true }
+                            )
+                        }
                     }
 
                     destination == AppDestination.SETTINGS -> {
-                        SettingsScreen(
-                            viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME },
-                            onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
-                            onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
-                            onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
-                            onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
-                        )
+                        if (mode == AppMode.CHILD) {
+                            ChildSettingsScreen(
+                                viewModel = viewModel,
+                                onNavigateBack = { currentDestination = AppDestination.HOME },
+                                onUnlockSuccess = { currentDestination = AppDestination.HOME }
+                            )
+                        } else {
+                            SettingsScreen(
+                                viewModel = viewModel,
+                                onNavigateBack = { currentDestination = AppDestination.HOME },
+                                onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
+                                onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
+                                onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
+                                onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
+                            )
+                        }
                     }
 
                     destination == AppDestination.UPDATE -> {

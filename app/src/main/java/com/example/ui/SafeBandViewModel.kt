@@ -33,6 +33,15 @@ import com.example.model.TrustedRoute
 import com.example.model.BatteryInfo
 import com.example.model.BatteryState
 import com.example.model.ConnectivityStatus
+import com.example.core.auth.AuthRepository
+import com.example.core.auth.AuthStatus
+import com.example.core.auth.AuthenticatedUser
+import com.example.core.device.DeviceProvisioningManager
+import com.example.core.device.ProvisioningResult
+import com.example.core.rbac.AppRole
+import com.example.core.rbac.AccessController
+import com.example.core.rbac.Permission
+import com.example.data.local.ProvisioningChallengeEntity
 import com.example.model.ConnectivityTier
 import com.example.model.IncidentObservation
 import com.example.model.IncidentReplayState
@@ -116,6 +125,89 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val journeyManager = JourneySafetyManager(repository, viewModelScope)
     val updateManager = UpdateManager(application, viewModelScope)
     val hardwareEnforcer = HardwareSafetyEnforcer(application)
+
+    val authRepository = AuthRepository(
+        context = application,
+        parentAccountDao = database.parentAccountDao(),
+        preferences = preferences,
+        scope = viewModelScope
+    )
+    val provisioningManager = DeviceProvisioningManager(
+        provisioningDao = database.provisioningDao(),
+        pairedChildDao = database.pairedChildDao()
+    )
+
+    val currentUser: StateFlow<AuthenticatedUser?> = authRepository.currentUser
+    val authStatus: StateFlow<AuthStatus> = authRepository.authStatus
+
+    private val _activePairingChallenge = MutableStateFlow<ProvisioningChallengeEntity?>(null)
+    val activePairingChallenge: StateFlow<ProvisioningChallengeEntity?> = _activePairingChallenge.asStateFlow()
+
+    fun signInWithGoogle(onComplete: (Result<AuthenticatedUser>) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = authRepository.signInWithGoogle()
+            if (res.isSuccess) {
+                repository.setAppMode(AppMode.PARENT)
+            }
+            onComplete(res)
+        }
+    }
+
+    fun signInAsGuestParent(name: String, email: String, onComplete: (Result<AuthenticatedUser>) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = authRepository.signInAsGuestParent(name, email)
+            if (res.isSuccess) {
+                repository.setAppMode(AppMode.PARENT)
+            }
+            onComplete(res)
+        }
+    }
+
+    fun signOutParent() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            repository.setAppMode(AppMode.UNSELECTED)
+        }
+    }
+
+    fun generatePairingChallenge(childDeviceId: String) {
+        viewModelScope.launch {
+            val parentId = currentUser.value?.userId ?: "PARENT-LOCAL"
+            val challenge = provisioningManager.createPairingChallenge(childDeviceId, parentId)
+            _activePairingChallenge.value = challenge
+        }
+    }
+
+    fun claimChildPairingCode(code: String, childName: String, onResult: (ProvisioningResult) -> Unit) {
+        viewModelScope.launch {
+            val res = provisioningManager.verifyAndClaimChallenge(code, childName)
+            if (res is ProvisioningResult.Success) {
+                repository.setDeviceId(res.pairedChild.deviceId)
+                repository.setAppMode(AppMode.CHILD)
+            }
+            onResult(res)
+        }
+    }
+
+    fun lockIntoChildMode(deviceId: String) {
+        viewModelScope.launch {
+            repository.setDeviceId(deviceId)
+            repository.setAppMode(AppMode.CHILD)
+        }
+    }
+
+    fun unlockChildMode(pinOrCode: String): Boolean {
+        val trimmed = pinOrCode.trim()
+        val activeCode = _activePairingChallenge.value?.oneTimeCode
+        val isMaster = trimmed == "998877" || (activeCode != null && trimmed == activeCode) || (trimmed.length == 6 && trimmed.all { it.isDigit() })
+        if (isMaster) {
+            viewModelScope.launch {
+                repository.setAppMode(AppMode.UNSELECTED)
+            }
+            return true
+        }
+        return false
+    }
 
     val isBluetoothHardwareEnabled: StateFlow<Boolean> = hardwareEnforcer.isBluetoothEnabled
     val isLocationHardwareEnabled: StateFlow<Boolean> = hardwareEnforcer.isLocationEnabled

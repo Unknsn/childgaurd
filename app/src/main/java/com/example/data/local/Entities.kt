@@ -241,3 +241,47 @@ data class PlaybookActionLog(
     val actionSummary: String,
     val actor: String = "Primary Parent"
 )
+
+// =============================================================================
+// v3.3.0: Parent Identity, Provisioning & Family Guardian Entities
+// =============================================================================
+
+@Entity(tableName = "parent_accounts")
+data class ParentAccountEntity(
+    @PrimaryKey
+    val userId: String,
+    val googleSub: String,
+    val email: String,
+    val displayName: String,
+    val photoUrl: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val lastLoginAt: Long = System.currentTimeMillis(),
+    val authStatus: String = "AUTHENTICATED"
+)
+
+@Entity(tableName = "provisioning_challenges")
+data class ProvisioningChallengeEntity(
+    @PrimaryKey
+    val challengeId: String,
+    val childDeviceId: String,
+    val oneTimeCode: String,
+    val expiresAt: Long,
+    val createdAt: Long = System.currentTimeMillis(),
+    val status: String = "PENDING", // "PENDING", "VERIFIED", "EXPIRED", "REVOKED"
+    val parentUserId: String
+) {
+    val isExpired: Boolean get() = System.currentTimeMillis() > expiresAt || status != "PENDING"
+}
+
+@Entity(tableName = "family_guardians")
+data class FamilyGuardianEntity(
+    @PrimaryKey
+    val guardianId: String,
+    val parentUserId: String,
+    val name: String,
+    val phoneNumber: String,
+    val relationship: String,
+    val role: String = "TRUSTED_GUARDIAN", // "TRUSTED_GUARDIAN", "EMERGENCY_CONTACT", "INSTITUTION"
+    val status: String = "ACTIVE", // "ACTIVE", "PENDING", "REVOKED"
+    val createdAt: Long = System.currentTimeMillis()
+)

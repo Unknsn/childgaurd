@@ -23,9 +23,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         IncidentCoordinationRecord::class,
         PairedChild::class,
         ChildSpecificContact::class,
-        PlaybookActionLog::class
+        PlaybookActionLog::class,
+        ParentAccountEntity::class,
+        ProvisioningChallengeEntity::class,
+        FamilyGuardianEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class SafeBandDatabase : RoomDatabase() {
@@ -38,6 +41,9 @@ abstract class SafeBandDatabase : RoomDatabase() {
     abstract fun coordinationDao(): CoordinationDao
     abstract fun pairedChildDao(): PairedChildDao
     abstract fun playbookDao(): PlaybookDao
+    abstract fun parentAccountDao(): ParentAccountDao
+    abstract fun provisioningDao(): ProvisioningDao
+    abstract fun familyGuardianDao(): FamilyGuardianDao
 
     companion object {
         @Volatile
@@ -272,6 +278,55 @@ abstract class SafeBandDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Non-destructive migration from Schema v4 to v5 (v3.3.0 Release).
+         * Adds tables for Parent Account, Provisioning Challenges, and Family Guardians.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Parent Accounts Table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS parent_accounts (
+                        userId TEXT PRIMARY KEY NOT NULL,
+                        googleSub TEXT NOT NULL,
+                        email TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        photoUrl TEXT,
+                        createdAt INTEGER NOT NULL,
+                        lastLoginAt INTEGER NOT NULL,
+                        authStatus TEXT NOT NULL DEFAULT 'AUTHENTICATED'
+                    )
+                """.trimIndent())
+
+                // 2. Provisioning Challenges Table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS provisioning_challenges (
+                        challengeId TEXT PRIMARY KEY NOT NULL,
+                        childDeviceId TEXT NOT NULL,
+                        oneTimeCode TEXT NOT NULL,
+                        expiresAt INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        parentUserId TEXT NOT NULL
+                    )
+                """.trimIndent())
+
+                // 3. Family Guardians Table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS family_guardians (
+                        guardianId TEXT PRIMARY KEY NOT NULL,
+                        parentUserId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        phoneNumber TEXT NOT NULL,
+                        relationship TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'TRUSTED_GUARDIAN',
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): SafeBandDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -279,7 +334,7 @@ abstract class SafeBandDatabase : RoomDatabase() {
                     SafeBandDatabase::class.java,
                     "safeband_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 INSTANCE = instance
                 instance

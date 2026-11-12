@@ -259,3 +259,70 @@ interface PlaybookDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlaybookLog(log: PlaybookActionLog): Long
 }
+
+// =============================================================================
+// v3.3.0: Parent Account, Provisioning & Guardian DAOs
+// =============================================================================
+
+@Dao
+interface ParentAccountDao {
+    @Query("SELECT * FROM parent_accounts LIMIT 1")
+    fun getActiveParentAccount(): Flow<ParentAccountEntity?>
+
+    @Query("SELECT * FROM parent_accounts LIMIT 1")
+    suspend fun getActiveParentAccountSnapshot(): ParentAccountEntity?
+
+    @Query("SELECT * FROM parent_accounts WHERE userId = :userId LIMIT 1")
+    suspend fun getAccountById(userId: String): ParentAccountEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateAccount(account: ParentAccountEntity)
+
+    @Query("UPDATE parent_accounts SET lastLoginAt = :timestamp, authStatus = :status WHERE userId = :userId")
+    suspend fun updateLoginStatus(userId: String, status: String, timestamp: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM parent_accounts")
+    suspend fun clearAccounts()
+}
+
+@Dao
+interface ProvisioningDao {
+    @Query("SELECT * FROM provisioning_challenges WHERE oneTimeCode = :code AND status = 'PENDING' AND expiresAt > :currentTime LIMIT 1")
+    suspend fun findValidChallenge(code: String, currentTime: Long = System.currentTimeMillis()): ProvisioningChallengeEntity?
+
+    @Query("SELECT * FROM provisioning_challenges WHERE oneTimeCode = :code ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getChallengeByCode(code: String): ProvisioningChallengeEntity?
+
+    @Query("SELECT * FROM provisioning_challenges WHERE challengeId = :challengeId LIMIT 1")
+    suspend fun getChallengeById(challengeId: String): ProvisioningChallengeEntity?
+
+    @Query("SELECT * FROM provisioning_challenges WHERE parentUserId = :parentUserId ORDER BY createdAt DESC")
+    fun getChallengesForParent(parentUserId: String): Flow<List<ProvisioningChallengeEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChallenge(challenge: ProvisioningChallengeEntity)
+
+    @Query("UPDATE provisioning_challenges SET status = :status WHERE challengeId = :challengeId")
+    suspend fun updateChallengeStatus(challengeId: String, status: String)
+
+    @Query("DELETE FROM provisioning_challenges WHERE expiresAt < :currentTime")
+    suspend fun purgeExpiredChallenges(currentTime: Long = System.currentTimeMillis())
+}
+
+@Dao
+interface FamilyGuardianDao {
+    @Query("SELECT * FROM family_guardians WHERE parentUserId = :parentUserId ORDER BY name ASC")
+    fun getGuardiansForParent(parentUserId: String): Flow<List<FamilyGuardianEntity>>
+
+    @Query("SELECT * FROM family_guardians WHERE parentUserId = :parentUserId ORDER BY name ASC")
+    suspend fun getGuardiansSnapshot(parentUserId: String): List<FamilyGuardianEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGuardian(guardian: FamilyGuardianEntity)
+
+    @Query("UPDATE family_guardians SET status = :status WHERE guardianId = :guardianId")
+    suspend fun updateGuardianStatus(guardianId: String, status: String)
+
+    @Query("DELETE FROM family_guardians WHERE guardianId = :guardianId")
+    suspend fun deleteGuardian(guardianId: String)
+}
