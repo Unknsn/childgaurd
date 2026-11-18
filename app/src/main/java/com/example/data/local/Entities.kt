@@ -217,7 +217,33 @@ data class PairedChild(
     val avatarColorHex: String = "#00F5D4",
     val isPhysicalEsp32: Boolean = true,
     val lastSeenTimestamp: Long = 0L,
-    val batteryLevel: Int = 100
+    val batteryLevel: Int = 100,
+    val parentNodeIp: String = "192.168.1.100",
+    val parentNodePort: Int = 8080,
+    val parentNodeEndpointId: String = "",
+    val tamperStatus: String = "PROTECTED",
+    val tamperAuthorizedUntil: Long = 0L,
+    val isProvisioned: Boolean = false,
+    val provisionedAt: Long = 0L
+)
+
+@Entity(tableName = "relay_forwarding_records")
+data class RelayForwardingRecord(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val incidentId: String,
+    val deviceId: String,
+    val eventType: String = "SOS", // "SOS", "TAMPER"
+    val detectionTimestamp: Long = System.currentTimeMillis(),
+    val relayLatitude: Double? = null,
+    val relayLongitude: Double? = null,
+    val relayAccuracy: Float? = null,
+    val forwardStatus: String = "QUEUED", // "QUEUED", "FORWARDING", "DELIVERED_DIRECT", "DELIVERED_BACKEND", "FAILED", "EXPIRED"
+    val targetEndpoint: String = "",
+    val attempts: Int = 0,
+    val lastAttemptTimestamp: Long = 0L,
+    val deliveryTimestamp: Long? = null,
+    val acknowledgmentToken: String? = null
 )
 
 @Entity(tableName = "child_specific_contacts")

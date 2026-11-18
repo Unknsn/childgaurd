@@ -113,7 +113,8 @@ data class SafetyNode(
     val rssi: Int = -100,
     val lastSeenTimestamp: Long = System.currentTimeMillis(),
     val trustLevel: TrustRole = TrustRole.ANONYMOUS_RELAY,
-    val connectionState: NodeConnectionState = NodeConnectionState.UNKNOWN
+    val connectionState: NodeConnectionState = NodeConnectionState.UNKNOWN,
+    val estimatedDistanceMeters: Double? = null
 ) {
     val isNearby: Boolean
         get() = connectionState == NodeConnectionState.NEARBY || connectionState == NodeConnectionState.ONLINE
@@ -340,7 +341,9 @@ data class BleBeaconPayload(
     val isSimulation: Boolean = false,
     val ephemeralId: String = "",
     val trustRole: TrustRole = TrustRole.ANONYMOUS_RELAY,
-    val hopCount: Int = 0
+    val hopCount: Int = 0,
+    val rssi: Int = 0,
+    val distanceMeters: Double? = null
 )
 
 data class ChildBioProfile(

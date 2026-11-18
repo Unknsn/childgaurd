@@ -138,6 +138,17 @@ class BleSafetyMonitorService : Service() {
 
         @Volatile
         private var activeInstance: BleSafetyMonitorService? = null
+
+        fun dismissEmergencyAlert() {
+            activeInstance?.clearEmergencyNotification()
+            val current = _activeEmergencyIncident.value
+            if (current != null) {
+                _activeEmergencyIncident.value = current.copy(
+                    stage = IncidentStage.SILENCED,
+                    lastUpdatedTimestamp = System.currentTimeMillis()
+                )
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -149,6 +160,7 @@ class BleSafetyMonitorService : Service() {
 
     private var beaconWatchdogJob: Job? = null
     private var lastLoggedIncidentTime = 0L
+    private var emergencyRelayManager: EmergencyRelayManager? = null
 
     // Over-the-air bio and contact cache per child node (v3.1.0)
     val incomingBioCache = ConcurrentHashMap<String, ChildBioProfile>()
@@ -180,6 +192,7 @@ class BleSafetyMonitorService : Service() {
 
         val database = SafeBandDatabase.getDatabase(applicationContext)
         val preferences = SafeBandPreferences(applicationContext)
+        val relayDao = database.relayForwardingDao()
         repository = SafetyRepository(
             database.safetyEventDao(),
             database.trustedContactDao(),
@@ -190,11 +203,18 @@ class BleSafetyMonitorService : Service() {
             database.journeyDao(),
             database.coordinationDao(),
             database.pairedChildDao(),
-            database.playbookDao()
+            database.playbookDao(),
+            relayDao
         )
+        emergencyRelayManager = EmergencyRelayManager(applicationContext, relayDao, preferences, serviceScope)
 
         createNotificationChannels()
-        registerReceiver(bluetoothReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        ContextCompat.registerReceiver(
+            this,
+            bluetoothReceiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_EXPORTED
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -301,6 +321,25 @@ class BleSafetyMonitorService : Service() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // API 34+
+                val hasLocationPerm = ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+
+                var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                if (hasLocationPerm) {
+                    types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                }
+
+                startForeground(
+                    NOTIFICATION_ID_FOREGROUND,
+                    notification,
+                    types
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID_FOREGROUND,
                     notification,
@@ -414,7 +453,7 @@ class BleSafetyMonitorService : Service() {
         notificationManager.notify(NOTIFICATION_ID_EMERGENCY, emergencyNotification.build())
     }
 
-    private fun clearEmergencyNotification() {
+    internal fun clearEmergencyNotification() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         notificationManager?.cancel(NOTIFICATION_ID_EMERGENCY)
     }
@@ -756,6 +795,21 @@ class BleSafetyMonitorService : Service() {
                         observationId = obsId,
                         hopCount = payload.hopCount
                     )
+
+                    // Feature 2: Community-Assisted Relay Propagation (Privacy-Preserving)
+                    if (payload.riskLevel == RiskLevel.CRITICAL) {
+                        val alertType = if (payload.deviceId.contains("TAMPER", ignoreCase = true) ||
+                            payload.ephemeralId.contains("TAMPER", ignoreCase = true)) "TAMPER" else "SOS"
+                        val locPair = if (payload.latitude != null && payload.longitude != null &&
+                            (payload.latitude != 0.0 || payload.longitude != 0.0)) {
+                            Pair(payload.latitude, payload.longitude)
+                        } else null
+                        emergencyRelayManager?.handleEmergencyBroadcast(
+                            broadcastId = payload.ephemeralId.ifEmpty { payload.deviceId },
+                            alertType = alertType,
+                            overrideLocation = locPair
+                        )
+                    }
                 }
             }
         }

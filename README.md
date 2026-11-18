@@ -240,13 +240,31 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`
 ```bash
 ./gradlew testDebugUnitTest
 ```
-Runs all 100 Robolectric & JUnit unit tests verifying:
+Runs all 115 Robolectric & JUnit unit tests (100% pass rate in ~27s) verifying:
 - Parent / Child role isolation and access boundaries
 - Google authentication persistence & session recovery
 - 6-digit challenge generation, single-use, and 15-minute TTL expiry
 - Database migration `MIGRATION_4_5` integrity
 - Real-time geofence, journey corridor, and school schedule monitoring
 - Multi-packet BLE decoding and emergency notification dispatch
+
+### Build Release APK
+```bash
+./gradlew assembleRelease
+```
+Output: `app/build/outputs/apk/release/app-release.apk`
+
+---
+
+## 📚 Technical Documentation
+
+- 📐 **[System Architecture](file:///d:/sip/ARCHITECTURE.md)** - Component architecture, RBAC, Room schema v5, and dual-path emergency relay.
+- 🔐 **[Security & Privacy Specification](file:///d:/sip/SECURITY.md)** - Threat model, child lockdown, PIN validation, Credential Manager, and backup rules.
+- 🔌 **[Hardware Integration Guide](file:///d:/sip/HARDWARE_INTEGRATION.md)** - ESP32-S3 wearable node, GPIO mappings, and BLE 0x5AFE communication protocol.
+- 🧪 **[Comprehensive Testing Report](file:///d:/sip/TESTING_REPORT.md)** - Full unit test matrix, deadlock fix details, and lint reports.
+- 📊 **[Feature Status Matrix](file:///d:/sip/FEATURE_STATUS.md)** - Verification evidence and status definitions across all system capabilities.
+- 📝 **[Engineering Progress Log](file:///d:/sip/ENGINEERING_PROGRESS.md)** - Audit log, architectural decisions, and modified files.
+- 🚀 **[Release Notes v3.3.0](file:///d:/sip/RELEASE_NOTES.md)** - Detailed changes and release binary checksums.
 
 ---
 

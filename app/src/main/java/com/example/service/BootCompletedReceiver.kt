@@ -29,27 +29,34 @@ class BootCompletedReceiver : BroadcastReceiver() {
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             Log.i("BootCompletedReceiver", "Received $action: checking if safety monitoring should be restored")
 
+            val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
-                val preferences = SafeBandPreferences(context.applicationContext)
-                val isMonitoringEnabled = preferences.safetyMonitoringEnabled.first()
-                val currentMode = preferences.appMode.first()
+                try {
+                    val preferences = SafeBandPreferences(context.applicationContext)
+                    val isMonitoringEnabled = preferences.safetyMonitoringEnabled.first()
+                    val currentMode = preferences.appMode.first()
 
-                if (isMonitoringEnabled && currentMode == AppMode.PARENT) {
-                    val hasBleScan = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            android.Manifest.permission.BLUETOOTH_SCAN
-                        ) == PackageManager.PERMISSION_GRANTED
-                    } else true
+                    if (isMonitoringEnabled && currentMode == AppMode.PARENT) {
+                        val hasBleScan = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.BLUETOOTH_SCAN
+                            ) == PackageManager.PERMISSION_GRANTED
+                        } else true
 
-                    if (hasBleScan) {
-                        Log.i("BootCompletedReceiver", "Restoring BleSafetyMonitorService on boot")
-                        BleSafetyMonitorService.start(context.applicationContext)
+                        if (hasBleScan) {
+                            Log.i("BootCompletedReceiver", "Restoring BleSafetyMonitorService on boot")
+                            BleSafetyMonitorService.start(context.applicationContext)
+                        } else {
+                            Log.w("BootCompletedReceiver", "Cannot restore monitoring on boot: BLUETOOTH_SCAN permission not granted")
+                        }
                     } else {
-                        Log.w("BootCompletedReceiver", "Cannot restore monitoring on boot: BLUETOOTH_SCAN permission not granted")
+                        Log.d("BootCompletedReceiver", "Monitoring not restored: monitoringEnabled=$isMonitoringEnabled, mode=$currentMode")
                     }
-                } else {
-                    Log.d("BootCompletedReceiver", "Monitoring not restored: monitoringEnabled=$isMonitoringEnabled, mode=$currentMode")
+                } catch (e: Exception) {
+                    Log.e("BootCompletedReceiver", "Error restoring monitoring on boot", e)
+                } finally {
+                    pendingResult.finish()
                 }
             }
         }

@@ -27,6 +27,8 @@ import com.example.data.local.TrustedContactDao
 import com.example.data.preferences.SafeBandPreferences
 import com.example.model.AppMode
 import com.example.model.SafeZone
+import com.example.data.local.RelayForwardingDao
+import com.example.data.local.RelayForwardingRecord
 import com.example.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -42,11 +44,14 @@ class SafetyRepository(
     private val journeyDao: JourneyDao? = null,
     private val coordinationDao: CoordinationDao? = null,
     private val pairedChildDao: PairedChildDao? = null,
-    private val playbookDao: PlaybookDao? = null
+    private val playbookDao: PlaybookDao? = null,
+    private val relayForwardingDao: RelayForwardingDao? = null
 ) {
     val allEvents: Flow<List<SafetyEvent>> = eventDao.getAllEvents()
     val allContacts: Flow<List<TrustedContact>> = contactDao.getAllContacts()
     val appMode: Flow<AppMode> = preferences.appMode
+    fun getCachedAppMode(): AppMode = preferences.getCachedAppMode()
+    val allRelayRecords: Flow<List<RelayForwardingRecord>> = relayForwardingDao?.getAllRecords() ?: flowOf(emptyList())
     val deviceId: Flow<String> = preferences.deviceId
     val safeZone: Flow<SafeZone> = preferences.safeZone
     val childBioProfile: Flow<com.example.model.ChildBioProfile> = preferences.childBioProfile
@@ -114,6 +119,18 @@ class SafetyRepository(
 
     suspend fun logPlaybookAction(log: PlaybookActionLog): Long {
         return playbookDao?.insertPlaybookLog(log) ?: -1L
+    }
+
+    suspend fun updateParentNodeEndpoint(deviceId: String, ip: String, port: Int, endpointId: String) {
+        pairedChildDao?.updateParentNodeEndpoint(deviceId, ip, port, endpointId)
+    }
+
+    suspend fun updateTamperStatus(deviceId: String, status: String, authorizedUntil: Long) {
+        pairedChildDao?.updateTamperStatus(deviceId, status, authorizedUntil)
+    }
+
+    suspend fun updateProvisioningStatus(deviceId: String, isProvisioned: Boolean, provisionedAt: Long) {
+        pairedChildDao?.updateProvisioningStatus(deviceId, isProvisioned, provisionedAt)
     }
 
 
@@ -409,7 +426,8 @@ class SafetyRepository(
         incidentId: String,
         tier: Int,
         recipientName: String,
-        recipientContact: String
+        recipientContact: String,
+        status: String = "DISPATCHED"
     ): Long {
         val record = EscalationRecord(
             incidentId = incidentId,
@@ -417,7 +435,7 @@ class SafetyRepository(
             tier = tier,
             recipientName = recipientName,
             recipientContact = recipientContact,
-            status = "DISPATCHED"
+            status = status
         )
         return escalationDao?.insertEscalationRecord(record) ?: -1L
     }

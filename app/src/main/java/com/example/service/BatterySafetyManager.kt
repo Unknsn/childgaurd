@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import androidx.core.content.ContextCompat
 import com.example.model.BatteryInfo
 import com.example.model.BatteryState
 import com.example.model.OperatingMode
@@ -46,7 +47,12 @@ class BatterySafetyManager(private val context: Context) {
         }
 
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val initialIntent = context.registerReceiver(receiver, filter)
+        val initialIntent = ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED
+        )
         if (initialIntent != null) {
             processBatteryIntent(initialIntent)
         }

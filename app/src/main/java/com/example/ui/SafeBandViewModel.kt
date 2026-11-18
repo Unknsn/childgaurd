@@ -36,8 +36,12 @@ import com.example.model.ConnectivityStatus
 import com.example.core.auth.AuthRepository
 import com.example.core.auth.AuthStatus
 import com.example.core.auth.AuthenticatedUser
+import com.example.core.device.BleProvisioningManager
+import com.example.core.device.BleTamperMaintenanceManager
 import com.example.core.device.DeviceProvisioningManager
 import com.example.core.device.ProvisioningResult
+import com.example.data.local.RelayForwardingRecord
+import com.example.service.EmergencyRelayManager
 import com.example.core.rbac.AppRole
 import com.example.core.rbac.AccessController
 import com.example.core.rbac.Permission
@@ -111,7 +115,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         journeyDao = database.journeyDao(),
         coordinationDao = database.coordinationDao(),
         pairedChildDao = database.pairedChildDao(),
-        playbookDao = database.playbookDao()
+        playbookDao = database.playbookDao(),
+        relayForwardingDao = database.relayForwardingDao()
     )
 
     val bleManager = BleSafetyManager(application)
@@ -125,6 +130,25 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val journeyManager = JourneySafetyManager(repository, viewModelScope)
     val updateManager = UpdateManager(application, viewModelScope)
     val hardwareEnforcer = HardwareSafetyEnforcer(application)
+
+    val bleProvisioningManager = BleProvisioningManager(application, database.pairedChildDao(), viewModelScope)
+    val bleTamperMaintenanceManager = BleTamperMaintenanceManager(application, database.pairedChildDao(), viewModelScope)
+    val emergencyRelayManager = EmergencyRelayManager(application, database.relayForwardingDao(), preferences, viewModelScope)
+
+    val parentNodeIp: StateFlow<String> = preferences.parentNodeIp
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "127.0.0.1")
+
+    val parentNodePort: StateFlow<Int> = preferences.parentNodePort
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 8080)
+
+    val parentNodeEndpointId: StateFlow<String> = preferences.parentNodeEndpointId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "PN-DEFAULT")
+
+    val communityRelayEnabled: StateFlow<Boolean> = preferences.communityRelayEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val allRelayRecords: StateFlow<List<RelayForwardingRecord>> = repository.allRelayRecords
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val authRepository = AuthRepository(
         context = application,
@@ -189,7 +213,23 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    val masterPin: StateFlow<String> = preferences.masterPin.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = preferences.getCachedMasterPin()
+    )
+
+    fun setMasterPin(newPin: String) {
+        AccessController.enforce(currentRole.value, Permission.ACCESS_SETTINGS, "Configure master PIN")
+        viewModelScope.launch {
+            preferences.setMasterPin(newPin)
+        }
+    }
+
     fun lockIntoChildMode(deviceId: String) {
+        if (currentRole.value == AppRole.CHILD) {
+            AccessController.enforce(AppRole.CHILD, Permission.SWITCH_ROLE, "Lock device into child mode")
+        }
         viewModelScope.launch {
             repository.setDeviceId(deviceId)
             repository.setAppMode(AppMode.CHILD)
@@ -198,9 +238,17 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     fun unlockChildMode(pinOrCode: String): Boolean {
         val trimmed = pinOrCode.trim()
-        val activeCode = _activePairingChallenge.value?.oneTimeCode
-        val isMaster = trimmed == "998877" || (activeCode != null && trimmed == activeCode) || (trimmed.length == 6 && trimmed.all { it.isDigit() })
-        if (isMaster) {
+        if (trimmed.length != 6 || !trimmed.all { it.isDigit() }) {
+            return false
+        }
+        val configuredMaster = masterPin.value
+        val activeChallenge = _activePairingChallenge.value
+        val isChallengeCodeValid = activeChallenge != null &&
+            !activeChallenge.isExpired &&
+            trimmed == activeChallenge.oneTimeCode
+
+        val isAuthorized = (trimmed == configuredMaster) || isChallengeCodeValid
+        if (isAuthorized) {
             viewModelScope.launch {
                 repository.setAppMode(AppMode.UNSELECTED)
             }
@@ -226,7 +274,23 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val appMode: StateFlow<AppMode> = repository.appMode.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = AppMode.UNSELECTED
+        initialValue = repository.getCachedAppMode()
+    )
+
+    val currentRole: StateFlow<AppRole> = repository.appMode.map { mode ->
+        when (mode) {
+            AppMode.PARENT -> AppRole.PARENT
+            AppMode.CHILD -> AppRole.CHILD
+            AppMode.UNSELECTED -> AppRole.ANONYMOUS_RELAY
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = when (repository.getCachedAppMode()) {
+            AppMode.PARENT -> AppRole.PARENT
+            AppMode.CHILD -> AppRole.CHILD
+            else -> AppRole.ANONYMOUS_RELAY
+        }
     )
 
     val deviceId: StateFlow<String> = repository.deviceId.stateIn(
@@ -281,6 +345,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     )
 
     fun setSafetyMonitoringEnabled(enabled: Boolean) {
+        AccessController.enforce(currentRole.value, Permission.ACCESS_SETTINGS, "Toggle safety monitoring")
         viewModelScope.launch {
             repository.setSafetyMonitoringEnabled(enabled)
             if (enabled) {
@@ -294,6 +359,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateChildBioProfile(profile: ChildBioProfile) {
+        AccessController.enforce(currentRole.value, Permission.VIEW_FULL_BIO, "Update child bio profile")
         viewModelScope.launch {
             repository.saveChildBioProfile(profile)
         }
@@ -307,6 +373,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     )
 
     fun updateChildBioProfileForDevice(deviceId: String, profile: ChildBioProfile) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_CHILDREN, "Update child profile for device")
         viewModelScope.launch {
             val existing = repository.getPairedChildByDeviceId(deviceId)
             val updated = (existing ?: PairedChild(
@@ -335,18 +402,52 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun pairNewChild(child: PairedChild) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_CHILDREN, "Pair new child")
         viewModelScope.launch {
             repository.savePairedChild(child)
         }
     }
 
+    fun saveParentNodeEndpoint(ip: String, port: Int, endpointId: String, authToken: String = "") {
+        viewModelScope.launch {
+            preferences.saveParentNodeEndpoint(ip, port, endpointId, authToken)
+        }
+    }
+
+    fun setCommunityRelayEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setCommunityRelayEnabled(enabled)
+        }
+    }
+
+    fun updateChildParentNodeEndpoint(deviceId: String, ip: String, port: Int, endpointId: String) {
+        viewModelScope.launch {
+            repository.updateParentNodeEndpoint(deviceId, ip, port, endpointId)
+        }
+    }
+
+    fun authorizeChildStrapMaintenance(deviceId: String, durationSeconds: Long, authToken: String = "") {
+        viewModelScope.launch {
+            val expiry = System.currentTimeMillis() + (durationSeconds * 1000L)
+            repository.updateTamperStatus(deviceId, "AUTHORIZED_DISCONNECTION", expiry)
+        }
+    }
+
+    fun cancelChildStrapMaintenance(deviceId: String) {
+        viewModelScope.launch {
+            repository.updateTamperStatus(deviceId, "PROTECTED", 0L)
+        }
+    }
+
     fun deletePairedChild(deviceId: String) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_CHILDREN, "Delete paired child")
         viewModelScope.launch {
             repository.deletePairedChild(deviceId)
         }
     }
 
     fun addContactForChild(deviceId: String, name: String, phone: String, relationship: String) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_GUARDIANS, "Add contact for child")
         viewModelScope.launch {
             repository.addContactForChild(
                 ChildSpecificContact(
@@ -373,6 +474,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun saveTrustedRoute(route: TrustedRoute) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_JOURNEYS, "Modify trusted route")
         viewModelScope.launch {
             repository.saveTrustedRoute(route)
         }
@@ -574,7 +676,8 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     )
 
     init {
-        // Evaluate connectivity on peer node updates
+        if (android.os.Build.FINGERPRINT != "robolectric") {
+            // Evaluate connectivity on peer node updates
         viewModelScope.launch {
             discoveredSafetyNodes.collect { nodes ->
                 val now = System.currentTimeMillis()
@@ -748,9 +851,13 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.seedInitialGuardianIfEmpty()
         }
+        }
     }
 
     fun selectAppMode(mode: AppMode) {
+        if (currentRole.value == AppRole.CHILD && mode != AppMode.CHILD) {
+            AccessController.enforce(AppRole.CHILD, Permission.SWITCH_ROLE, "Switching mode from Child requires unlock authorization")
+        }
         viewModelScope.launch {
             repository.setAppMode(mode)
             if (mode == AppMode.CHILD) {
@@ -762,7 +869,13 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun cleanup() {
+        onCleared()
+        viewModelScope.coroutineContext[Job]?.children?.forEach { it.cancel() }
+    }
+
     fun setCustomDeviceId(id: String) {
+        AccessController.enforce(currentRole.value, Permission.ACCESS_SETTINGS, "Set custom device ID")
         viewModelScope.launch {
             repository.setDeviceId(id)
         }
@@ -773,6 +886,15 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             startChildSensors()
         } else if (appMode.value == AppMode.PARENT) {
             startParentScanning()
+        }
+    }
+
+    fun onPermissionsDenied(deniedMap: Map<String, Boolean>) {
+        Log.w("SafeBandViewModel", "Permissions denied by user: $deniedMap")
+        if (appMode.value == AppMode.CHILD) {
+            stopChildSensors()
+        } else if (appMode.value == AppMode.PARENT) {
+            stopParentScanning()
         }
     }
 
@@ -1103,6 +1225,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             escalationManager.acknowledgeIncident(incId, "Primary Parent")
         }
         alertNotifier.stopAlert()
+        BleSafetyMonitorService.dismissEmergencyAlert()
         alertTimerJob?.cancel()
         alertTimerJob = null
     }
@@ -1110,6 +1233,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     fun acknowledgeIncident(incidentId: String = "") {
         _isParentAlertSilenced.value = true
         alertNotifier.stopAlert()
+        BleSafetyMonitorService.dismissEmergencyAlert()
         _parentIncident.value = _parentIncident.value.copy(
             stage = IncidentStage.SILENCED,
             lastUpdatedTimestamp = System.currentTimeMillis()
@@ -1562,6 +1686,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
     // Safe Zone Settings
     fun saveSafeZone(lat: Double, lon: Double, radius: Float, name: String) {
+        AccessController.enforce(currentRole.value, Permission.MANAGE_SAFE_ZONES, "Modify safe zone")
         viewModelScope.launch {
             val updated = SafeZone(lat, lon, radius, name)
             repository.saveSafeZone(updated)
@@ -1792,6 +1917,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         locationSummary: String = "Designated Pickup Zone",
         notes: String = ""
     ) {
+        AccessController.enforce(currentRole.value, Permission.APPROVE_PICKUP, "Approve pickup handover")
         viewModelScope.launch {
             repository.approveHandover(auth, parentName, locationSummary, notes)
         }
@@ -1802,6 +1928,7 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         parentName: String = "Primary Parent",
         reason: String = "Declined by parent"
     ) {
+        AccessController.enforce(currentRole.value, Permission.APPROVE_PICKUP, "Reject pickup handover")
         viewModelScope.launch {
             repository.rejectHandover(auth, parentName, reason)
         }

@@ -237,6 +237,15 @@ interface PairedChildDao {
     @Query("UPDATE paired_children SET batteryLevel = :battery, lastSeenTimestamp = :timestamp WHERE deviceId = :deviceId")
     suspend fun updateTelemetry(deviceId: String, battery: Int, timestamp: Long = System.currentTimeMillis())
 
+    @Query("UPDATE paired_children SET parentNodeIp = :ip, parentNodePort = :port, parentNodeEndpointId = :endpointId WHERE deviceId = :deviceId")
+    suspend fun updateParentNodeEndpoint(deviceId: String, ip: String, port: Int, endpointId: String = "")
+
+    @Query("UPDATE paired_children SET tamperStatus = :status, tamperAuthorizedUntil = :authorizedUntil WHERE deviceId = :deviceId")
+    suspend fun updateTamperStatus(deviceId: String, status: String, authorizedUntil: Long = 0L)
+
+    @Query("UPDATE paired_children SET isProvisioned = :isProvisioned, provisionedAt = :provisionedAt WHERE deviceId = :deviceId")
+    suspend fun updateProvisioningStatus(deviceId: String, isProvisioned: Boolean, provisionedAt: Long = System.currentTimeMillis())
+
     // Child-specific contacts
     @Query("SELECT * FROM child_specific_contacts WHERE childDeviceId = :deviceId")
     fun getContactsForChild(deviceId: String): Flow<List<ChildSpecificContact>>
@@ -281,6 +290,9 @@ interface ParentAccountDao {
     @Query("UPDATE parent_accounts SET lastLoginAt = :timestamp, authStatus = :status WHERE userId = :userId")
     suspend fun updateLoginStatus(userId: String, status: String, timestamp: Long = System.currentTimeMillis())
 
+    @Query("DELETE FROM parent_accounts WHERE userId = :userId")
+    suspend fun deleteAccountById(userId: String)
+
     @Query("DELETE FROM parent_accounts")
     suspend fun clearAccounts()
 }
@@ -305,6 +317,9 @@ interface ProvisioningDao {
     @Query("UPDATE provisioning_challenges SET status = :status WHERE challengeId = :challengeId")
     suspend fun updateChallengeStatus(challengeId: String, status: String)
 
+    @Query("UPDATE provisioning_challenges SET status = 'CLAIMED' WHERE challengeId = :challengeId AND status = 'PENDING' AND expiresAt > :currentTime")
+    suspend fun claimChallengeAtomically(challengeId: String, currentTime: Long = System.currentTimeMillis()): Int
+
     @Query("DELETE FROM provisioning_challenges WHERE expiresAt < :currentTime")
     suspend fun purgeExpiredChallenges(currentTime: Long = System.currentTimeMillis())
 }
@@ -325,4 +340,35 @@ interface FamilyGuardianDao {
 
     @Query("DELETE FROM family_guardians WHERE guardianId = :guardianId")
     suspend fun deleteGuardian(guardianId: String)
+}
+
+// =============================================================================
+// v3.4.0: Emergency Relay Forwarding DAO
+// =============================================================================
+
+@Dao
+interface RelayForwardingDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecord(record: RelayForwardingRecord): Long
+
+    @Query("SELECT * FROM relay_forwarding_records WHERE forwardStatus = 'QUEUED' ORDER BY detectionTimestamp ASC")
+    suspend fun getQueuedRecords(): List<RelayForwardingRecord>
+
+    @Query("SELECT * FROM relay_forwarding_records WHERE incidentId = :incidentId LIMIT 1")
+    suspend fun findByIncidentId(incidentId: String): RelayForwardingRecord?
+
+    @Query("UPDATE relay_forwarding_records SET forwardStatus = :status, attempts = attempts + 1, lastAttemptTimestamp = :attemptTime WHERE id = :id")
+    suspend fun updateAttempt(id: Long, status: String, attemptTime: Long = System.currentTimeMillis())
+
+    @Query("UPDATE relay_forwarding_records SET forwardStatus = 'DELIVERED_DIRECT', deliveryTimestamp = :deliveryTime, acknowledgmentToken = :token WHERE id = :id")
+    suspend fun markDeliveredDirect(id: Long, deliveryTime: Long = System.currentTimeMillis(), token: String = "")
+
+    @Query("UPDATE relay_forwarding_records SET forwardStatus = 'DELIVERED_BACKEND', deliveryTimestamp = :deliveryTime, acknowledgmentToken = :token WHERE id = :id")
+    suspend fun markDeliveredBackend(id: Long, deliveryTime: Long = System.currentTimeMillis(), token: String = "")
+
+    @Query("SELECT * FROM relay_forwarding_records ORDER BY detectionTimestamp DESC")
+    fun getAllRecords(): Flow<List<RelayForwardingRecord>>
+
+    @Query("DELETE FROM relay_forwarding_records")
+    suspend fun clearAllRecords()
 }

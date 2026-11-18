@@ -24,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,8 +82,23 @@ class MainActivity : ComponentActivity() {
 fun SafeBandApp(viewModel: SafeBandViewModel) {
     val context = LocalContext.current
     val currentMode by viewModel.appMode.collectAsState()
-    var currentDestination by remember { mutableStateOf(AppDestination.HOME) }
+    
+    // Robust State-Stack Navigation (Requirements 15 & 16)
+    val destinationStack = remember { mutableStateListOf(AppDestination.HOME) }
+    val currentDestination = destinationStack.lastOrNull() ?: AppDestination.HOME
     var isChildProvisioning by remember { mutableStateOf(false) }
+
+    fun navigateTo(dest: AppDestination) {
+        if (destinationStack.lastOrNull() != dest) {
+            destinationStack.add(dest)
+        }
+    }
+
+    fun navigateBack() {
+        if (destinationStack.size > 1) {
+            destinationStack.removeAt(destinationStack.size - 1)
+        }
+    }
 
     // Permission handling state
     var showRationaleDialog by remember { mutableStateOf(false) }
@@ -91,7 +107,12 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        viewModel.onPermissionsGranted()
+        val allGranted = results.isNotEmpty() && results.values.all { it }
+        if (allGranted) {
+            viewModel.onPermissionsGranted()
+        } else {
+            viewModel.onPermissionsDenied(results)
+        }
     }
 
     // Determine required permissions based on SDK version
@@ -150,14 +171,23 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
         }
     }
 
-    if (currentDestination != AppDestination.HOME) {
+    // System Back & Gesture Navigation Handlers
+    if (isChildProvisioning) {
         androidx.activity.compose.BackHandler {
-            currentDestination = AppDestination.HOME
+            isChildProvisioning = false
+        }
+    } else if (destinationStack.size > 1) {
+        androidx.activity.compose.BackHandler {
+            navigateBack()
         }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
             AnimatedContent(
                 targetState = Triple(currentMode, currentDestination, isChildProvisioning),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -171,7 +201,8 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                                 onNavigateBack = { isChildProvisioning = false },
                                 onProvisioningComplete = {
                                     isChildProvisioning = false
-                                    currentDestination = AppDestination.HOME
+                                    destinationStack.clear()
+                                    destinationStack.add(AppDestination.HOME)
                                 }
                             )
                         } else {
@@ -186,17 +217,20 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                         if (mode == AppMode.CHILD) {
                             ChildSettingsScreen(
                                 viewModel = viewModel,
-                                onNavigateBack = { currentDestination = AppDestination.HOME },
-                                onUnlockSuccess = { currentDestination = AppDestination.HOME }
+                                onNavigateBack = { navigateBack() },
+                                onUnlockSuccess = {
+                                    destinationStack.clear()
+                                    destinationStack.add(AppDestination.HOME)
+                                }
                             )
                         } else {
                             SettingsScreen(
                                 viewModel = viewModel,
-                                onNavigateBack = { currentDestination = AppDestination.HOME },
-                                onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
-                                onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
-                                onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
-                                onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
+                                onNavigateBack = { navigateBack() },
+                                onNavigateToUpdate = { navigateTo(AppDestination.UPDATE) },
+                                onNavigateToPickup = { navigateTo(AppDestination.PICKUP) },
+                                onNavigateToSchool = { navigateTo(AppDestination.SCHOOL) },
+                                onNavigateToJourney = { navigateTo(AppDestination.JOURNEY) }
                             )
                         }
                     }
@@ -204,55 +238,54 @@ fun SafeBandApp(viewModel: SafeBandViewModel) {
                     destination == AppDestination.UPDATE -> {
                         AppUpdateScreen(
                             viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                            onNavigateBack = { navigateBack() }
                         )
                     }
 
                     destination == AppDestination.PICKUP -> {
                         PickupManagementScreen(
                             viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                            onNavigateBack = { navigateBack() }
                         )
                     }
 
                     destination == AppDestination.SCHOOL -> {
                         SchoolManagementScreen(
                             viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                            onNavigateBack = { navigateBack() }
                         )
                     }
 
                     destination == AppDestination.JOURNEY -> {
                         JourneySafetyScreen(
                             viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME }
+                            onNavigateBack = { navigateBack() }
                         )
                     }
 
                     destination == AppDestination.HISTORY -> {
                         AlertHistoryScreen(
                             viewModel = viewModel,
-                            onNavigateBack = { currentDestination = AppDestination.HOME },
-                            modifier = Modifier.padding(innerPadding)
+                            onNavigateBack = { navigateBack() }
                         )
                     }
 
                     mode == AppMode.CHILD -> {
                         ChildHomeScreen(
                             viewModel = viewModel,
-                            onNavigateToSettings = { currentDestination = AppDestination.SETTINGS },
-                            onNavigateToHistory = { currentDestination = AppDestination.HISTORY }
+                            onNavigateToSettings = { navigateTo(AppDestination.SETTINGS) },
+                            onNavigateToHistory = { navigateTo(AppDestination.HISTORY) }
                         )
                     }
 
                     mode == AppMode.PARENT -> {
                         ParentHomeScreen(
                             viewModel = viewModel,
-                            onNavigateToSettings = { currentDestination = AppDestination.SETTINGS },
-                            onNavigateToUpdate = { currentDestination = AppDestination.UPDATE },
-                            onNavigateToPickup = { currentDestination = AppDestination.PICKUP },
-                            onNavigateToSchool = { currentDestination = AppDestination.SCHOOL },
-                            onNavigateToJourney = { currentDestination = AppDestination.JOURNEY }
+                            onNavigateToSettings = { navigateTo(AppDestination.SETTINGS) },
+                            onNavigateToUpdate = { navigateTo(AppDestination.UPDATE) },
+                            onNavigateToPickup = { navigateTo(AppDestination.PICKUP) },
+                            onNavigateToSchool = { navigateTo(AppDestination.SCHOOL) },
+                            onNavigateToJourney = { navigateTo(AppDestination.JOURNEY) }
                         )
                     }
                 }

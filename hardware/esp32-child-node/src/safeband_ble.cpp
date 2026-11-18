@@ -1,13 +1,19 @@
 #include "safeband_ble.h"
 #include "status_led.h"
+#include "node_config.h"
+#include "tamper_monitor.h"
 
 BLEServer* SafeBandBleManager::s_pServer = nullptr;
 BLECharacteristic* SafeBandBleManager::s_pStatusCharacteristic = nullptr;
+BLECharacteristic* SafeBandBleManager::s_pProvisionCharacteristic = nullptr;
+BLECharacteristic* SafeBandBleManager::s_pMaintenanceCharacteristic = nullptr;
+BLECharacteristic* SafeBandBleManager::s_pTamperCharacteristic = nullptr;
 BLEAdvertising* SafeBandBleManager::s_pAdvertising = nullptr;
 bool SafeBandBleManager::s_deviceConnected = false;
 bool SafeBandBleManager::s_oldDeviceConnected = false;
 uint32_t SafeBandBleManager::s_lastAdvUpdateMs = 0;
 String SafeBandBleManager::s_currentEphemeralId = "";
+uint8_t SafeBandBleManager::s_currentAlertType = ALERT_TYPE_NORMAL;
 
 class SafeBandServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) override {
@@ -20,6 +26,26 @@ class SafeBandServerCallbacks: public BLEServerCallbacks {
         SafeBandBleManager::setDeviceConnected(false);
         Serial.println("[BLE] Guardian device disconnected. Auto-resuming advertising...");
         pServer->startAdvertising();
+    }
+};
+
+class ProvisionCallback: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pChar) override {
+        String rxValue = pChar->getValue().c_str();
+        if (rxValue.length() > 0) {
+            Serial.printf("[BLE-GATT] Provisioning payload received: %s\n", rxValue.c_str());
+            SafeBandBleManager::handleProvisionWrite(rxValue);
+        }
+    }
+};
+
+class MaintenanceCallback: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pChar) override {
+        String rxValue = pChar->getValue().c_str();
+        if (rxValue.length() > 0) {
+            Serial.printf("[BLE-GATT] Maintenance command received: %s\n", rxValue.c_str());
+            SafeBandBleManager::handleMaintenanceWrite(rxValue);
+        }
     }
 };
 
@@ -38,7 +64,8 @@ void SafeBandBleManager::buildManufacturerPayload(
     RiskLevelCode risk,
     uint32_t timeSeconds,
     float lat,
-    float lon
+    float lon,
+    uint8_t alertType
 ) {
     if (outSize < 24) return;
     memset(outBuffer, 0, outSize);
@@ -83,7 +110,7 @@ void SafeBandBleManager::buildManufacturerPayload(
 }
 
 void SafeBandBleManager::init() {
-    Serial.println("[BLE] Initializing SafeBand BLE subsystem...");
+    Serial.println("[BLE] Initializing SafeBand BLE subsystem with Provisioning & Tamper...");
 
     // Initialize BLE device with public name
     BLEDevice::init(SAFEBAND_BLE_DEVICE_NAME);
@@ -98,16 +125,45 @@ void SafeBandBleManager::init() {
     // Create Primary SafeBand Service
     BLEService* pService = s_pServer->createService(SAFEBAND_SERVICE_UUID);
 
-    // Create Status / Telemetry Characteristic
+    // 1. Status / Telemetry Characteristic (Read / Notify)
     s_pStatusCharacteristic = pService->createCharacteristic(
         SAFEBAND_CHAR_STATUS_UUID,
         BLECharacteristic::PROPERTY_READ |
         BLECharacteristic::PROPERTY_NOTIFY
     );
     s_pStatusCharacteristic->addDescriptor(new BLE2902());
-
-    // Initial status value
     s_pStatusCharacteristic->setValue("NORMAL");
+
+    // 2. Provisioning Characteristic (Write / Read / Notify)
+    s_pProvisionCharacteristic = pService->createCharacteristic(
+        SAFEBAND_CHAR_PROVISION_UUID,
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_WRITE |
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+    s_pProvisionCharacteristic->addDescriptor(new BLE2902());
+    s_pProvisionCharacteristic->setCallbacks(new ProvisionCallback());
+    s_pProvisionCharacteristic->setValue(NodeConfig::isProvisioned() ? "PROVISIONED" : "UNPROVISIONED");
+
+    // 3. Maintenance Characteristic (Write / Read / Notify)
+    s_pMaintenanceCharacteristic = pService->createCharacteristic(
+        SAFEBAND_CHAR_MAINTENANCE_UUID,
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_WRITE |
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+    s_pMaintenanceCharacteristic->addDescriptor(new BLE2902());
+    s_pMaintenanceCharacteristic->setCallbacks(new MaintenanceCallback());
+    s_pMaintenanceCharacteristic->setValue("MAINT_IDLE");
+
+    // 4. Tamper Monitoring Characteristic (Read / Notify)
+    s_pTamperCharacteristic = pService->createCharacteristic(
+        SAFEBAND_CHAR_TAMPER_UUID,
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+    s_pTamperCharacteristic->addDescriptor(new BLE2902());
+    s_pTamperCharacteristic->setValue(TamperMonitor::getStateName(TamperMonitor::getState()));
 
     pService->start();
 
@@ -117,14 +173,128 @@ void SafeBandBleManager::init() {
     s_pAdvertising->setMinPreferred(0x06);
     s_pAdvertising->setMinPreferred(0x12);
 
-    updateAdvertisement(NODE_NORMAL, millis());
+    updateAdvertisement(NODE_NORMAL, millis(), ALERT_TYPE_NORMAL);
 
     Serial.println("[BLE] SafeBand BLE advertising active!");
-    Serial.printf("[BLE] Service UUID: %s\n", SAFEBAND_SERVICE_UUID);
-    Serial.printf("[BLE] Device Name : %s\n", SAFEBAND_BLE_DEVICE_NAME);
+    Serial.printf("[BLE] Service UUID     : %s\n", SAFEBAND_SERVICE_UUID);
+    Serial.printf("[BLE] Status Char UUID  : %s\n", SAFEBAND_CHAR_STATUS_UUID);
+    Serial.printf("[BLE] Provision UUID    : %s\n", SAFEBAND_CHAR_PROVISION_UUID);
+    Serial.printf("[BLE] Maintenance UUID  : %s\n", SAFEBAND_CHAR_MAINTENANCE_UUID);
+    Serial.printf("[BLE] Tamper Char UUID  : %s\n", SAFEBAND_CHAR_TAMPER_UUID);
 }
 
-void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestampMs) {
+void SafeBandBleManager::handleProvisionWrite(const String& value) {
+    // Format: PROV:childId|parentId|parentNodeIp|parentNodePort|endpointId|authToken|version
+    if (!value.startsWith("PROV:")) {
+        if (s_pProvisionCharacteristic) {
+            s_pProvisionCharacteristic->setValue("ERR:INVALID_PREFIX");
+            s_pProvisionCharacteristic->notify();
+        }
+        return;
+    }
+
+    String payload = value.substring(5);
+    int tokens[7];
+    int tokenCount = 0;
+    int lastPos = 0;
+
+    for (int i = 0; i < payload.length() && tokenCount < 6; i++) {
+        if (payload[i] == '|') {
+            tokens[tokenCount++] = i;
+        }
+    }
+
+    if (tokenCount < 6) {
+        Serial.printf("[BLE] ERR: Provisioning payload invalid field count: %d\n", tokenCount);
+        if (s_pProvisionCharacteristic) {
+            s_pProvisionCharacteristic->setValue("ERR:INVALID_FIELD_COUNT");
+            s_pProvisionCharacteristic->notify();
+        }
+        return;
+    }
+
+    String childId = payload.substring(0, tokens[0]);
+    String parentId = payload.substring(tokens[0] + 1, tokens[1]);
+    String parentNodeIp = payload.substring(tokens[1] + 1, tokens[2]);
+    int32_t port = payload.substring(tokens[2] + 1, tokens[3]).toInt();
+    String endpointId = payload.substring(tokens[3] + 1, tokens[4]);
+    String authToken = payload.substring(tokens[4] + 1, tokens[5]);
+    int32_t version = payload.substring(tokens[5] + 1).toInt();
+
+    if (port <= 0) port = 8080;
+    if (version <= 0) version = 1;
+
+    bool saved = NodeConfig::saveProvisioning(
+        childId, parentId, parentNodeIp, port, endpointId, authToken, version
+    );
+
+    if (saved) {
+        // Update local child profile
+        ChildProfile prof = SafeBandNodeIdentity::getLocalProfile();
+        strncpy(prof.childId, childId.c_str(), sizeof(prof.childId) - 1);
+        SafeBandNodeIdentity::setLocalProfile(prof);
+
+        String ackMsg = "ACK:PROV:OK:v=" + String(version);
+        if (s_pProvisionCharacteristic) {
+            s_pProvisionCharacteristic->setValue(ackMsg.c_str());
+            s_pProvisionCharacteristic->notify();
+        }
+        Serial.printf("[BLE] Provisioning completed and acknowledged: %s\n", ackMsg.c_str());
+    } else {
+        if (s_pProvisionCharacteristic) {
+            s_pProvisionCharacteristic->setValue("ERR:SAVE_FAILED");
+            s_pProvisionCharacteristic->notify();
+        }
+    }
+}
+
+void SafeBandBleManager::handleMaintenanceWrite(const String& value) {
+    // Format 1: MAINT:AUTH:<durationSec>:<authToken>
+    // Format 2: MAINT:CANCEL
+    if (value.startsWith("MAINT:AUTH:")) {
+        int firstColon = 11;
+        int secondColon = value.indexOf(':', firstColon);
+        if (secondColon == -1) {
+            if (s_pMaintenanceCharacteristic) {
+                s_pMaintenanceCharacteristic->setValue("ERR:INVALID_FORMAT");
+                s_pMaintenanceCharacteristic->notify();
+            }
+            return;
+        }
+
+        uint32_t durationSec = value.substring(firstColon, secondColon).toInt();
+        String token = value.substring(secondColon + 1);
+
+        bool ok = TamperMonitor::authorizeMaintenance(durationSec, token);
+        if (ok) {
+            String ack = "ACK:MAINT:OK:" + String(durationSec);
+            if (s_pMaintenanceCharacteristic) {
+                s_pMaintenanceCharacteristic->setValue(ack.c_str());
+                s_pMaintenanceCharacteristic->notify();
+            }
+            notifyTamperStatus(TamperMonitor::getState());
+        } else {
+            if (s_pMaintenanceCharacteristic) {
+                s_pMaintenanceCharacteristic->setValue("ERR:MAINT:UNAUTHORIZED");
+                s_pMaintenanceCharacteristic->notify();
+            }
+        }
+    } else if (value == "MAINT:CANCEL") {
+        TamperMonitor::cancelMaintenance();
+        if (s_pMaintenanceCharacteristic) {
+            s_pMaintenanceCharacteristic->setValue("ACK:MAINT:CANCELLED");
+            s_pMaintenanceCharacteristic->notify();
+        }
+        notifyTamperStatus(TamperMonitor::getState());
+    } else {
+        if (s_pMaintenanceCharacteristic) {
+            s_pMaintenanceCharacteristic->setValue("ERR:UNKNOWN_COMMAND");
+            s_pMaintenanceCharacteristic->notify();
+        }
+    }
+}
+
+void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestampMs, uint8_t alertType) {
     if (!s_pAdvertising) return;
 
     if (timestampMs == 0) {
@@ -132,25 +302,24 @@ void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestamp
     }
 
     s_currentEphemeralId = SafeBandNodeIdentity::getEphemeralId(timestampMs);
+    s_currentAlertType = alertType;
 
-    RiskLevelCode risk = (state == NODE_SOS_ACTIVE) ? RISK_CRITICAL : RISK_NORMAL;
+    RiskLevelCode risk = (state == NODE_SOS_ACTIVE || alertType == ALERT_TYPE_TAMPER) ? RISK_CRITICAL : RISK_NORMAL;
     uint32_t timeSeconds = timestampMs / 1000UL;
     float lat = 0.0f; // No GPS hardware connected
     float lon = 0.0f; // No GPS hardware connected
 
     uint8_t payloadBytes[24];
-    buildManufacturerPayload(payloadBytes, sizeof(payloadBytes), s_currentEphemeralId, risk, timeSeconds, lat, lon);
+    buildManufacturerPayload(payloadBytes, sizeof(payloadBytes), s_currentEphemeralId, risk, timeSeconds, lat, lon, alertType);
 
     std::string mfString((char*)payloadBytes, 24);
 
     // 1. Primary Advertising Packet: MUST stay <= 31 bytes!
-    // Flags (3 bytes) + Manufacturer Data (26 bytes: 2 header + 24 data) = 29 bytes!
     BLEAdvertisementData advData;
     advData.setFlags(0x06); // General Discoverable + BR/EDR Not Supported
     advData.setManufacturerData(mfString);
 
     // 2. Scan Response Packet: MUST stay <= 31 bytes!
-    // Service UUID (18 bytes) + Short Name (10 bytes) = 28 bytes!
     BLEAdvertisementData scanResponseData;
     scanResponseData.setCompleteServices(BLEUUID(SAFEBAND_SERVICE_UUID));
     scanResponseData.setShortName("SafeBand");
@@ -163,22 +332,41 @@ void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestamp
 
     s_lastAdvUpdateMs = timestampMs;
 
-    Serial.printf("[BLE] Adv updated: Ephemeral=%s, Risk=%s, State=%s [AdvLen=%d, ScanRspLen=%d]\n",
+    Serial.printf("[BLE] Adv updated: Ephemeral=%s, Risk=%s, AlertType=%d, State=%s\n",
         s_currentEphemeralId.c_str(),
-        (risk == RISK_CRITICAL) ? "CRITICAL (SOS)" : "NORMAL",
-        SafeBandNodeIdentity::getStateName(state),
-        advData.getPayload().length(),
-        scanResponseData.getPayload().length()
+        (risk == RISK_CRITICAL) ? "CRITICAL" : "NORMAL",
+        alertType,
+        SafeBandNodeIdentity::getStateName(state)
     );
 
-    notifyStatus(state);
+    notifyStatus(state, alertType);
 }
 
-void SafeBandBleManager::notifyStatus(NodeState state) {
+void SafeBandBleManager::notifyStatus(NodeState state, uint8_t alertType) {
     if (s_pStatusCharacteristic && s_deviceConnected) {
-        const char* statusStr = (state == NODE_SOS_ACTIVE) ? "SOS_CRITICAL" : "NORMAL";
+        const char* statusStr = "NORMAL";
+        if (alertType == ALERT_TYPE_TAMPER) {
+            statusStr = "TAMPER_CRITICAL";
+        } else if (state == NODE_SOS_ACTIVE) {
+            statusStr = "SOS_CRITICAL";
+        }
         s_pStatusCharacteristic->setValue(statusStr);
         s_pStatusCharacteristic->notify();
+    }
+}
+
+void SafeBandBleManager::notifyTamperStatus(TamperState state) {
+    if (s_pTamperCharacteristic && s_deviceConnected) {
+        const char* statusStr = TamperMonitor::getStateName(state);
+        s_pTamperCharacteristic->setValue(statusStr);
+        s_pTamperCharacteristic->notify();
+    }
+}
+
+void SafeBandBleManager::notifyProvisionStatus(const char* status) {
+    if (s_pProvisionCharacteristic && s_deviceConnected) {
+        s_pProvisionCharacteristic->setValue(status);
+        s_pProvisionCharacteristic->notify();
     }
 }
 
@@ -188,7 +376,7 @@ void SafeBandBleManager::handleLoop() {
     // Check for ephemeral ID rotation (every 15 minutes)
     if (now - s_lastAdvUpdateMs >= EPHEMERAL_WINDOW_MS) {
         Serial.println("[BLE] Rotating ephemeral identifier...");
-        updateAdvertisement(SafeBandNodeIdentity::getState(), now);
+        updateAdvertisement(SafeBandNodeIdentity::getState(), now, s_currentAlertType);
     }
 
     // Handle connection state transitions

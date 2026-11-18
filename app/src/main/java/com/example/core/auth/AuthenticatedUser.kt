@@ -19,5 +19,6 @@ data class AuthenticatedUser(
     val photoUrl: String? = null,
     val role: AppRole = AppRole.PARENT,
     val authStatus: AuthStatus = AuthStatus.AUTHENTICATED,
+    val authProvider: String = "GOOGLE",
     val lastLoginTimestamp: Long = System.currentTimeMillis()
 )

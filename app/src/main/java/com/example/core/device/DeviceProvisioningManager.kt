@@ -41,6 +41,9 @@ class DeviceProvisioningManager(
         childDeviceId: String,
         parentUserId: String
     ): ProvisioningChallengeEntity {
+        require(parentUserId.isNotBlank()) { "Authenticated parent ID required to generate pairing challenge" }
+        require(childDeviceId.isNotBlank()) { "Child device ID required to generate pairing challenge" }
+
         // Generate secure 6-digit PIN (e.g., 481920)
         val codeInt = 100000 + secureRandom.nextInt(900000)
         val code = codeInt.toString()
@@ -51,20 +54,23 @@ class DeviceProvisioningManager(
             oneTimeCode = code,
             expiresAt = System.currentTimeMillis() + CHALLENGE_TTL_MS,
             status = "PENDING",
-            parentUserId = parentUserId
+            parentUserId = parentUserId.trim()
         )
 
         provisioningDao.insertChallenge(challenge)
-        Log.i(TAG, "Generated pairing challenge $code for device $childDeviceId")
+        // Never log pairing codes to Logcat
+        Log.i(TAG, "Generated pairing challenge for device ${challenge.childDeviceId} (expires in ${CHALLENGE_TTL_MS / 60000}m)")
         return challenge
     }
 
     /**
-     * Child device verifies and claims the pairing challenge.
+     * Child device verifies and atomically claims the pairing challenge.
+     * Enforces single-use consumption, 15-minute TTL, and optional parent challenge ownership.
      */
     suspend fun verifyAndClaimChallenge(
         code: String,
-        childName: String = "Child Device"
+        childName: String = "Child Device",
+        expectedParentUserId: String? = null
     ): ProvisioningResult {
         return try {
             val cleanCode = code.trim().filter { it.isDigit() }
@@ -75,7 +81,8 @@ class DeviceProvisioningManager(
             val challenge = provisioningDao.getChallengeByCode(cleanCode)
                 ?: return ProvisioningResult.InvalidCode("Invalid pairing code")
 
-            if (challenge.expiresAt < System.currentTimeMillis()) {
+            val now = System.currentTimeMillis()
+            if (challenge.expiresAt < now) {
                 provisioningDao.updateChallengeStatus(challenge.challengeId, "EXPIRED")
                 return ProvisioningResult.Expired("Challenge code has expired")
             }
@@ -84,8 +91,21 @@ class DeviceProvisioningManager(
                 return ProvisioningResult.InvalidCode("Pairing code has already been used")
             }
 
-            // Mark challenge claimed
-            provisioningDao.updateChallengeStatus(challenge.challengeId, "CLAIMED")
+            // Verify parent ownership if expected parent is specified
+            if (expectedParentUserId != null && challenge.parentUserId != expectedParentUserId) {
+                return ProvisioningResult.InvalidCode("Pairing code belongs to a different parent account")
+            }
+
+            // Atomically claim challenge to prevent race conditions & duplicate claims
+            val updatedCount = provisioningDao.claimChallengeAtomically(challenge.challengeId, now)
+            if (updatedCount == 0) {
+                val current = provisioningDao.getChallengeById(challenge.challengeId)
+                return if (current == null || current.status != "PENDING") {
+                    ProvisioningResult.InvalidCode("Pairing code has already been used")
+                } else {
+                    ProvisioningResult.Expired("Challenge code has expired")
+                }
+            }
 
             // Create or link PairedChild record
             val existing = pairedChildDao.findChildByDeviceId(challenge.childDeviceId)

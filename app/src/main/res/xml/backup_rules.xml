@@ -1,13 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Exclude sensitive Room database records (children bio, guardian identities, auth tokens) -->
+    <exclude domain="database" path="safeband_database" />
+    <exclude domain="database" path="safeband_database-wal" />
+    <exclude domain="database" path="safeband_database-shm" />
+    <!-- Exclude sensitive DataStore preferences -->
+    <exclude domain="sharedpref" path="safeband_preferences" />
+    <exclude domain="root" path="files/datastore/safeband_preferences.preferences_pb" />
+    <exclude domain="root" path="databases" />
 </full-backup-content>

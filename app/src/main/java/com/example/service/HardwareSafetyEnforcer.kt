@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationManager
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,7 +56,12 @@ class HardwareSafetyEnforcer(private val context: Context) {
             addAction(LocationManager.MODE_CHANGED_ACTION)
         }
         try {
-            context.registerReceiver(hardwareReceiver, filter)
+            ContextCompat.registerReceiver(
+                context,
+                hardwareReceiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED
+            )
         } catch (_: Exception) {}
     }
 

@@ -26,6 +26,23 @@
 // BLE Service & Characteristic UUIDs
 #define SAFEBAND_SERVICE_UUID       "00005afe-0000-1000-8000-00805f9b34fb"
 #define SAFEBAND_CHAR_STATUS_UUID   "00005afe-0001-1000-8000-00805f9b34fb"
+#define SAFEBAND_CHAR_PROVISION_UUID   "00005afe-0002-1000-8000-00805f9b34fb"
+#define SAFEBAND_CHAR_MAINTENANCE_UUID "00005afe-0003-1000-8000-00805f9b34fb"
+#define SAFEBAND_CHAR_TAMPER_UUID      "00005afe-0004-1000-8000-00805f9b34fb"
+
+// Hardware Tamper Detection (GPIO 3 TX Toggle & GPIO 4 RX Pull-down)
+#define PIN_TAMPER_TX               3       // GPIO 3: Heartbeat signal generator (output)
+#define PIN_TAMPER_RX               4       // GPIO 4: Strap continuity detector (input with pulldown)
+#define TAMPER_CHECK_INTERVAL_MS    200     // Continuity verification cycle interval (200ms)
+#define TAMPER_DEBOUNCE_CYCLES      3       // Minimum 3 consecutive failed cycles (600ms) to trigger tamper
+#define TAMPER_RESTORE_CYCLES       3       // Minimum 3 consecutive valid cycles (600ms) to clear tamper
+#define DEFAULT_MAINTENANCE_SEC     300     // 5 minutes default maintenance window
+#define MAX_MAINTENANCE_SEC         3600    // 1 hour maximum maintenance window
+
+// Alert Event Types for Beacon & Protocol
+#define ALERT_TYPE_NORMAL           0x00
+#define ALERT_TYPE_SOS              0x01
+#define ALERT_TYPE_TAMPER           0x02
 
 // Public BLE Device Name (privacy-preserving, no child name)
 #define SAFEBAND_BLE_DEVICE_NAME    "SafeBand-Child"

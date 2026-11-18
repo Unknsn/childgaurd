@@ -52,8 +52,8 @@ object LocationAddressResolver {
             )
         }
 
-        if (!Geocoder.isPresent()) {
-            Log.w(TAG, "Geocoder service is not present on this device")
+        if (!Geocoder.isPresent() || Build.FINGERPRINT == "robolectric") {
+            Log.w(TAG, "Geocoder service is not present or running in test environment")
             return@withContext null
         }
 

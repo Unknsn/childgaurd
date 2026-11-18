@@ -25,7 +25,8 @@ object AccessController {
             Permission.APPROVE_PICKUP,
             Permission.ACCESS_SETTINGS,
             Permission.SWITCH_ROLE,
-            Permission.VIEW_FULL_BIO
+            Permission.VIEW_FULL_BIO,
+            Permission.INSTALL_UPDATE
         ),
         AppRole.TRUSTED_GUARDIAN to setOf(
             Permission.VIEW_INCIDENTS,

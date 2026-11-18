@@ -566,6 +566,43 @@ fun EmergencyAlertSheet(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // Community Relay Notice (Feature 2)
+                            val isRelayedAlert = payload.hopCount > 0 ||
+                                    payload.trustRole == com.example.model.TrustRole.ANONYMOUS_RELAY ||
+                                    payload.ephemeralId.isNotEmpty()
+
+                            if (isRelayedAlert) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 6.dp),
+                                    shape = RoundedCornerShape(2.dp),
+                                    color = Color(0xFF1E3A8A).copy(alpha = 0.5f),
+                                    border = BorderStroke(1.dp, Color(0xFF3B82F6))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Radar,
+                                            contentDescription = null,
+                                            tint = Color(0xFF60A5FA),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Emergency detected near this location by a participating device.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF93C5FD),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+
                             // Exact GNSS Coordinates Box
                             Surface(
                                 modifier = Modifier
@@ -579,7 +616,13 @@ fun EmergencyAlertSheet(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("GNSS COORDINATES", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                                        Text(
+                                            text = if (isRelayedAlert) "RELAY REPORTED LOCATION" else "GNSS COORDINATES",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = ObsidianOutline
+                                        )
                                         Text("ACCURACY: ±3.2m", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = PhosphorWhite)
                                     }
                                     val lat = payload.latitude ?: 28.6133
@@ -591,6 +634,16 @@ fun EmergencyAlertSheet(
                                         fontWeight = FontWeight.Bold,
                                         color = PhosphorWhite
                                     )
+                                    if (isRelayedAlert) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Child Last Known Fix: 28.6133° N, 77.2090° E (Designated Safe Zone)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = MilledSilver
+                                        )
+                                    }
                                 }
                             }
 
@@ -640,14 +693,16 @@ fun EmergencyAlertSheet(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column {
-                                        Text("RELATIVE DISTANCE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                                        Text("68 METERS", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                                        Text("RSSI: -74 dBm", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                                        Text("RELATIVE DISTANCE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                                        val distText = if (payload.distanceMeters != null && payload.distanceMeters > 0) "${payload.distanceMeters.toInt()} METERS" else "PROXIMITY LINK"
+                                        Text(distText, style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                                        val rssiText = if (payload.rssi != 0) "RSSI: ${payload.rssi} dBm" else "DIRECT BLE"
+                                        Text(rssiText, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
-                                        Text("HEADING / AZIMUTH", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 7.sp, color = ObsidianOutline)
-                                        Text("042° NE", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
-                                        Text("NORTH-EAST RELATIVE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = MilledSilver)
+                                        Text("LINK STATUS", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = ObsidianOutline)
+                                        Text("DIRECT P2P", style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = PhosphorWhite)
+                                        Text("ESP32-S3 BLE", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = MilledSilver)
                                     }
                                 }
                             }

@@ -26,9 +26,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PlaybookActionLog::class,
         ParentAccountEntity::class,
         ProvisioningChallengeEntity::class,
-        FamilyGuardianEntity::class
+        FamilyGuardianEntity::class,
+        RelayForwardingRecord::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SafeBandDatabase : RoomDatabase() {
@@ -44,6 +45,7 @@ abstract class SafeBandDatabase : RoomDatabase() {
     abstract fun parentAccountDao(): ParentAccountDao
     abstract fun provisioningDao(): ProvisioningDao
     abstract fun familyGuardianDao(): FamilyGuardianDao
+    abstract fun relayForwardingDao(): RelayForwardingDao
 
     companion object {
         @Volatile
@@ -327,6 +329,44 @@ abstract class SafeBandDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Non-destructive migration from Schema v5 to v6 (v3.4.0 Release).
+         * Adds parent node endpoint & tamper tracking to paired_children,
+         * and creates relay_forwarding_records for community emergency alert propagation.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add Parent Node Endpoint & Tamper columns to paired_children
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN parentNodeIp TEXT NOT NULL DEFAULT '192.168.1.100'")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN parentNodePort INTEGER NOT NULL DEFAULT 8080")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN parentNodeEndpointId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN tamperStatus TEXT NOT NULL DEFAULT 'PROTECTED'")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN tamperAuthorizedUntil INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN isProvisioned INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE paired_children ADD COLUMN provisionedAt INTEGER NOT NULL DEFAULT 0")
+
+                // 2. Create relay_forwarding_records table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS relay_forwarding_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        incidentId TEXT NOT NULL,
+                        deviceId TEXT NOT NULL,
+                        eventType TEXT NOT NULL DEFAULT 'SOS',
+                        detectionTimestamp INTEGER NOT NULL,
+                        relayLatitude REAL,
+                        relayLongitude REAL,
+                        relayAccuracy REAL,
+                        forwardStatus TEXT NOT NULL DEFAULT 'QUEUED',
+                        targetEndpoint TEXT NOT NULL DEFAULT '',
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        lastAttemptTimestamp INTEGER NOT NULL DEFAULT 0,
+                        deliveryTimestamp INTEGER,
+                        acknowledgmentToken TEXT
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): SafeBandDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -334,7 +374,7 @@ abstract class SafeBandDatabase : RoomDatabase() {
                     SafeBandDatabase::class.java,
                     "safeband_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
                 INSTANCE = instance
                 instance

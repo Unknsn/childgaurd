@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -535,6 +536,7 @@ fun ParentMonitorTab(
         // v3.0.0 / v3.1.0: Multi-Child & Paired Band Status Carousel
         val pairedChildren by viewModel.allPairedChildren.collectAsState()
         var showPairChildDialog by remember { mutableStateOf(false) }
+        var selectedChildForManage by remember { mutableStateOf<PairedChild?>(null) }
 
         GlassCard(
             modifier = Modifier
@@ -574,13 +576,49 @@ fun ParentMonitorTab(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (pairedChildren.isEmpty()) {
-                Text(
-                    text = "No bands paired yet. Tap 'Add / Pair' to link an ESP32-S3 band or child phone.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = ObsidianOutline
-                )
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = GlassSurfaceLowest,
+                    border = BorderStroke(1.dp, GlassBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Radar,
+                            contentDescription = null,
+                            tint = MilledSilver,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Text(
+                            text = "NO CHILDREN OR BANDS PAIRED",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = PhosphorWhite
+                        )
+                        Text(
+                            text = "Link a child's ESP32-S3 wearable band or phone to monitor safety, receive SOS alerts, and track safe zones.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MilledSilver,
+                            textAlign = TextAlign.Center
+                        )
+                        GlassButton(
+                            text = "+ Pair Child Band / Device",
+                            onClick = { showPairChildDialog = true },
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
             } else {
                 Row(
                     modifier = Modifier
@@ -592,45 +630,105 @@ fun ParentMonitorTab(
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = GlassSurfaceElevated,
-                            border = BorderStroke(0.75.dp, GlassBorder)
+                            border = BorderStroke(0.75.dp, GlassBorder),
+                            modifier = Modifier.clickable { selectedChildForManage = child }
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = GlassSurfaceLowest,
-                                    border = BorderStroke(1.dp, PhosphorWhite),
-                                    modifier = Modifier.size(28.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = GlassSurfaceLowest,
+                                        border = BorderStroke(1.dp, PhosphorWhite),
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = child.childName.take(1).uppercase(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PhosphorWhite
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
                                         Text(
-                                            text = child.childName.take(1).uppercase(),
+                                            text = child.childName,
                                             style = MaterialTheme.typography.labelMedium,
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
                                             color = PhosphorWhite
                                         )
+                                        Text(
+                                            text = "${child.deviceId} • 🩸 ${child.bloodType}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MilledSilver,
+                                            fontSize = 10.sp
+                                        )
                                     }
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = child.childName,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PhosphorWhite
-                                    )
-                                    Text(
-                                        text = "${child.deviceId} • 🩸 ${child.bloodType}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MilledSilver,
-                                        fontSize = 10.sp
-                                    )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val isProv = child.isProvisioned
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = if (isProv) Color(0xFF065F46) else Color(0xFF78350F)
+                                    ) {
+                                        Text(
+                                            text = if (isProv) "PROV" else "UNPROV",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = PhosphorWhite,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+
+                                    val tamperColor = when (child.tamperStatus) {
+                                        "AUTHORIZED_DISCONNECTION" -> Color(0xFFD97706)
+                                        "TAMPER_CONFIRMED" -> Color(0xFFDC2626)
+                                        else -> Color(0xFF10B981)
+                                    }
+                                    val tamperLabel = when (child.tamperStatus) {
+                                        "AUTHORIZED_DISCONNECTION" -> "MAINT"
+                                        "TAMPER_CONFIRMED" -> "TAMPER"
+                                        else -> "STRAP OK"
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = tamperColor.copy(alpha = 0.25f),
+                                        border = BorderStroke(0.5.dp, tamperColor)
+                                    ) {
+                                        Text(
+                                            text = tamperLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = PhosphorWhite,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
+
+                                Text(
+                                    text = "Node: ${child.parentNodeIp}:${child.parentNodePort}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    color = MilledSilver,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
                             }
                         }
                     }
@@ -646,6 +744,14 @@ fun ParentMonitorTab(
                     showPairChildDialog = false
                     viewModel.pairNewChild(newChild)
                 }
+            )
+        }
+
+        if (selectedChildForManage != null) {
+            ChildManageDialog(
+                child = selectedChildForManage!!,
+                viewModel = viewModel,
+                onDismiss = { selectedChildForManage = null }
             )
         }
 
@@ -741,12 +847,13 @@ fun ParentMonitorTab(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    val isLinked = lastBeacon != null || nearbyNodes.isNotEmpty()
                     Text(
-                        text = "ESP32-P2P DIRECT LINK • ACTIVE",
+                        text = if (isLinked) "ESP32-P2P DIRECT LINK • ACTIVE" else "ESP32-P2P SCANNING...",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
-                        color = ObsidianOutline,
+                        color = if (isLinked) Color(0xFF10B981) else ObsidianOutline,
                         maxLines = 1
                     )
                 }
@@ -794,8 +901,11 @@ fun ParentMonitorTab(
                             maxLines = 1
                         )
                         Spacer(modifier = Modifier.height(2.dp))
+                        val currentRssi = lastBeacon?.rssi?.takeIf { it != 0 } ?: nearbyNodes.values.firstOrNull()?.rssi?.takeIf { it != 0 && it != -100 }
+                        val rssiDisplay = if (currentRssi != null) "$currentRssi dBm" else "-- dBm"
+                        val linkDisplay = if (lastBeacon != null || nearbyNodes.isNotEmpty()) "DIRECT LINK" else "SCANNING..."
                         Text(
-                            text = "-52 dBm",
+                            text = rssiDisplay,
                             style = MaterialTheme.typography.titleSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -803,7 +913,7 @@ fun ParentMonitorTab(
                             maxLines = 1
                         )
                         Text(
-                            text = "DIRECT LINK",
+                            text = linkDisplay,
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.sp,
@@ -1561,6 +1671,10 @@ fun PairChildDialog(
     var allergies by remember { mutableStateOf("") }
     var emergencyNotes by remember { mutableStateOf("") }
 
+    var parentNodeIp by remember { mutableStateOf("192.168.1.100") }
+    var parentNodePort by remember { mutableStateOf("8080") }
+    var parentNodeEndpointId by remember { mutableStateOf("PN-PRIMARY") }
+
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -1780,6 +1894,30 @@ fun PairChildDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    OutlinedTextField(
+                        value = parentNodeIp,
+                        onValueChange = { parentNodeIp = it },
+                        label = { Text("Parent Node IP (e.g. 192.168.1.100)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = parentNodePort,
+                        onValueChange = { parentNodePort = it },
+                        label = { Text("Parent Node Port (Default 8080)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = parentNodeEndpointId,
+                        onValueChange = { parentNodeEndpointId = it },
+                        label = { Text("Endpoint ID (e.g. PN-PRIMARY)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
@@ -1793,6 +1931,7 @@ fun PairChildDialog(
                         Button(
                             onClick = {
                                 if (deviceId.isNotBlank() && childName.isNotBlank()) {
+                                    val port = parentNodePort.toIntOrNull() ?: 8080
                                     onSave(
                                         PairedChild(
                                             deviceId = deviceId,
@@ -1803,7 +1942,12 @@ fun PairChildDialog(
                                             secondaryGuardianPhone = secondaryPhone,
                                             medicalConditions = medicalConditions,
                                             allergies = allergies,
-                                            emergencyNotes = emergencyNotes
+                                            emergencyNotes = emergencyNotes,
+                                            parentNodeIp = parentNodeIp.ifEmpty { "127.0.0.1" },
+                                            parentNodePort = port,
+                                            parentNodeEndpointId = parentNodeEndpointId.ifEmpty { "PN-PRIMARY" },
+                                            tamperStatus = "PROTECTED",
+                                            isProvisioned = false
                                         )
                                     )
                                 }
@@ -1812,6 +1956,208 @@ fun PairChildDialog(
                         ) {
                             Text("Save & Pair")
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChildManageDialog(
+    child: PairedChild,
+    viewModel: SafeBandViewModel,
+    onDismiss: () -> Unit
+) {
+    var parentNodeIp by remember { mutableStateOf(child.parentNodeIp) }
+    var parentNodePort by remember { mutableStateOf(child.parentNodePort.toString()) }
+    var parentNodeEndpointId by remember { mutableStateOf(child.parentNodeEndpointId) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Manage ${child.childName} (${child.deviceId})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // 1. Wearable Provisioning
+                Text(
+                    text = "1. WEARABLE PROVISIONING (BLE)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = if (child.isProvisioned) "Status: Provisioned (Firmware NVS Active)" else "Status: Unprovisioned",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (child.isProvisioned) Color(0xFF10B981) else Color(0xFFF59E0B)
+                )
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            statusMessage = "Transmitting provisioning config over BLE..."
+                            val port = parentNodePort.toIntOrNull() ?: 8080
+                            val ok = viewModel.bleProvisioningManager.provisionChildNode(
+                                deviceAddress = child.deviceId,
+                                childId = child.deviceId,
+                                parentId = "PARENT-LOCAL-01",
+                                parentNodeIp = parentNodeIp,
+                                parentNodePort = port,
+                                parentNodeEndpointId = parentNodeEndpointId,
+                                authToken = "SECURE-AUTH-TOKEN",
+                                version = 1
+                            )
+                            statusMessage = if (ok) "Provisioning SUCCESSFUL!" else "Provisioning Saved to Local Profile (Simulated/Offline)"
+                            viewModel.updateChildParentNodeEndpoint(child.deviceId, parentNodeIp, port, parentNodeEndpointId)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Provision Wearable (GATT 0x5AFE)", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 2. Hardware Strap Tamper Monitoring
+                Text(
+                    text = "2. HARDWARE STRAP MONITOR (GPIO 3/4)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                val tamperColor = when (child.tamperStatus) {
+                    "AUTHORIZED_DISCONNECTION" -> Color(0xFFD97706)
+                    "TAMPER_CONFIRMED" -> Color(0xFFDC2626)
+                    else -> Color(0xFF10B981)
+                }
+                Text(
+                    text = "Tamper State: ${child.tamperStatus}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = tamperColor
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.authorizeChildStrapMaintenance(child.deviceId, 300L)
+                            statusMessage = "Authorized strap maintenance for 5 minutes"
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                    ) {
+                        Text("Maint 5m", fontSize = 10.sp, maxLines = 1)
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.authorizeChildStrapMaintenance(child.deviceId, 900L)
+                            statusMessage = "Authorized strap maintenance for 15 minutes"
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                    ) {
+                        Text("Maint 15m", fontSize = 10.sp, maxLines = 1)
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.cancelChildStrapMaintenance(child.deviceId)
+                            statusMessage = "Maintenance ended. Strap monitoring locked."
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF065F46))
+                    ) {
+                        Text("Lock", fontSize = 10.sp, maxLines = 1)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 3. Parent Node Configuration
+                Text(
+                    text = "3. PARENT NODE ENDPOINT",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                OutlinedTextField(
+                    value = parentNodeIp,
+                    onValueChange = { parentNodeIp = it },
+                    label = { Text("Parent Node IP / Host") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = parentNodePort,
+                    onValueChange = { parentNodePort = it },
+                    label = { Text("Port (e.g. 8080)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = parentNodeEndpointId,
+                    onValueChange = { parentNodeEndpointId = it },
+                    label = { Text("Endpoint ID") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = {
+                        val port = parentNodePort.toIntOrNull() ?: 8080
+                        viewModel.updateChildParentNodeEndpoint(child.deviceId, parentNodeIp, port, parentNodeEndpointId)
+                        statusMessage = "Endpoint configuration saved."
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Save Endpoint Configuration")
+                }
+
+                if (statusMessage != null) {
+                    Text(
+                        text = statusMessage!!,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF10B981)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Close")
                     }
                 }
             }

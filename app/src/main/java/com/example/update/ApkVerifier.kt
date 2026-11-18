@@ -73,7 +73,29 @@ object ApkVerifier {
     }
 
     /**
+     * Verifies that the downloaded APK is strictly an upgrade (downgrade prevention).
+     */
+    fun verifyVersionUpgrade(context: Context, apkFile: File): Boolean {
+        if (!apkFile.exists()) return false
+        val pm = context.packageManager
+        val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, 0) ?: return false
+        val currentCode = try {
+            val pInfo = pm.getPackageInfo(context.packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode else @Suppress("DEPRECATION") pInfo.versionCode.toLong()
+        } catch (_: Exception) {
+            0L
+        }
+        val apkCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) archiveInfo.longVersionCode else @Suppress("DEPRECATION") archiveInfo.versionCode.toLong()
+        if (apkCode <= currentCode && currentCode > 0) {
+            Log.e(TAG, "Version downgrade rejected: installed=$currentCode, apk=$apkCode")
+            return false
+        }
+        return true
+    }
+
+    /**
      * Verifies that the downloaded APK's signing certificate matches the installed application.
+     * Fails CLOSED if certificates are missing, empty, mismatched, or if an exception occurs.
      */
     @Suppress("DEPRECATION")
     fun verifySigningCertificateCompatibility(context: Context, apkFile: File): Boolean {
@@ -102,9 +124,10 @@ object ApkVerifier {
                 archiveInfo.signatures?.map { it.toByteArray().contentHashCode() }
             } ?: emptyList()
 
+            // Fail closed if signatures cannot be inspected or are missing
             if (installedSignatures.isEmpty() || apkSignatures.isEmpty()) {
-                // If in test environment where debug keystores are synthesized or unparsed
-                return true
+                Log.e(TAG, "Security error: Missing signing certificates. Update rejected (fail closed).")
+                return false
             }
 
             val hasCommonSignature = installedSignatures.any { apkSignatures.contains(it) }
@@ -113,8 +136,8 @@ object ApkVerifier {
             }
             hasCommonSignature
         } catch (e: Exception) {
-            Log.w(TAG, "Certificate verification non-fatal diagnostic: ${e.message}")
-            true
+            Log.e(TAG, "Certificate verification error: ${e.message}. Failing closed.", e)
+            false // Strictly fail closed
         }
     }
 }

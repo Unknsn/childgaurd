@@ -58,9 +58,9 @@ class UpdateManager(
                 @Suppress("DEPRECATION")
                 pInfo.versionCode
             }
-            Pair(pInfo.versionName ?: "1.1.0", code)
+            Pair(pInfo.versionName ?: "3.3.0", code)
         } catch (e: Exception) {
-            Pair("1.1.0", 5)
+            Pair("3.3.0", 10)
         }
         currentVersionName = vName
         currentVersionCode = vCode
@@ -230,7 +230,13 @@ class UpdateManager(
             return false
         }
 
-        // 3. Signing certificate verification
+        // 3. Version upgrade verification (downgrade prevention)
+        if (!ApkVerifier.verifyVersionUpgrade(context, file)) {
+            Log.e(TAG, "Security error: Downgrade or invalid version rejected")
+            return false
+        }
+
+        // 4. Signing certificate verification
         if (!ApkVerifier.verifySigningCertificateCompatibility(context, file)) {
             Log.e(TAG, "Security error: Signing certificate verification failed")
             return false

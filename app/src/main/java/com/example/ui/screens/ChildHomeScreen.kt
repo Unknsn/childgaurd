@@ -166,6 +166,7 @@ fun ChildHomeScreen(
     val connectivityStatus by viewModel.connectivityStatus.collectAsState()
     val activeAuthorizations by viewModel.activeAuthorizations.collectAsState()
     val activeJourney by viewModel.activeJourney.collectAsState()
+    val discoveredNodes by viewModel.discoveredSafetyNodes.collectAsState()
 
     var isDemoControlsExpanded by remember { mutableStateOf(false) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
@@ -230,7 +231,7 @@ fun ChildHomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "${batteryInfo.percentage ?: 88}%",
+                            text = batteryInfo.percentage?.let { "$it%" } ?: "--%",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -318,8 +319,9 @@ fun ChildHomeScreen(
                                 .clip(CircleShape)
                                 .background(if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981))
                         )
+                        val nearestNode = discoveredNodes.values.firstOrNull { it.isNearby }
                         Text(
-                            text = if (isEmergency) "ALERT BROADCAST ACTIVE" else "GUARDIAN IN RANGE",
+                            text = if (isEmergency) "ALERT BROADCAST ACTIVE" else if (nearestNode != null) "GUARDIAN IN RANGE" else "PROTECTION ACTIVE",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -328,8 +330,19 @@ fun ChildHomeScreen(
                             maxLines = 1
                         )
                     }
+                    val nearestNode = discoveredNodes.values.firstOrNull { it.isNearby }
+                    val proximityText = when {
+                        nearestNode != null -> {
+                            val distStr = nearestNode.estimatedDistanceMeters?.let { d -> "%.1fm • ".format(d) } ?: ""
+                            val rssiStr = if (nearestNode.rssi != 0 && nearestNode.rssi != -100) "RSSI ${nearestNode.rssi} dBm" else "Direct Link"
+                            "$distStr$rssiStr"
+                        }
+                        isEmergency -> "Broadcasting SOS"
+                        isAdvertising -> "Advertising • Standby"
+                        else -> "BLE Standby"
+                    }
                     Text(
-                        text = "14m • RSSI -52 dBm",
+                        text = proximityText,
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         color = MilledSilver,
@@ -706,10 +719,11 @@ fun ChildHomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (com.example.BuildConfig.DEBUG) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Collapsible Sensor Diagnostics & Simulators (Demo Mode)
-            GlassCard(
+                // Collapsible Sensor Diagnostics & Simulators (Demo Mode)
+                GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 padding = 12.dp
             ) {
@@ -790,6 +804,7 @@ fun ChildHomeScreen(
                             }
                         }
                     }
+                }
                 }
             }
 

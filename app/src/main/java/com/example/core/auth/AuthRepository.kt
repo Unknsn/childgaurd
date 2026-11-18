@@ -53,7 +53,8 @@ class AuthRepository(
     suspend fun restoreSession(): Result<AuthenticatedUser?> {
         return try {
             val account = parentAccountDao.getActiveParentAccountSnapshot()
-            if (account != null && account.authStatus == "AUTHENTICATED") {
+            if (account != null && (account.authStatus == "AUTHENTICATED" || account.authStatus == "OFFLINE_AUTHENTICATED")) {
+                val isOffline = account.authStatus == "OFFLINE_AUTHENTICATED"
                 val user = AuthenticatedUser(
                     userId = account.userId,
                     googleSub = account.googleSub,
@@ -61,12 +62,13 @@ class AuthRepository(
                     displayName = account.displayName,
                     photoUrl = account.photoUrl,
                     role = AppRole.PARENT,
-                    authStatus = AuthStatus.SESSION_RESTORED,
+                    authStatus = if (isOffline) AuthStatus.OFFLINE_AUTHENTICATED else AuthStatus.SESSION_RESTORED,
+                    authProvider = if (isOffline) "GUEST_OFFLINE" else "GOOGLE",
                     lastLoginTimestamp = account.lastLoginAt
                 )
                 _currentUser.value = user
-                _authStatus.value = AuthStatus.SESSION_RESTORED
-                Log.i(TAG, "Restored active parent session: ${user.email}")
+                _authStatus.value = user.authStatus
+                Log.i(TAG, "Restored active parent session: ${user.email} (Provider: ${user.authProvider})")
                 Result.success(user)
             } else {
                 _currentUser.value = null
@@ -124,7 +126,8 @@ class AuthRepository(
             email = email.ifBlank { "parent@safeband.local" },
             displayName = name.ifBlank { "Parent Guardian" },
             role = AppRole.PARENT,
-            authStatus = AuthStatus.OFFLINE_AUTHENTICATED
+            authStatus = AuthStatus.OFFLINE_AUTHENTICATED,
+            authProvider = "GUEST_OFFLINE"
         )
         return authenticateWithUser(user)
     }
@@ -143,6 +146,22 @@ class AuthRepository(
         }
     }
 
+    /**
+     * Completely remove account and credentials from local storage.
+     */
+    suspend fun removeAccount(userId: String) {
+        try {
+            parentAccountDao.deleteAccountById(userId)
+            if (_currentUser.value?.userId == userId) {
+                _currentUser.value = null
+                _authStatus.value = AuthStatus.SIGNED_OUT
+            }
+            Log.i(TAG, "Parent account $userId removed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during account removal", e)
+        }
+    }
+
     private suspend fun persistAccount(user: AuthenticatedUser) {
         val entity = ParentAccountEntity(
             userId = user.userId,
@@ -151,7 +170,7 @@ class AuthRepository(
             displayName = user.displayName,
             photoUrl = user.photoUrl,
             lastLoginAt = System.currentTimeMillis(),
-            authStatus = "AUTHENTICATED"
+            authStatus = if (user.authStatus == AuthStatus.OFFLINE_AUTHENTICATED) "OFFLINE_AUTHENTICATED" else "AUTHENTICATED"
         )
         parentAccountDao.insertOrUpdateAccount(entity)
     }

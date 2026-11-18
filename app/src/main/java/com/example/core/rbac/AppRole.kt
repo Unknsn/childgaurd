@@ -28,5 +28,6 @@ enum class Permission {
     APPROVE_PICKUP,
     ACCESS_SETTINGS,
     SWITCH_ROLE,
-    VIEW_FULL_BIO
+    VIEW_FULL_BIO,
+    INSTALL_UPDATE
 }

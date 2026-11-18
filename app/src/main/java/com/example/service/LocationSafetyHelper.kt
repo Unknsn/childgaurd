@@ -161,8 +161,21 @@ class LocationSafetyHelper(
 
     /**
      * Unified processor for newly arrived location fixes.
+     * Rejects fabricated (0.0, 0.0) or stale (>3 mins) locations from triggering incidents.
      */
     fun onNewLocationReceived(location: Location) {
+        if (location.latitude == 0.0 && location.longitude == 0.0) {
+            Log.w("LocationSafetyHelper", "Ignored fabricated (0,0) location fix")
+            return
+        }
+        val now = System.currentTimeMillis()
+        val isStale = location.time > 0 && (now - location.time > 180_000L)
+        if (isStale) {
+            Log.w("LocationSafetyHelper", "Ignored stale location fix (${now - location.time}ms old)")
+            evaluateVerifiedLocation(location)
+            return
+        }
+
         evaluateVerifiedLocation(location)
         evaluateSafeZone(location, currentSafeZone)
         evaluateRouteCorridor(location, currentTrustedRoute)
@@ -247,6 +260,10 @@ class LocationSafetyHelper(
      */
     fun evaluateSafeZone(location: Location?, safeZone: SafeZone) {
         if (location == null) return
+        if (location.latitude == 0.0 && location.longitude == 0.0) return
+        val now = System.currentTimeMillis()
+        if (location.time > 0 && (now - location.time > 180_000L)) return
+
         currentSafeZone = safeZone
 
         val results = FloatArray(1)

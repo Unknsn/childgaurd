@@ -379,62 +379,64 @@ fun FirstLaunchScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (com.example.BuildConfig.DEBUG) {
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // OPTION 3: QUICK WEARABLE HARDWARE DEMO (EVALUATOR/DEVELOPER PATH)
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                backgroundColor = GlassSurfaceLowest,
-                borderColor = ObsidianEtchedBorder,
-                padding = 12.dp
-            ) {
-                Row(
+                // OPTION 3: QUICK WEARABLE HARDWARE DEMO (EVALUATOR/DEVELOPER PATH - DEBUG ONLY)
+                GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    backgroundColor = GlassSurfaceLowest,
+                    borderColor = ObsidianEtchedBorder,
+                    padding = 12.dp
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "QUICK EVALUATION MODE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite,
-                            fontSize = 9.sp
-                        )
-                        Text(
-                            text = "Direct testing without provisioning PIN.",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = ObsidianOutline,
-                            fontSize = 8.sp
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = { viewModel.lockIntoChildMode("EP-C0D7") }
-                        ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Child Demo",
+                                text = "QUICK EVALUATION MODE",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
                                 color = PhosphorWhite,
                                 fontSize = 9.sp
+                            )
+                            Text(
+                                text = "Direct testing without provisioning PIN.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = ObsidianOutline,
+                                fontSize = 8.sp
                             )
                         }
-                        TextButton(
-                            onClick = {
-                                viewModel.signInAsGuestParent("Demo Parent", "parent@safeband.local")
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { viewModel.lockIntoChildMode("EP-C0D7") }
+                            ) {
+                                Text(
+                                    text = "Child Demo",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = PhosphorWhite,
+                                    fontSize = 9.sp
+                                )
                             }
-                        ) {
-                            Text(
-                                text = "Parent Demo",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = PhosphorWhite,
-                                fontSize = 9.sp
-                            )
+                            TextButton(
+                                onClick = {
+                                    viewModel.signInAsGuestParent("Demo Parent", "parent@safeband.local")
+                                }
+                            ) {
+                                Text(
+                                    text = "Parent Demo",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = PhosphorWhite,
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
                 }

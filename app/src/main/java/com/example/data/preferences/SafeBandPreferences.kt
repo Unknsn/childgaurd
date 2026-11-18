@@ -10,8 +10,12 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.model.AppMode
 import com.example.model.SafeZone
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "safeband_preferences")
@@ -44,26 +48,196 @@ class SafeBandPreferences(private val context: Context) {
 
         // Background Safety Monitoring (Phase 13)
         private val KEY_SAFETY_MONITORING_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("safety_monitoring_enabled")
+
+        // Parent Node Endpoint Configuration
+        private val KEY_PARENT_NODE_IP = stringPreferencesKey("parent_node_ip")
+        private val KEY_PARENT_NODE_PORT = androidx.datastore.preferences.core.intPreferencesKey("parent_node_port")
+        private val KEY_PARENT_NODE_ENDPOINT_ID = stringPreferencesKey("parent_node_endpoint_id")
+        private val KEY_PARENT_NODE_AUTH_TOKEN = stringPreferencesKey("parent_node_auth_token")
+
+        // Community Relay Settings
+        private val KEY_RELAY_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("community_relay_enabled")
+        private val KEY_AUTO_FORWARD_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("auto_forward_enabled")
+
+        // Guardian Master PIN for Child Mode Lockdown
+        private val KEY_MASTER_PIN = stringPreferencesKey("master_guardian_pin")
+        const val DEFAULT_CONFIGURED_MASTER_PIN = "998877"
+
+        @Volatile
+        private var cachedAppMode: AppMode = AppMode.UNSELECTED
+
+        @Volatile
+        private var cachedMasterPin: String = DEFAULT_CONFIGURED_MASTER_PIN
+
+        @Volatile
+        private var cachedCommunityRelayEnabled: Boolean = true
+
+        @Volatile
+        private var cachedParentNodeIp: String = "192.168.1.100"
+
+        @Volatile
+        private var cachedParentNodePort: Int = 8080
+
+        @Volatile
+        private var cachedParentNodeEndpointId: String = "PN-HUB-01"
+
+        @Volatile
+        private var cachedParentNodeAuthToken: String = "SB-TOKEN-SECURE"
+    }
+
+    fun isCommunityRelayEnabledDirect(): Boolean = cachedCommunityRelayEnabled
+    fun getParentNodeIpDirect(): String = cachedParentNodeIp
+    fun getParentNodePortDirect(): Int = cachedParentNodePort
+    fun getParentNodeEndpointIdDirect(): String = cachedParentNodeEndpointId
+    fun getParentNodeAuthTokenDirect(): String = cachedParentNodeAuthToken
+
+    fun setCommunityRelayEnabledDirect(enabled: Boolean) {
+        cachedCommunityRelayEnabled = enabled
     }
 
     val safetyMonitoringEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_SAFETY_MONITORING_ENABLED] ?: true
     }
 
+    val parentNodeIp: Flow<String> = context.dataStore.data.map { preferences ->
+        val ip = preferences[KEY_PARENT_NODE_IP] ?: "192.168.1.100"
+        cachedParentNodeIp = ip
+        ip
+    }
+
+    val parentNodePort: Flow<Int> = context.dataStore.data.map { preferences ->
+        val port = preferences[KEY_PARENT_NODE_PORT] ?: 8080
+        cachedParentNodePort = port
+        port
+    }
+
+    val parentNodeEndpointId: Flow<String> = context.dataStore.data.map { preferences ->
+        val endpointId = preferences[KEY_PARENT_NODE_ENDPOINT_ID] ?: "PN-HUB-01"
+        cachedParentNodeEndpointId = endpointId
+        endpointId
+    }
+
+    val parentNodeAuthToken: Flow<String> = context.dataStore.data.map { preferences ->
+        val token = preferences[KEY_PARENT_NODE_AUTH_TOKEN] ?: "SB-TOKEN-SECURE"
+        cachedParentNodeAuthToken = token
+        token
+    }
+
+    val communityRelayEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        val enabled = preferences[KEY_RELAY_ENABLED] ?: true
+        cachedCommunityRelayEnabled = enabled
+        enabled
+    }
+
+    val autoForwardEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_FORWARD_ENABLED] ?: true
+    }
+
+    suspend fun saveParentNodeEndpoint(ip: String, port: Int, endpointId: String = "PN-HUB-01", token: String = "SB-TOKEN-SECURE") {
+        cachedParentNodeIp = ip.trim()
+        cachedParentNodePort = port
+        cachedParentNodeEndpointId = endpointId.trim()
+        cachedParentNodeAuthToken = token.trim()
+        try {
+            context.dataStore.edit { preferences ->
+                preferences[KEY_PARENT_NODE_IP] = ip.trim()
+                preferences[KEY_PARENT_NODE_PORT] = port
+                preferences[KEY_PARENT_NODE_ENDPOINT_ID] = endpointId.trim()
+                preferences[KEY_PARENT_NODE_AUTH_TOKEN] = token.trim()
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun setCommunityRelayEnabled(enabled: Boolean) {
+        cachedCommunityRelayEnabled = enabled
+        try {
+            context.dataStore.edit { preferences ->
+                preferences[KEY_RELAY_ENABLED] = enabled
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun setAutoForwardEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_FORWARD_ENABLED] = enabled
+        }
+    }
+
+    val masterPin: Flow<String> = context.dataStore.data.map { preferences ->
+        val pin = preferences[KEY_MASTER_PIN] ?: DEFAULT_CONFIGURED_MASTER_PIN
+        cachedMasterPin = pin
+        pin
+    }
+
+    suspend fun setMasterPin(pin: String) {
+        val sanitized = pin.trim().filter { it.isDigit() }
+        if (sanitized.length == 6) {
+            cachedMasterPin = sanitized
+            context.dataStore.edit { preferences ->
+                preferences[KEY_MASTER_PIN] = sanitized
+            }
+        }
+    }
+
+    fun getCachedMasterPin(): String = cachedMasterPin
+
+    fun setCachedMasterPin(pin: String) {
+        cachedMasterPin = pin.trim().filter { it.isDigit() }
+    }
+
+    fun setCachedAppMode(mode: AppMode) {
+        cachedAppMode = mode
+    }
+
+    fun resetCache() {
+        cachedAppMode = AppMode.UNSELECTED
+        cachedMasterPin = DEFAULT_CONFIGURED_MASTER_PIN
+    }
+
     val appMode: Flow<AppMode> = context.dataStore.data.map { preferences ->
         val modeStr = preferences[KEY_APP_MODE]
-        try {
+        val mode = try {
             if (modeStr != null) AppMode.valueOf(modeStr) else AppMode.UNSELECTED
         } catch (_: Exception) {
             AppMode.UNSELECTED
         }
+        cachedAppMode = mode
+        mode
     }
 
+    suspend fun setAppMode(mode: AppMode) {
+        cachedAppMode = mode
+        context.dataStore.edit { preferences ->
+            preferences[KEY_APP_MODE] = mode.name
+        }
+    }
+
+    fun getCachedAppMode(): AppMode = cachedAppMode
+
     val deviceId: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_DEVICE_ID] ?: run {
+        val existing = preferences[KEY_DEVICE_ID]
+        if (existing != null) {
+            existing
+        } else {
             val generated = "SB-" + UUID.randomUUID().toString().take(4).uppercase()
+            CoroutineScope(Dispatchers.IO).launch {
+                context.dataStore.edit { prefs ->
+                    if (prefs[KEY_DEVICE_ID] == null) {
+                        prefs[KEY_DEVICE_ID] = generated
+                    }
+                }
+            }
             generated
         }
+    }
+
+    suspend fun getOrCreateDeviceId(): String {
+        val prefs = context.dataStore.data.first()
+        val existing = prefs[KEY_DEVICE_ID]
+        if (existing != null) return existing
+        val generated = "SB-" + UUID.randomUUID().toString().take(4).uppercase()
+        context.dataStore.edit { it[KEY_DEVICE_ID] = generated }
+        return generated
     }
 
     val safeZone: Flow<SafeZone> = context.dataStore.data.map { preferences ->
@@ -88,11 +262,6 @@ class SafeBandPreferences(private val context: Context) {
         )
     }
 
-    suspend fun setAppMode(mode: AppMode) {
-        context.dataStore.edit { preferences ->
-            preferences[KEY_APP_MODE] = mode.name
-        }
-    }
 
     suspend fun setSafetyMonitoringEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
