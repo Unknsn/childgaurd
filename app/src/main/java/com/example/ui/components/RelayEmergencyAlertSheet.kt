@@ -13,44 +13,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.RelayForwardingRecord
-import com.example.ui.theme.GlassBorder
-import com.example.ui.theme.GlassHazard
-import com.example.ui.theme.GlassHazardBorder
-import com.example.ui.theme.GlassSurfaceElevated
-import com.example.ui.theme.MilledSilver
-import com.example.ui.theme.PhosphorWhite
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
+import com.example.ui.theme.SafeBandSpacing
 
 /**
- * RelayEmergencyAlertSheet
+ * RelayEmergencyAlertSheet (v3.6.0 Design Overhaul)
+ * Privacy-Preserving Alert Sheet for Nearby Participating Relay Devices.
  *
- * Privacy-Preserving Alert Sheet for Nearby Participating Relay Devices (Feature 2).
- *
- * IMPORTANT PRIVACY CONTRACT:
- * - NEVER displays child's full name, medical details, or parent phone number.
- * - Displays broadcast ephemeral ID and relay coordinates.
- * - Confirms that location fix was securely forwarded to the guardian network.
+ * STRICT PRIVACY CONTRACT:
+ * - ZERO child PII (no names, medical records, or parent phone numbers).
+ * - Ephemeral beacon ID and honest relay GPS coordinates.
+ * - Reassuring feedback that the bystander phone helped relay the alert.
  */
 @Composable
 fun RelayEmergencyAlertSheet(
@@ -58,212 +48,205 @@ fun RelayEmergencyAlertSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    SafeBandCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = GlassHazard,
-        border = BorderStroke(1.5.dp, GlassHazardBorder),
-        shadowElevation = 16.dp
+            .padding(SafeBandSpacing.lg),
+        shape = SafeBandShapes.ExtraLarge,
+        containerColor = MaterialTheme.colorScheme.surface,
+        borderColor = SafeBandColor.Emergency.copy(alpha = 0.5f),
+        borderWidth = 1.5.dp,
+        elevation = 6.dp
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(SafeBandSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(SafeBandSpacing.md)
         ) {
             // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFFDC2626), CircleShape),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    shape = CircleShape,
+                    color = SafeBandColor.EmergencySurfaceLight,
+                    modifier = Modifier.size(44.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Alert",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Alert",
+                            tint = SafeBandColor.EmergencyDark,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Spacer(modifier = Modifier.width(SafeBandSpacing.md))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "NEARBY EMERGENCY DETECTED",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
+                        text = "Nearby Safety Alert Detected",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PhosphorWhite
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "SafeBand Community Relay Active",
+                        text = "SafeBand Community Relay Mesh Active",
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MilledSilver,
-                        fontSize = 11.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
             // Event Details Box
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = GlassSurfaceElevated,
-                border = BorderStroke(0.75.dp, GlassBorder)
+            SafeBandCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = SafeBandShapes.Large,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                elevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(SafeBandSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "EVENT TYPE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver
+                            text = "Event Type",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = record.eventType,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF5252)
+                        SafeBandStatusBadge(
+                            style = if (record.eventType == "TAMPER") StatusBadgeStyle.TAMPER else StatusBadgeStyle.SOS,
+                            label = record.eventType
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "BEACON ID",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver
+                            text = "Beacon Identifier",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = record.deviceId,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "FORWARDING STATUS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver
+                            text = "Relay Status",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = record.forwardStatus,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (record.forwardStatus == "DELIVERED_DIRECT" || record.forwardStatus == "DISPATCHED") Color(0xFF10B981) else Color(0xFFF59E0B)
+                        val isDelivered = record.forwardStatus.startsWith("DELIVERED") || record.forwardStatus == "DISPATCHED"
+                        SafeBandStatusBadge(
+                            style = if (isDelivered) StatusBadgeStyle.CONNECTED else StatusBadgeStyle.STALE,
+                            label = if (isDelivered) "Relayed to Guardian" else "Queued for Forwarding"
                         )
                     }
                 }
             }
 
             // Location Box
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = GlassSurfaceElevated,
-                border = BorderStroke(0.75.dp, GlassBorder)
+            SafeBandCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = SafeBandShapes.Medium,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                elevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(SafeBandSpacing.md),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location",
-                        tint = Color(0xFF3B82F6),
-                        modifier = Modifier.size(24.dp)
+                        tint = SafeBandColor.PrimaryBrand,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
                     Column {
                         Text(
-                            text = "RELAY LOCATION CAPTURED",
+                            text = "Relaying Device Location",
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = "%.5f, %.5f (±%.0fm)".format(
-                                record.relayLatitude ?: 0.0,
-                                record.relayLongitude ?: 0.0,
+                        val locText = if (record.relayLatitude != null && record.relayLongitude != null) {
+                            "%.5f, %.5f (±%.0fm)".format(
+                                record.relayLatitude,
+                                record.relayLongitude,
                                 record.relayAccuracy ?: 15.0f
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Medium,
-                            color = PhosphorWhite
+                            )
+                        } else {
+                            "Location Unavailable (No GPS Fix)"
+                        }
+                        Text(
+                            text = locText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
 
             // Privacy Notice
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF1E293B).copy(alpha = 0.6f)
+            SafeBandCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = SafeBandShapes.Medium,
+                containerColor = SafeBandColor.SuccessSurfaceLight,
+                borderColor = SafeBandColor.SuccessBorder,
+                elevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp),
+                        .padding(SafeBandSpacing.md),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.Security,
                         contentDescription = "Privacy Shield",
-                        tint = Color(0xFF10B981),
+                        tint = SafeBandColor.SuccessDark,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
                     Text(
-                        text = "Zero PII Exposure: Child identity, medical details, and guardian contacts remain strictly private to protect child safety.",
+                        text = "Zero Child PII Exposure: Child identity, medical details, and family contacts remain strictly confidential to safeguard privacy.",
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        color = MilledSilver
+                        color = SafeBandColor.SuccessDark
                     )
                 }
             }
 
-            // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(
-                    onClick = onDismiss,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF374151),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Acknowledge & Close", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                }
-            }
+            Spacer(modifier = Modifier.height(SafeBandSpacing.xs))
+
+            // Action Button
+            SafeBandPrimaryButton(
+                text = "Acknowledge & Close",
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

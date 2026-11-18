@@ -1,10 +1,7 @@
 package com.example.ui.screens
 
-import com.example.ui.components.GlassCard
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,19 +19,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -53,23 +46,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.IncidentStage
-import com.example.ui.components.TactileKeycap
-import com.example.ui.theme.CarbonChassis
-import com.example.ui.theme.MilledSilver
-import com.example.ui.theme.ObsidianContainer
-import com.example.ui.theme.ObsidianContainerLow
-import com.example.ui.theme.ObsidianContainerLowest
-import com.example.ui.theme.ObsidianEtchedBorder
-import com.example.ui.theme.ObsidianOutline
-import com.example.ui.theme.PhosphorWhite
 import com.example.model.RiskLevel
 import com.example.model.SafetyIncident
 import com.example.model.SyncStatus
@@ -77,22 +61,17 @@ import com.example.model.TimelineItem
 import com.example.ui.SafeBandViewModel
 import com.example.ui.components.IncidentDetailSheet
 import com.example.ui.components.IncidentReplaySheet
+import com.example.ui.components.SafeBandCard
+import com.example.ui.components.SafeBandPrimaryButton
+import com.example.ui.components.SafeBandSecondaryButton
+import com.example.ui.components.SafeBandStatusBadge
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
+import com.example.ui.theme.SafeBandSpacing
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Event Timeline V2 Screen (Batch E: Phase 12).
- *
- * Displays a chronological incident timeline featuring:
- * - Deterministic event and incident grouping
- * - CRITICAL risk level badges and color hierarchy
- * - Multi-node observation count and propagation hop counts
- * - SyncStatus indicators (LOCAL_ONLY, PENDING_SYNC, RELAYED, ACKNOWLEDGED, SYNCED)
- * - Source/provenance node chips
- * - Simulation markers
- * - Interactive Incident Detail view (Phase 13) and Replay Engine (Phase 14)
- */
 @Composable
 fun AlertHistoryScreen(
     viewModel: SafeBandViewModel,
@@ -122,10 +101,10 @@ fun AlertHistoryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CarbonChassis)
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(SafeBandSpacing.lg)
     ) {
-        // Top Header (Stitch Incident Audit Log)
+        // Top Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -140,30 +119,38 @@ fun AlertHistoryScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = PhosphorWhite
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(SafeBandSpacing.xs))
                 }
 
-                Box(modifier = Modifier.size(8.dp).background(PhosphorWhite))
-                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    shape = SafeBandShapes.medium,
+                    color = SafeBandColor.PrimaryLight,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = SafeBandColor.Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
                 Column {
                     Text(
-                        text = "SAFEBAND // BLACKBOX_AUDIT",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
+                        text = "Safety Event Timeline",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PhosphorWhite,
-                        letterSpacing = 1.sp
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "NVRAM_RECORD // SHA-256 VERIFIED",
+                        text = "Cryptographically signed • Offline persistent log",
                         style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp,
-                        color = ObsidianOutline,
-                        letterSpacing = 1.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -180,7 +167,7 @@ fun AlertHistoryScreen(
                     Icon(
                         imageVector = Icons.Default.PlayCircle,
                         contentDescription = "Launch Replay",
-                        tint = PhosphorWhite
+                        tint = SafeBandColor.Primary
                     )
                 }
 
@@ -192,19 +179,19 @@ fun AlertHistoryScreen(
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
                             contentDescription = "Clear History",
-                            tint = Color(0xFFFF5252)
+                            tint = SafeBandColor.Emergency
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
-        // Secondary Hardware Status Header (Frosted Glass)
-        GlassCard(
+        // Status Card: Audit status
+        SafeBandCard(
             modifier = Modifier.fillMaxWidth(),
-            padding = 10.dp
+            padding = SafeBandSpacing.sm
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -213,58 +200,57 @@ fun AlertHistoryScreen(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.xs)
                 ) {
-                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF10B981)))
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(SafeBandColor.Success)
+                    )
                     Text(
-                        text = "BUFFER: 128KB NVRAM",
+                        text = "Offline SQLite & NVRAM Storage Active",
                         style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        color = PhosphorWhite
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                Text(
-                    text = "SHA-256 VERIFIED",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
-                    color = MilledSilver
+                SafeBandStatusBadge(
+                    text = "SHA-256 SIGNED",
+                    color = SafeBandColor.Primary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
 
-        // Tactile Selector Chips Row
+        // Filter Chips Row
         if (timelineItems.isNotEmpty()) {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.xs),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val filters = listOf("ALL", "CRITICAL", "EMERGENCY", "WARNING", "RELAY / SYNC", "RESOLVED")
                 items(filters) { filter ->
                     val isSelected = selectedFilter == filter
-                    Surface(
+                    FilterChip(
+                        selected = isSelected,
                         onClick = { selectedFilter = filter },
-                        shape = RoundedCornerShape(2.dp),
-                        color = if (isSelected) PhosphorWhite else ObsidianContainerLow,
-                        modifier = Modifier.border(1.dp, if (isSelected) PhosphorWhite else ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                    ) {
-                        Text(
-                            text = "[ $filter ]",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp,
-                            color = if (isSelected) Color.Black else MilledSilver,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        label = {
+                            Text(
+                                text = filter,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SafeBandColor.PrimaryLight,
+                            selectedLabelColor = SafeBandColor.PrimaryDark
                         )
-                    }
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
         }
 
         // Timeline Feed or Empty State
@@ -297,7 +283,8 @@ fun AlertHistoryScreen(
                     Text(
                         text = if (timelineItems.isEmpty()) "No Safety Events Logged Yet" else "No Events Matching Filter",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = if (timelineItems.isEmpty())
@@ -311,17 +298,14 @@ fun AlertHistoryScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedButton(
+                    SafeBandSecondaryButton(
+                        text = "Run Evaluation Replay",
+                        icon = Icons.Default.PlayCircle,
                         onClick = {
                             viewModel.startIncidentReplay()
                             showReplaySheet = true
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Run Evaluation Replay", fontWeight = FontWeight.SemiBold)
-                    }
+                        }
+                    )
                 }
             }
         } else {
@@ -329,7 +313,7 @@ fun AlertHistoryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
             ) {
                 items(filteredItems, key = { it.id }) { item ->
                     TimelineCardItem(
@@ -341,7 +325,7 @@ fun AlertHistoryScreen(
         }
     }
 
-    // Incident Detail Dialog (Phase 13)
+    // Incident Detail Dialog
     selectedItemForDetail?.let { item ->
         val incident = SafetyIncident(
             incidentId = item.id,
@@ -377,7 +361,7 @@ fun AlertHistoryScreen(
         )
     }
 
-    // Incident Replay Sheet (Phase 14)
+    // Incident Replay Sheet
     if (showReplaySheet) {
         IncidentReplaySheet(
             replayState = replayState,
@@ -397,7 +381,7 @@ fun AlertHistoryScreen(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("Clear All Safety History?") },
+            title = { Text("Clear All Safety History?", fontWeight = FontWeight.Bold) },
             text = { Text("This will permanently remove all offline safety event logs from this device. Real incidents cannot be recovered once cleared.") },
             confirmButton = {
                 Button(
@@ -405,9 +389,9 @@ fun AlertHistoryScreen(
                         viewModel.clearAllHistory()
                         showClearConfirmation = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = SafeBandColor.Emergency)
                 ) {
-                    Text("Clear All")
+                    Text("Clear All", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -420,7 +404,7 @@ fun AlertHistoryScreen(
 }
 
 /**
- * Visual Timeline Item Card with vertical connector and provenance metadata (Obsidian Telemetry).
+ * Visual Timeline Item Card with modern design system styling.
  */
 @Composable
 fun TimelineCardItem(
@@ -431,37 +415,35 @@ fun TimelineCardItem(
     val timeFormat = SimpleDateFormat("HH:mm:ss • dd MMM", Locale.US)
     val timeStr = timeFormat.format(Date(item.timestamp))
 
-    val dotColor = when (item.riskLevel) {
-        RiskLevel.CRITICAL -> Color(0xFFFF5252)
-        RiskLevel.HIGH -> Color(0xFFFF7043)
-        RiskLevel.MEDIUM -> Color(0xFFFFB74D)
-        RiskLevel.LOW -> PhosphorWhite
-        RiskLevel.NORMAL -> MilledSilver
+    val riskColor = when (item.riskLevel) {
+        RiskLevel.CRITICAL -> SafeBandColor.Emergency
+        RiskLevel.HIGH -> SafeBandColor.Emergency
+        RiskLevel.MEDIUM -> SafeBandColor.Warning
+        RiskLevel.LOW -> SafeBandColor.Success
+        RiskLevel.NORMAL -> SafeBandColor.Primary
     }
 
-    Surface(
-        shape = RoundedCornerShape(2.dp),
-        color = ObsidianContainerLowest,
+    SafeBandCard(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, if (item.riskLevel == RiskLevel.CRITICAL) Color(0xFFFF5252) else ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        borderColor = if (item.riskLevel == RiskLevel.CRITICAL) SafeBandColor.Emergency.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant,
+        padding = SafeBandSpacing.md
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
-            // Visual Node Indicator
+            // Visual Node Indicator Dot
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(top = 4.dp, end = 10.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .background(dotColor)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(riskColor)
                 )
             }
 
@@ -473,44 +455,29 @@ fun TimelineCardItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = item.title.uppercase(),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PhosphorWhite,
-                        fontSize = 11.sp
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = if (item.riskLevel == RiskLevel.CRITICAL) Color(0xFFFF5252) else PhosphorWhite
-                    ) {
-                        Text(
-                            text = "[ ${item.riskLevel.title.uppercase()} ]",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Black,
-                            color = Color.Black,
-                            fontSize = 8.sp,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                        )
-                    }
+                    SafeBandStatusBadge(
+                        text = item.riskLevel.title,
+                        color = riskColor
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = item.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MilledSilver,
-                    lineHeight = 14.sp,
-                    fontSize = 10.sp
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Provenance & Metadata Chips Row
+                // Metadata Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -519,62 +486,29 @@ fun TimelineCardItem(
                     Text(
                         text = timeStr,
                         style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = ObsidianOutline,
-                        fontSize = 8.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // Observation Count Chip
                     if (item.observationCount > 1) {
-                        Surface(
-                            shape = RoundedCornerShape(2.dp),
-                            color = ObsidianContainerLow,
-                            modifier = Modifier.border(0.5.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                        ) {
-                            Text(
-                                text = "×${item.observationCount} OBS",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = PhosphorWhite,
-                                fontSize = 8.sp,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-
-                    // Sync Status Chip
-                    Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = ObsidianContainerLow,
-                        modifier = Modifier.border(0.5.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                    ) {
-                        Text(
-                            text = item.syncStatus.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver,
-                            fontSize = 8.sp,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        SafeBandStatusBadge(
+                            text = "×${item.observationCount} OBS",
+                            color = SafeBandColor.Primary
                         )
                     }
 
+                    // Sync Status Chip
+                    SafeBandStatusBadge(
+                        text = item.syncStatus.name,
+                        color = SafeBandColor.Slate500
+                    )
+
                     // Simulation Indicator
                     if (item.isSimulation) {
-                        Surface(
-                            shape = RoundedCornerShape(2.dp),
-                            color = PhosphorWhite
-                        ) {
-                            Text(
-                                text = "SIM",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Black,
-                                color = Color.Black,
-                                fontSize = 8.sp,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
+                        SafeBandStatusBadge(
+                            text = "SIM",
+                            color = SafeBandColor.Warning
+                        )
                     }
                 }
             }

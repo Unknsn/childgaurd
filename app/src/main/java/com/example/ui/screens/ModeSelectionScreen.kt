@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FamilyRestroom
@@ -23,6 +22,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,19 +35,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AppMode
-import com.example.ui.theme.CarbonChassis
-import com.example.ui.theme.MilledSilver
-import com.example.ui.theme.ObsidianContainerLow
-import com.example.ui.theme.ObsidianContainerLowest
-import com.example.ui.theme.ObsidianEtchedBorder
-import com.example.ui.theme.ObsidianOutline
-import com.example.ui.theme.PhosphorWhite
+import com.example.ui.components.SafeBandCard
+import com.example.ui.components.SafeBandStatusBadge
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
+import com.example.ui.theme.SafeBandSpacing
 
 @Composable
 fun ModeSelectionScreen(
@@ -57,238 +54,189 @@ fun ModeSelectionScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(CarbonChassis)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(SafeBandSpacing.xl)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
 
-            // App Telemetry Logo
+            // App Brand Logo
             Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = ObsidianContainerLowest,
-                modifier = Modifier
-                    .size(68.dp)
-                    .border(1.5.dp, PhosphorWhite, RoundedCornerShape(4.dp))
+                shape = SafeBandShapes.large,
+                color = SafeBandColor.PrimaryLight,
+                modifier = Modifier.size(72.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.Radar,
+                        imageVector = Icons.Default.Shield,
                         contentDescription = "SafeBand Logo",
-                        tint = PhosphorWhite,
-                        modifier = Modifier.size(36.dp)
+                        tint = SafeBandColor.Primary,
+                        modifier = Modifier.size(40.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
             Text(
-                text = "SAFEBAND // BLE_P2P",
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
+                text = "SafeBand Guardian",
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = PhosphorWhite,
-                letterSpacing = 2.sp
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
-                text = "PEER-TO-PEER EARLY WARNING SYSTEM",
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = ObsidianOutline,
+                text = "Community-Driven Child Safety Wearable System",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                letterSpacing = 1.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Text(
-                text = "Autonomous RF beacon telemetry protecting children with zero cloud dependency and verified zero fake-GPS contracts.",
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MilledSilver,
-                textAlign = TextAlign.Center,
-                fontSize = 10.sp,
-                modifier = Modifier.padding(top = 6.dp, start = 12.dp, end = 12.dp)
-            )
+            Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 3 Core Product Pillars
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
-                color = ObsidianContainerLowest,
-                border = BorderStroke(1.dp, ObsidianEtchedBorder)
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+            // 3 Core Product Pillars Card
+            SafeBandCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(SafeBandSpacing.md)) {
                     PillarRow(
                         icon = Icons.Default.Lock,
-                        title = "100% OFFLINE & EPHEMERAL",
-                        description = "Direct peer-to-peer 2.4GHz BLE broadcasts. No central tracking servers."
+                        title = "100% Offline & Ephemeral",
+                        description = "Direct peer-to-peer 2.4 GHz BLE broadcasts. Zero central tracking surveillance."
                     )
                     PillarRow(
                         icon = Icons.Default.LocationOn,
-                        title = "SAFE-ZONE RADAR SCOPE",
-                        description = "Radial boundary monitoring alerts guardians if child moves beyond perimeter."
+                        title = "Safe-Zone Boundary Monitoring",
+                        description = "Radial geofence monitoring alerts guardians if child moves beyond perimeter."
                     )
                     PillarRow(
                         icon = Icons.Default.NotificationsActive,
-                        title = "EMERGENCY DND OVERRIDE",
+                        title = "Emergency Siren & Helplines",
                         description = "Priority alarm bypass, alerting child bio, and Indian 112/1098 helplines."
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.xl))
 
             Text(
-                text = "SELECT NODE ARCHITECTURE TO INITIALIZE",
+                text = "SELECT DEVICE EXPERIENCE",
                 style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ObsidianOutline,
-                fontSize = 8.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.sp,
                 modifier = Modifier.align(Alignment.Start)
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
 
             // Child Device Card
-            Card(
+            SafeBandCard(
                 onClick = { onSelectMode(AppMode.CHILD) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("select_child_mode_card"),
-                shape = RoundedCornerShape(4.dp),
-                colors = CardDefaults.cardColors(containerColor = ObsidianContainerLow),
-                border = BorderStroke(1.5.dp, PhosphorWhite)
+                border = BorderStroke(1.5.dp, SafeBandColor.Primary.copy(alpha = 0.3f))
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = PhosphorWhite,
-                        modifier = Modifier.size(44.dp)
+                        shape = SafeBandShapes.medium,
+                        color = SafeBandColor.PrimaryLight,
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Watch,
                                 contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(24.dp)
+                                tint = SafeBandColor.Primary,
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(SafeBandSpacing.md))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "CHILD WEARABLE MODE",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontFamily = FontFamily.Monospace,
+                            text = "Child Device Mode",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite,
-                            letterSpacing = 1.sp
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Monitors 6-axis accelerometer, tracks safe-zone boundary, and transmits emergency beacon with tactile 2-second hold SOS trigger.",
+                            text = "Transmits safety beacons, tracks boundary, and provides one-tap SOS trigger with haptic feedback.",
                             style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver,
-                            fontSize = 9.sp,
-                            modifier = Modifier.padding(top = 2.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
             // Parent / Guardian Card
-            Card(
+            SafeBandCard(
                 onClick = { onSelectMode(AppMode.PARENT) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("select_parent_mode_card"),
-                shape = RoundedCornerShape(4.dp),
-                colors = CardDefaults.cardColors(containerColor = ObsidianContainerLow),
-                border = BorderStroke(1.dp, ObsidianEtchedBorder)
+                border = BorderStroke(1.5.dp, SafeBandColor.Secondary.copy(alpha = 0.3f))
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(2.dp),
-                        color = ObsidianContainerLowest,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .border(1.dp, PhosphorWhite, RoundedCornerShape(2.dp))
+                        shape = SafeBandShapes.medium,
+                        color = SafeBandColor.SecondaryLight,
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.FamilyRestroom,
                                 contentDescription = null,
-                                tint = PhosphorWhite,
-                                modifier = Modifier.size(24.dp)
+                                tint = SafeBandColor.Secondary,
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(SafeBandSpacing.md))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "PARENT GUARDIAN MONITOR",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontFamily = FontFamily.Monospace,
+                            text = "Parent Guardian Mode",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite,
-                            letterSpacing = 1.sp
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Continuously scans for BLE safety packets, manages multiple child bands, computes safe-zone corridor deviations, and coordinates emergency response.",
+                            text = "Scans for BLE beacons, manages multiple child bands, monitors safe-zones, and coordinates emergency response.",
                             style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MilledSilver,
-                            fontSize = 9.sp,
-                            modifier = Modifier.padding(top = 2.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
 
             Text(
-                text = "ROLE MAY BE RECONFIGURED ANYTIME IN HARDWARE SETTINGS",
+                text = "Role may be reconfigured anytime in guardian settings",
                 style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 8.sp,
-                color = ObsidianOutline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
         }
     }
 }
@@ -303,36 +251,32 @@ private fun PillarRow(
         verticalAlignment = Alignment.Top,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .background(ObsidianContainerLow)
-                .border(0.5.dp, ObsidianEtchedBorder),
-            contentAlignment = Alignment.Center
+        Surface(
+            shape = SafeBandShapes.small,
+            color = SafeBandColor.PrimaryLight,
+            modifier = Modifier.size(28.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = PhosphorWhite,
-                modifier = Modifier.size(14.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = SafeBandColor.Primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                fontSize = 9.sp,
-                color = PhosphorWhite
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MilledSilver,
-                fontSize = 8.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

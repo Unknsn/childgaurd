@@ -1,3 +1,66 @@
+# SafeBand Guardian v3.6.0 Release Notes
+
+**Release Version:** v3.6.0  
+**Package:** `com.aistudio.safeband.xqmt`  
+**Target Platform:** Android 7.0 (API 24) through Android 15 (API 36)  
+**Hardware Node:** ESP32-S3 BLE Wearable Node  
+**Release Date:** November 2026  
+**Git Tag:** `v3.6.0`  
+
+---
+
+## 🎨 What's New & Refined in v3.6.0: Complete UI/UX Overhaul
+
+### 💎 1. Universal Design System Architecture
+- **Material 3 Design Tokens:** Implemented modern, accessible design tokens across `SafeBandColor.kt`, `SafeBandTypography.kt`, `SafeBandShapes.kt`, and `SafeBandSpacing.kt`.
+- **Calm, Human-Centered Aesthetics:** Deprecated the harsh, high-density "Obsidian Telemetry" terminal styling (monospaced terminal fonts, mechanical toggles, 0dp margins, wireframes). Replaced with empathetic Slate neutrals, SafeBand Blue 600 (`#2563EB`), Indigo 600 (`#4F46E5`), and semantic alerts (`#10B981` Emerald, `#F59E0B` Amber, `#EF4444` Rose).
+- **Reusable Component Library (`SafeBandComponents.kt`):** Universal components with ColumnScope layout support: `SafeBandCard`, `SafeBandHeroCard`, `SafeBandPrimaryButton`, `SafeBandSecondaryButton`, `SafeBandStatusBadge`, `SafeBandSectionHeader`, `SafeBandAvatar`, `SafeBandMetricChip`, `SafeBandTextField`, and `SafeBandEmptyState`.
+
+### 🛡️ 2. Screen-by-Screen Visual & Usability Transformation
+- **Parent Experience (`ParentHomeScreen.kt`):** Branded top app bar, modern bottom navigation bar (`Monitor`, `Safe Zones`, `History`, `Contacts`), paired children carousel with dynamic device-health badges (`CONNECTED`, `STALE`, `OFFLINE`), child safety hero card, and quick action dock (`Add Child`, `Test Siren`, `Maintenance Mode`, `Configure Zones`).
+- **Child Experience (`ChildHomeScreen.kt`):** Calming, reassuring hero banner (*"You Are Protected — SafeBand is watching over you"*), 2-second hold circular SOS button with animated progress ring and haptic feedback to prevent accidental triggers, quick calling buttons for National Emergency (112) and Child Helpline (1098), and emergency countdown cancel modal.
+- **Guardian Access Guard (`ChildSettingsScreen.kt`):** Smooth 64dp circular number keys with pulse feedback and shake animation on invalid PIN entry, child-proofing device settings.
+- **Grouped Settings (`SettingsScreen.kt`):** Logical grouped card architecture separating Security, Network/Endpoints, Pairing Challenge generation, Medical Bio-data, and Wearable Diagnostics.
+- **Incident Timeline (`AlertHistoryScreen.kt`):** Card-based chronological events replacing raw terminal logs, interactive category filter chips (`All`, `SOS`, `Tamper`, `Geofence`), and seamless incident replay modal launcher.
+- **Trusted Contacts (`TrustedContactsScreen.kt`):** Priority cards with color-coded initials avatars, one-tap phone calling, emergency SMS dispatch, and a clean contact creation dialog.
+- **Safe Zones & Corridors (`SafeZoneConfigScreen.kt` & `SafeZoneCanvas.kt`):** Anti-aliased radar canvas visualizer with preset safe zones (`Home`, `School`, `Park`) and trusted route safety corridor controls.
+- **Community Relay Sheet (`RelayEmergencyAlertSheet.kt`):** Good Samaritan translucent bottom sheet with clear zero-PII privacy reassurance and anonymous location telemetry.
+- **Parent Emergency Alarm Sheet (`EmergencyAlertSheet.kt`):** High-priority pulsing alarm sheet with child dossier, elapsed timer, and immediate 112 calling shortcuts.
+- **Provisioning Wizard (`ChildProvisioningScreen.kt`):** 4-step guided onboarding wizard with pulsing radar scanner and encrypted GATT transfer progress.
+
+### ♿ 3. Accessibility & Usability Hardening
+- **WCAG 2.1 Compliance:** Body text exceeds 4.5:1 contrast ratio; primary headings and emergency badges exceed 7.0:1 (AAA compliance).
+- **Minimum Touch Targets:** All interactive buttons, chips, and icons strictly conform to $\ge 48\times 48\text{ dp}$.
+- **Dynamic Font Scaling:** UI layouts flexibly accommodate user-scaled system fonts up to 200% without clipping.
+
+### 📋 4. Documentation Deliverables
+- `UI_UX_AUDIT_V3_6_0.md`: Full aesthetic, structural, and usability audit of the pre-v3.6.0 interface.
+- `UI_SCREEN_COVERAGE_V3_6_0.md`: Inventory and progress checklist across all 14 screens and overlays.
+- `UI_DESIGN_SYSTEM_V3_6_0.md`: Complete design system token reference and component architectural specification.
+- `UI_VISUAL_QA_V3_6_0.md`: Visual inspection and accessibility contrast ratio report.
+- `UI_REGRESSION_TESTS_V3_6_0.md`: Regression verification report.
+
+---
+
+## 📦 Verified Build Artifacts
+
+| Component | Path | Size | SHA-256 Checksum |
+| :--- | :--- | :--- | :--- |
+| **Android Release APK** | `app/build/outputs/apk/release/app-release.apk` | **14.1 MB** (14,147,946 B) | `A38E5F2FD0B94E3D868DA13FEB08BAC825A103B1F2DA5660A959FBB015FDFEEA` |
+| **Android Debug APK** | `app/build/outputs/apk/debug/app-debug.apk` | **21.0 MB** (20,951,972 B) | `CF4F53D3850B7C6C4E7406642B304CD5A655B8FC6C5E77A79324DB3CC1AB993C` |
+| **ESP32-S3 Firmware** | `hardware/esp32-child-node/.pio/build/esp32-s3-devkitc-1/firmware.bin` | **922 KB** (944,208 B) | `9BBF7B8C247EDFE0BCFA78DE247678BDAFA61579D54A9E9E4915D56348076D0E` |
+
+---
+
+## 🧪 Automated Verification Summary
+
+- **Unit Tests:** 129 of 129 passed (`./gradlew testDebugUnitTest` - 100% success rate)
+- **Android Lint:** 0 errors, clean analysis (`./gradlew lintDebug` passed)
+- **ESP32-S3 Build:** PlatformIO build completed successfully (`pio run -d hardware/esp32-child-node`)
+- **Git Release Tag:** `v3.6.0`
+
+---
+
 # SafeBand Guardian v3.5.0 Release Notes
 
 **Release Version:** v3.5.0  

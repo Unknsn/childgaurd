@@ -41,14 +41,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.SafeZone
-import com.example.ui.theme.CarbonChassis
-import com.example.ui.theme.MilledSilver
-import com.example.ui.theme.ObsidianContainerLowest
-import com.example.ui.theme.ObsidianEtchedBorder
-import com.example.ui.theme.ObsidianOutline
-import com.example.ui.theme.PhosphorWhite
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
 import kotlin.math.cos
 import kotlin.math.sin
+
+private val ScopeBackground = SafeBandColor.Slate900
+private val ScopeContainer = SafeBandColor.BgDark
+private val ScopeBorder = SafeBandColor.BorderDark
+private val ScopeTextPrimary = SafeBandColor.TextPrimaryDark
+private val ScopeTextMuted = SafeBandColor.TextMutedDark
+private val ScopeTextDim = SafeBandColor.TextSecondaryDark
 
 /**
  * Obsidian Telemetry: Cathode-Ray Polar Coordinate Radar Scope
@@ -98,8 +101,8 @@ fun SafeZoneCanvas(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(CarbonChassis)
-            .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
+            .background(ScopeBackground)
+            .border(1.dp, ScopeBorder, RoundedCornerShape(2.dp))
             .padding(10.dp)
     ) {
         // 1. Scope Titlebar
@@ -117,14 +120,14 @@ fun SafeZoneCanvas(
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(if (isChildOutside) Color(0xFFFF5252) else PhosphorWhite)
+                        .background(if (isChildOutside) Color(0xFFFF5252) else ScopeTextPrimary)
                 )
                 Text(
                     text = "RADAR_SCOPE // POLAR_COORDINATES",
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = PhosphorWhite,
+                    color = ScopeTextPrimary,
                     letterSpacing = 1.sp
                 )
             }
@@ -132,7 +135,7 @@ fun SafeZoneCanvas(
                 text = "[ RANGE: 0 - 200M ]",
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
-                color = ObsidianOutline,
+                color = ScopeTextDim,
                 fontSize = 9.sp
             )
         }
@@ -142,8 +145,8 @@ fun SafeZoneCanvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.15f)
-                .background(ObsidianContainerLowest)
-                .border(1.dp, ObsidianEtchedBorder)
+                .background(ScopeContainer)
+                .border(1.dp, ScopeBorder)
                 .padding(6.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -156,7 +159,7 @@ fun SafeZoneCanvas(
                     .border(
                         BorderStroke(
                             1.5.dp,
-                            Brush.linearGradient(listOf(PhosphorWhite, Color.Transparent))
+                            Brush.linearGradient(listOf(ScopeTextPrimary, Color.Transparent))
                         )
                     )
             )
@@ -168,7 +171,7 @@ fun SafeZoneCanvas(
                     .border(
                         BorderStroke(
                             1.5.dp,
-                            Brush.linearGradient(listOf(Color.Transparent, PhosphorWhite))
+                            Brush.linearGradient(listOf(Color.Transparent, ScopeTextPrimary))
                         )
                     )
             )
@@ -180,7 +183,7 @@ fun SafeZoneCanvas(
                     .border(
                         BorderStroke(
                             1.5.dp,
-                            Brush.linearGradient(listOf(PhosphorWhite, Color.Transparent))
+                            Brush.linearGradient(listOf(ScopeTextPrimary, Color.Transparent))
                         )
                     )
             )
@@ -192,7 +195,7 @@ fun SafeZoneCanvas(
                     .border(
                         BorderStroke(
                             1.5.dp,
-                            Brush.linearGradient(listOf(Color.Transparent, PhosphorWhite))
+                            Brush.linearGradient(listOf(Color.Transparent, ScopeTextPrimary))
                         )
                     )
             )
@@ -209,9 +212,9 @@ fun SafeZoneCanvas(
                     val isGeofenceLimit = (fraction == 0.75f)
                     drawCircle(
                         color = if (isGeofenceLimit) {
-                            if (isChildOutside) Color(0xFFFF5252) else PhosphorWhite
+                            if (isChildOutside) Color(0xFFFF5252) else ScopeTextPrimary
                         } else {
-                            ObsidianEtchedBorder.copy(alpha = 0.55f)
+                            ScopeBorder.copy(alpha = 0.55f)
                         },
                         radius = r,
                         center = center,
@@ -224,13 +227,13 @@ fun SafeZoneCanvas(
 
                 // Cardinal Axis Hairlines (000° - 180° & 270° - 090°)
                 drawLine(
-                    color = ObsidianEtchedBorder.copy(alpha = 0.7f),
+                    color = ScopeBorder.copy(alpha = 0.7f),
                     start = Offset(center.x, center.y - maxRadius),
                     end = Offset(center.x, center.y + maxRadius),
                     strokeWidth = 1f
                 )
                 drawLine(
-                    color = ObsidianEtchedBorder.copy(alpha = 0.7f),
+                    color = ScopeBorder.copy(alpha = 0.7f),
                     start = Offset(center.x - maxRadius, center.y),
                     end = Offset(center.x + maxRadius, center.y),
                     strokeWidth = 1f
@@ -240,14 +243,14 @@ fun SafeZoneCanvas(
                 val diagEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 6f), 0f)
                 val d = maxRadius * 0.7071f
                 drawLine(
-                    color = ObsidianEtchedBorder.copy(alpha = 0.35f),
+                    color = ScopeBorder.copy(alpha = 0.35f),
                     start = Offset(center.x - d, center.y - d),
                     end = Offset(center.x + d, center.y + d),
                     strokeWidth = 1f,
                     pathEffect = diagEffect
                 )
                 drawLine(
-                    color = ObsidianEtchedBorder.copy(alpha = 0.35f),
+                    color = ScopeBorder.copy(alpha = 0.35f),
                     start = Offset(center.x - d, center.y + d),
                     end = Offset(center.x + d, center.y - d),
                     strokeWidth = 1f,
@@ -257,7 +260,7 @@ fun SafeZoneCanvas(
                 // Rotating Radar Sweep Line with gradient trail
                 rotate(sweepAngle, pivot = center) {
                     drawLine(
-                        color = PhosphorWhite,
+                        color = ScopeTextPrimary,
                         start = center,
                         end = Offset(center.x, center.y - maxRadius),
                         strokeWidth = 1.5f
@@ -266,7 +269,7 @@ fun SafeZoneCanvas(
 
                 // Guardian Base Anchor [0,0]
                 drawRect(
-                    color = PhosphorWhite,
+                    color = ScopeTextPrimary,
                     topLeft = Offset(center.x - 5f, center.y - 5f),
                     size = androidx.compose.ui.geometry.Size(10f, 10f)
                 )
@@ -283,7 +286,7 @@ fun SafeZoneCanvas(
 
                 // Vector hairline from center to target blip
                 drawLine(
-                    color = ObsidianOutline.copy(alpha = 0.6f),
+                    color = ScopeTextDim.copy(alpha = 0.6f),
                     start = center,
                     end = blipOffset,
                     strokeWidth = 1f,
@@ -291,7 +294,7 @@ fun SafeZoneCanvas(
                 )
 
                 // Target Blip Box & Ping Halo
-                val blipColor = if (isChildOutside) Color(0xFFFF5252) else PhosphorWhite
+                val blipColor = if (isChildOutside) Color(0xFFFF5252) else ScopeTextPrimary
                 drawCircle(
                     color = blipColor.copy(alpha = 0.25f),
                     radius = 14f * blipPulse,
@@ -311,10 +314,10 @@ fun SafeZoneCanvas(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 fontSize = 9.sp,
-                color = PhosphorWhite,
+                color = ScopeTextPrimary,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .background(CarbonChassis)
+                    .background(ScopeBackground)
                     .padding(horizontal = 4.dp)
             )
             Text(
@@ -322,10 +325,10 @@ fun SafeZoneCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
-                color = ObsidianOutline,
+                color = ScopeTextDim,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .background(CarbonChassis)
+                    .background(ScopeBackground)
                     .padding(horizontal = 4.dp)
             )
             Text(
@@ -333,10 +336,10 @@ fun SafeZoneCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
-                color = ObsidianOutline,
+                color = ScopeTextDim,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .background(CarbonChassis)
+                    .background(ScopeBackground)
                     .padding(vertical = 2.dp)
             )
             Text(
@@ -344,10 +347,10 @@ fun SafeZoneCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
-                color = ObsidianOutline,
+                color = ScopeTextDim,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .background(CarbonChassis)
+                    .background(ScopeBackground)
                     .padding(vertical = 2.dp)
             )
 
@@ -357,11 +360,11 @@ fun SafeZoneCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 8.sp,
-                color = ObsidianOutline,
+                color = ScopeTextDim,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = 12.dp, top = 8.dp)
-                    .background(CarbonChassis.copy(alpha = 0.8f))
+                    .background(ScopeBackground.copy(alpha = 0.8f))
                     .padding(horizontal = 4.dp, vertical = 2.dp)
             )
 
@@ -370,8 +373,8 @@ fun SafeZoneCanvas(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 12.dp, top = 22.dp)
-                    .border(1.dp, if (isChildOutside) Color(0xFFFF5252) else PhosphorWhite, RoundedCornerShape(2.dp)),
-                color = ObsidianContainerLowest,
+                    .border(1.dp, if (isChildOutside) Color(0xFFFF5252) else ScopeTextPrimary, RoundedCornerShape(2.dp)),
+                color = ScopeContainer,
                 shape = RoundedCornerShape(2.dp)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
@@ -382,7 +385,7 @@ fun SafeZoneCanvas(
                         Box(
                             modifier = Modifier
                                 .size(5.dp)
-                                .background(if (isChildOutside) Color(0xFFFF5252) else PhosphorWhite)
+                                .background(if (isChildOutside) Color(0xFFFF5252) else ScopeTextPrimary)
                         )
                         Text(
                             text = "BEACON_01 // ${safeZone.name.take(14)}",
@@ -390,7 +393,7 @@ fun SafeZoneCanvas(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 8.sp,
-                            color = PhosphorWhite
+                            color = ScopeTextPrimary
                         )
                     }
                     Text(
@@ -398,7 +401,7 @@ fun SafeZoneCanvas(
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 8.sp,
-                        color = MilledSilver
+                        color = ScopeTextMuted
                     )
                 }
             }
@@ -409,8 +412,8 @@ fun SafeZoneCanvas(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                .background(ObsidianContainerLowest)
+                .border(1.dp, ScopeBorder, RoundedCornerShape(2.dp))
+                .background(ScopeContainer)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -425,14 +428,14 @@ fun SafeZoneCanvas(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 9.sp,
-                    color = PhosphorWhite
+                    color = ScopeTextPrimary
                 )
                 Text(
                     text = if (isChildOutside) "BREACH DETECTED" else "POLAR SWEEP SYNCHRONIZED",
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 9.sp,
-                    color = if (isChildOutside) Color(0xFFFF5252) else MilledSilver
+                    color = if (isChildOutside) Color(0xFFFF5252) else ScopeTextMuted
                 )
             }
             Text(
@@ -440,7 +443,7 @@ fun SafeZoneCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 8.sp,
-                color = ObsidianOutline
+                color = ScopeTextDim
             )
         }
     }

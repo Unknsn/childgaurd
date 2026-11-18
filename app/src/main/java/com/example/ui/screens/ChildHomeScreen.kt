@@ -2,20 +2,6 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import com.example.ui.components.GlassButton
-import com.example.ui.components.GlassCard
-import com.example.ui.theme.GlassBorder
-import com.example.ui.theme.GlassBorderStrong
-import com.example.ui.theme.GlassHazard
-import com.example.ui.theme.GlassHazardBorder
-import com.example.ui.theme.GlassSurface
-import com.example.ui.theme.GlassSurfaceElevated
-import com.example.ui.theme.GlassSurfaceLowest
-import com.example.ui.theme.GlassSuccess
-import com.example.ui.theme.GlassSuccessBorder
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -27,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,29 +32,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.BluetoothSearching
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Sos
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,60 +64,37 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.BatteryChargingFull
-import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.rememberCoroutineScope
+import com.example.model.AlertFlag
+import com.example.model.RiskLevel
+import com.example.ui.SafeBandViewModel
+import com.example.ui.components.HardwarePrerequisiteBanner
+import com.example.ui.components.SafeBandCard
+import com.example.ui.components.SafeBandPrimaryButton
+import com.example.ui.components.SafeBandSecondaryButton
+import com.example.ui.components.SafeBandStatusBadge
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
+import com.example.ui.theme.SafeBandSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import com.example.model.AlertFlag
-import com.example.model.BatteryState
-import com.example.model.ConnectivityTier
-import com.example.model.GeofenceState
-import com.example.model.LocationConfidence
-import com.example.model.OperatingMode
-import com.example.model.RiskLevel
-import com.example.model.RouteState
-import com.example.model.TrustedRoute
-import com.example.model.VerifiedLocation
-import com.example.ui.SafeBandViewModel
-import com.example.ui.components.GlassButton
-import com.example.ui.components.GlassCard
-import com.example.ui.components.HardwarePrerequisiteBanner
-import com.example.ui.components.SegmentedMeter
-import com.example.ui.components.TactileKeycap
-import com.example.ui.theme.CarbonChassis
-import com.example.ui.theme.MilledSilver
-import com.example.ui.theme.ObsidianContainer
-import com.example.ui.theme.ObsidianContainerLowest
-import com.example.ui.theme.ObsidianContainerLow
-import com.example.ui.theme.ObsidianEtchedBorder
-import com.example.ui.theme.ObsidianOutline
-import com.example.ui.theme.PhosphorWhite
 
 enum class SosHoldState {
     IDLE,
@@ -152,15 +117,10 @@ fun ChildHomeScreen(
     val isCountingDown by viewModel.isCountingDown.collectAsState()
     val countdownSeconds by viewModel.countdownRemainingSeconds.collectAsState()
     val isAdvertising by viewModel.bleManager.isAdvertising.collectAsState()
-    val accelMagnitude by viewModel.motionDetector.currentMagnitude.collectAsState()
     val isMotionActive by viewModel.motionDetector.isAnomalyActive.collectAsState()
     val isOutsideSafeZone by viewModel.locationHelper.isOutsideSafeZone.collectAsState()
-    val geofenceState by viewModel.geofenceState.collectAsState()
-    val routeState by viewModel.routeState.collectAsState()
     val verifiedLocation by viewModel.verifiedLocation.collectAsState()
-    val trustedRoute by viewModel.trustedRoute.collectAsState()
     val deviceId by viewModel.deviceId.collectAsState()
-    val safeZone by viewModel.safeZone.collectAsState()
     val childProfile by viewModel.childBioProfile.collectAsState()
     val batteryInfo by viewModel.batteryInfo.collectAsState()
     val connectivityStatus by viewModel.connectivityStatus.collectAsState()
@@ -174,13 +134,18 @@ fun ChildHomeScreen(
     val hapticFeedback = LocalHapticFeedback.current
     val context = LocalContext.current
 
-    // Pulse animation for SOS button
+    // Reassurance state
+    val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
+    val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS) || holdState == SosHoldState.ACTIVATED
+    val nearestNode = discoveredNodes.values.firstOrNull { it.isNearby }
+
+    // Pulsing animation for SOS button
     val infiniteTransition = rememberInfiniteTransition(label = "SosPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.98f,
-        targetValue = 1.04f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "SosScale"
@@ -192,90 +157,105 @@ fun ChildHomeScreen(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Radar,
-                            contentDescription = null,
-                            tint = PhosphorWhite,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Surface(
+                            shape = SafeBandShapes.medium,
+                            color = if (isEmergency) SafeBandColor.EmergencyLight else SafeBandColor.PrimaryLight,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = if (isEmergency) SafeBandColor.Emergency else SafeBandColor.Primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                         Column {
                             Text(
-                                text = "SAFEBAND // BLE_P2P",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontFamily = FontFamily.Monospace,
+                                text = "SafeBand Guardian",
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PhosphorWhite,
-                                letterSpacing = 1.sp
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "$deviceId // BLE LINKED",
+                                text = "$deviceId • ${if (isAdvertising) "BLE Active" else "BLE Standby"}",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                color = ObsidianOutline,
-                                letterSpacing = 1.sp
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
                 actions = {
-                    // Battery Segmented Meter
-                    Row(
-                        modifier = Modifier
-                            .background(ObsidianContainerLowest, RoundedCornerShape(2.dp))
-                            .border(1.dp, ObsidianEtchedBorder, RoundedCornerShape(2.dp))
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Battery Pill
+                    Surface(
+                        shape = SafeBandShapes.pill,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.padding(end = SafeBandSpacing.xs)
                     ) {
-                        Text(
-                            text = batteryInfo.percentage?.let { "$it%" } ?: "--%",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                            color = PhosphorWhite
-                        )
-                        SegmentedMeter(
-                            filledSegments = ((batteryInfo.percentage ?: 88) * 8) / 100,
-                            totalSegments = 8,
-                            segmentHeight = 8,
-                            modifier = Modifier.width(36.dp)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if ((batteryInfo.percentage ?: 100) < 20) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
+                                contentDescription = null,
+                                tint = if ((batteryInfo.percentage ?: 100) < 20) SafeBandColor.Emergency else SafeBandColor.Success,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = batteryInfo.percentage?.let { "$it%" } ?: "95%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+
                     IconButton(
                         onClick = onNavigateToHistory,
                         modifier = Modifier.testTag("history_button")
                     ) {
-                        Icon(imageVector = Icons.Default.History, contentDescription = "Event Log", tint = MilledSilver)
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "Event Log",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
+
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("settings_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MilledSilver)
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CarbonChassis
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(CarbonChassis)
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = SafeBandSpacing.lg)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
 
+            // Hardware prerequisite banner
             val isBtOn by viewModel.isBluetoothHardwareEnabled.collectAsState()
             val isLocOn by viewModel.isLocationHardwareEnabled.collectAsState()
 
@@ -289,144 +269,133 @@ fun ChildHomeScreen(
                     onEnableLocation = {
                         try { context.startActivity(viewModel.getEnableLocationIntent()) } catch (_: Exception) {}
                     },
-                    modifier = Modifier.padding(bottom = 10.dp)
+                    modifier = Modifier.padding(bottom = SafeBandSpacing.sm)
                 )
             }
 
-            // 1. REASSURANCE GLASS CARD
-            val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM
-            val isSosActive = activeFlags.contains(AlertFlag.MANUAL_SOS) || holdState == SosHoldState.ACTIVATED
-
-            GlassCard(
+            // 1. Reassurance Hero Banner
+            SafeBandCard(
                 modifier = Modifier.fillMaxWidth(),
-                backgroundColor = if (isEmergency) GlassHazard else GlassSurface,
-                borderColor = if (isEmergency) GlassHazardBorder else GlassBorder,
-                padding = 12.dp
+                backgroundColor = if (isEmergency) SafeBandColor.EmergencyLight else SafeBandColor.SuccessLight,
+                border = BorderStroke(
+                    1.dp,
+                    if (isEmergency) SafeBandColor.Emergency.copy(alpha = 0.5f) else SafeBandColor.Success.copy(alpha = 0.5f)
+                )
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f, fill = false)
+                        horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
-                                .background(if (isEmergency) Color(0xFFFF5252) else Color(0xFF10B981))
+                                .background(if (isEmergency) SafeBandColor.Emergency else SafeBandColor.Success)
                         )
-                        val nearestNode = discoveredNodes.values.firstOrNull { it.isNearby }
                         Text(
-                            text = if (isEmergency) "ALERT BROADCAST ACTIVE" else if (nearestNode != null) "GUARDIAN IN RANGE" else "PROTECTION ACTIVE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
+                            text = when {
+                                isEmergency -> "EMERGENCY BROADCAST ACTIVE"
+                                nearestNode != null -> "GUARDIAN IN RANGE"
+                                else -> "YOU ARE PROTECTED"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (isEmergency) Color(0xFFFF5252) else PhosphorWhite,
-                            letterSpacing = 0.5.sp,
-                            maxLines = 1
+                            color = if (isEmergency) SafeBandColor.EmergencyDark else SafeBandColor.SuccessDark
                         )
                     }
-                    val nearestNode = discoveredNodes.values.firstOrNull { it.isNearby }
-                    val proximityText = when {
-                        nearestNode != null -> {
-                            val distStr = nearestNode.estimatedDistanceMeters?.let { d -> "%.1fm • ".format(d) } ?: ""
-                            val rssiStr = if (nearestNode.rssi != 0 && nearestNode.rssi != -100) "RSSI ${nearestNode.rssi} dBm" else "Direct Link"
-                            "$distStr$rssiStr"
-                        }
-                        isEmergency -> "Broadcasting SOS"
-                        isAdvertising -> "Advertising • Standby"
-                        else -> "BLE Standby"
-                    }
-                    Text(
-                        text = proximityText,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MilledSilver,
-                        fontSize = 11.sp,
-                        maxLines = 1
+
+                    SafeBandStatusBadge(
+                        text = when {
+                            nearestNode != null -> "Direct Link"
+                            isEmergency -> "SOS Signal"
+                            isAdvertising -> "Broadcasting"
+                            else -> "Standby"
+                        },
+                        color = if (isEmergency) SafeBandColor.Emergency else SafeBandColor.Success
                     )
                 }
             }
 
-            // Child Authorized Pickup Reassurance Badge
+            // Authorized pickup card if active
             if (activeAuthorizations.isNotEmpty()) {
                 val auth = activeAuthorizations.first()
-                Spacer(modifier = Modifier.height(8.dp))
-                GlassCard(
+                Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+                SafeBandCard(
                     modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = GlassSurfaceElevated,
-                    borderColor = GlassBorderStrong,
-                    padding = 10.dp
+                    backgroundColor = SafeBandColor.PrimaryLight
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.VerifiedUser, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.VerifiedUser,
+                            contentDescription = null,
+                            tint = SafeBandColor.Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
                         Column {
                             Text(
-                                text = "AUTHORIZED PICKUP: ${auth.authorizedPersonName.uppercase()}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
+                                text = "Authorized Pickup: ${auth.authorizedPersonName}",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = PhosphorWhite,
-                                fontSize = 10.sp
+                                color = SafeBandColor.PrimaryDark
                             )
                             Text(
-                                text = "RELATION: ${auth.relationship.uppercase()} • TOKEN: ${auth.verificationToken}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                color = MilledSilver
+                                text = "Relation: ${auth.relationship} • Code: ${auth.verificationToken}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SafeBandColor.PrimaryDark.copy(alpha = 0.8f)
                             )
                         }
                     }
                 }
             }
 
-            // Child Supervised Journey Reassurance Badge
+            // Supervised journey card if active
             if (activeJourney != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                GlassCard(
+                Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+                SafeBandCard(
                     modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = GlassSurfaceElevated,
-                    borderColor = GlassBorderStrong,
-                    padding = 10.dp
+                    backgroundColor = SafeBandColor.SecondaryLight
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = PhosphorWhite, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            contentDescription = null,
+                            tint = SafeBandColor.Secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
                         Column {
                             Text(
-                                text = "SUPERVISED JOURNEY: HEADING TO ${activeJourney!!.destLabel.uppercase()}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
+                                text = "Supervised Journey: Heading to ${activeJourney!!.destLabel}",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = PhosphorWhite,
-                                fontSize = 10.sp
+                                color = SafeBandColor.SecondaryDark
                             )
                             Text(
-                                text = "SAFETY CORRIDOR ACTIVE • TELEMETRY SYNCED",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                color = MilledSilver
+                                text = "Safety corridor active • Real-time telemetry synced",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SafeBandColor.SecondaryDark.copy(alpha = 0.8f)
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
 
-            // 2. CENTER HERO: FROSTED GLASS SOS DIAL
-            GlassCard(
+            // 2. Center Hero: High-Visibility SOS Trigger
+            SafeBandCard(
                 modifier = Modifier.fillMaxWidth(),
-                backgroundColor = if (isSosActive) GlassHazard else GlassSurface,
-                borderColor = if (isSosActive) GlassHazardBorder else GlassBorder,
-                padding = 16.dp
+                backgroundColor = if (isSosActive) SafeBandColor.EmergencyLight else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    1.5.dp,
+                    if (isSosActive) SafeBandColor.Emergency else SafeBandColor.Slate200
+                )
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -434,58 +403,53 @@ fun ChildHomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SAFEGUARD BEACON",
+                        text = "EMERGENCY BEACON",
                         style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = ObsidianOutline,
-                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 1.sp
                     )
-                    Text(
-                        text = if (isSosActive) "● BROADCASTING" else "● ARMED",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSosActive) Color(0xFFFF5252) else Color(0xFF10B981),
-                        fontSize = 10.sp
+                    SafeBandStatusBadge(
+                        text = if (isSosActive) "BROADCASTING" else "ARMED & READY",
+                        color = if (isSosActive) SafeBandColor.Emergency else SafeBandColor.Success
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(SafeBandSpacing.lg))
 
-                // Knurled Dial Housing with Hold Progress Ring
+                // Circular Hold Button
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(190.dp)
                         .align(Alignment.CenterHorizontally)
-                        .background(GlassSurfaceLowest, CircleShape)
-                        .border(1.5.dp, if (isSosActive) GlassHazardBorder else GlassBorder, CircleShape)
+                        .scale(if (isSosActive) pulseScale else 1f)
                 ) {
+                    // Outer track & progress indicator
                     if (holdState == SosHoldState.HOLDING) {
                         CircularProgressIndicator(
                             progress = { holdProgress },
                             modifier = Modifier.size(186.dp),
-                            color = PhosphorWhite,
-                            strokeWidth = 4.dp,
-                            trackColor = GlassSurfaceElevated
+                            color = SafeBandColor.Emergency,
+                            strokeWidth = 6.dp,
+                            trackColor = SafeBandColor.Slate200
                         )
                     } else if (isSosActive) {
                         CircularProgressIndicator(
                             progress = { 1f },
                             modifier = Modifier.size(186.dp),
-                            color = Color(0xFFFF5252),
-                            strokeWidth = 4.dp
+                            color = SafeBandColor.Emergency,
+                            strokeWidth = 6.dp
                         )
                     }
 
+                    // Main circular button
                     Surface(
                         shape = CircleShape,
-                        color = if (isSosActive) PhosphorWhite else CarbonChassis,
-                        shadowElevation = 0.dp,
+                        color = if (isSosActive) SafeBandColor.Emergency else SafeBandColor.Emergency,
+                        shadowElevation = if (isSosActive) 8.dp else 4.dp,
                         modifier = Modifier
-                            .size(142.dp)
-                            .border(1.5.dp, if (isSosActive) Color(0xFFFF5252) else GlassBorderStrong, CircleShape)
+                            .size(150.dp)
                             .clip(CircleShape)
                             .pointerInput(isSosActive) {
                                 if (isSosActive) {
@@ -539,8 +503,8 @@ fun ChildHomeScreen(
                                 Icon(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = "Hold 2s for SOS",
-                                    tint = if (isSosActive) Color.Black else PhosphorWhite,
-                                    modifier = Modifier.size(32.dp)
+                                    tint = SafeBandColor.White,
+                                    modifier = Modifier.size(36.dp)
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -549,40 +513,36 @@ fun ChildHomeScreen(
                                         holdState == SosHoldState.HOLDING -> "${(holdProgress * 100).toInt()}%"
                                         else -> "HOLD 2s\nFOR SOS"
                                     },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 11.sp,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
                                     textAlign = TextAlign.Center,
-                                    lineHeight = 14.sp,
-                                    color = if (isSosActive) Color.Black else PhosphorWhite
+                                    color = SafeBandColor.White
                                 )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
                 Text(
-                    text = "EMERGENCY BEACON TRANSMITTER // BLE 0x5AFE",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
-                    color = ObsidianOutline,
+                    text = if (isSosActive) "Tap SOS button to cancel alarm" else "Press and hold for 2 seconds to alert parents",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
-            // Quick Actions: Call Guardian & Sound Siren
+            // Quick Call Actions
             val guardianPhone = childProfile.primaryParentPhone
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
             ) {
-                GlassButton(
+                SafeBandPrimaryButton(
                     text = "Call Guardian",
                     icon = Icons.Default.Phone,
                     onClick = {
@@ -593,10 +553,10 @@ fun ChildHomeScreen(
                     },
                     modifier = Modifier.weight(1f)
                 )
-                GlassButton(
-                    text = if (isSosActive) "Cancel Alarm" else "Sound Siren",
+
+                SafeBandSecondaryButton(
+                    text = if (isSosActive) "Cancel Siren" else "Sound Siren",
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    isDestructive = isSosActive,
                     onClick = {
                         if (isSosActive) {
                             viewModel.cancelManualSos()
@@ -608,14 +568,40 @@ fun ChildHomeScreen(
                 )
             }
 
-            // False-Alarm Dispatch Intercept Tray (When Counting Down)
+            // Indian Emergency Helplines quick buttons
+            Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
+            ) {
+                SafeBandSecondaryButton(
+                    text = "Police (112)",
+                    icon = Icons.Default.Phone,
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                SafeBandSecondaryButton(
+                    text = "Childline (1098)",
+                    icon = Icons.Default.Phone,
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:1098"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Dispatch Countdown Tray (When Counting Down)
             if (isCountingDown) {
-                Spacer(modifier = Modifier.height(10.dp))
-                GlassCard(
+                Spacer(modifier = Modifier.height(SafeBandSpacing.md))
+                SafeBandCard(
                     modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = GlassHazard,
-                    borderColor = GlassHazardBorder,
-                    padding = 12.dp
+                    backgroundColor = SafeBandColor.EmergencyLight,
+                    border = BorderStroke(1.5.dp, SafeBandColor.Emergency)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -624,37 +610,33 @@ fun ChildHomeScreen(
                     ) {
                         Text(
                             text = "DISPATCH COUNTDOWN",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF6B6B),
-                            fontSize = 10.sp
+                            color = SafeBandColor.EmergencyDark
                         )
                         Text(
-                            text = "[ 00:00:%02d ]".format(countdownSeconds),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontFamily = FontFamily.Monospace,
+                            text = "00:00:%02d".format(countdownSeconds),
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PhosphorWhite
+                            color = SafeBandColor.EmergencyDark
                         )
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    GlassButton(
-                        text = "Abort / Cancel Alarm",
-                        isDestructive = true,
+                    Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+                    Button(
                         onClick = { viewModel.cancelConfirmationCountdown() },
+                        colors = ButtonDefaults.buttonColors(containerColor = SafeBandColor.Emergency),
+                        shape = SafeBandShapes.medium,
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    ) {
+                        Text("Cancel False Alarm", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
-            // Essential Status Strip (Frosted Glass)
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                padding = 12.dp
-            ) {
+            // Essential Status Strip
+            SafeBandCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -664,18 +646,14 @@ fun ChildHomeScreen(
                         Text(
                             text = "SAFE ZONE",
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            color = ObsidianOutline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (isOutsideSafeZone) "Perimeter Breach" else "Inside Perimeter",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
+                            text = if (isOutsideSafeZone) "Perimeter Breach" else "Inside Safe Zone",
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (isOutsideSafeZone) Color(0xFFFF5252) else PhosphorWhite
+                            color = if (isOutsideSafeZone) SafeBandColor.Emergency else SafeBandColor.Success
                         )
                     }
 
@@ -683,18 +661,14 @@ fun ChildHomeScreen(
                         Text(
                             text = "CONNECTIVITY",
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            color = ObsidianOutline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = connectivityStatus.tier.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = PhosphorWhite
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -702,113 +676,83 @@ fun ChildHomeScreen(
                         Text(
                             text = "LOCATION",
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            color = ObsidianOutline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = verifiedLocation?.confidence?.displayName ?: "High Accuracy",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = PhosphorWhite
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
 
+            // Debug diagnostics simulator
             if (com.example.BuildConfig.DEBUG) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
-                // Collapsible Sensor Diagnostics & Simulators (Demo Mode)
-                GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                padding = 12.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isDemoControlsExpanded = !isDemoControlsExpanded },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                SafeBandCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isDemoControlsExpanded = !isDemoControlsExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
+                            Text(
+                                text = "Diagnostics & Simulator (Debug)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Icon(
-                            imageVector = Icons.Default.BugReport,
+                            imageVector = if (isDemoControlsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = null,
-                            tint = MilledSilver,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "DIAGNOSTICS & SIMULATOR",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MilledSilver,
-                            fontSize = 10.sp
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    Icon(
-                        imageVector = if (isDemoControlsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MilledSilver,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
 
-                AnimatedVisibility(visible = isDemoControlsExpanded) {
-                    Column {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { viewModel.toggleSimulatedMotionAnomaly() },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("simulate_motion_button"),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isMotionActive) Color(0xFFF59E0B) else GlassSurfaceElevated,
-                                    contentColor = PhosphorWhite
-                                )
+                    AnimatedVisibility(visible = isDemoControlsExpanded) {
+                        Column {
+                            Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(SafeBandSpacing.sm)
                             ) {
-                                Text(
+                                SafeBandSecondaryButton(
                                     text = if (isMotionActive) "Stop Shake" else "Simulate Fall",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp
+                                    onClick = { viewModel.toggleSimulatedMotionAnomaly() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("simulate_motion_button")
                                 )
-                            }
-                            Button(
-                                onClick = { viewModel.toggleSimulatedGeofenceExit() },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("simulate_geofence_button"),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isOutsideSafeZone) Color(0xFFEF4444) else GlassSurfaceElevated,
-                                    contentColor = PhosphorWhite
-                                )
-                            ) {
-                                Text(
+
+                                SafeBandSecondaryButton(
                                     text = if (isOutsideSafeZone) "Inside Zone" else "Simulate Exit",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp
+                                    onClick = { viewModel.toggleSimulatedGeofenceExit() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("simulate_geofence_button")
                                 )
                             }
                         }
                     }
                 }
-                }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(SafeBandSpacing.xxl))
         }
     }
 }

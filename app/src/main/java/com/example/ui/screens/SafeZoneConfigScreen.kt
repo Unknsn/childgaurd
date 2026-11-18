@@ -31,6 +31,13 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.example.ui.components.SafeBandCard
+import com.example.ui.components.SafeBandPrimaryButton
+import com.example.ui.components.SafeBandSecondaryButton
+import com.example.ui.components.SafeBandStatusBadge
+import com.example.ui.theme.SafeBandColor
+import com.example.ui.theme.SafeBandShapes
+import com.example.ui.theme.SafeBandSpacing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -157,332 +164,285 @@ fun SafeZoneConfigScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Configuration Form Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        SafeBandCard(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "ZONE PARAMETERS",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = SafeBandColor.Primary,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = nameInput,
+                onValueChange = { nameInput = it },
+                label = { Text("Safe Zone Label") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("safe_zone_name_input"),
+                shape = SafeBandShapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = latInput,
+                    onValueChange = { latInput = it },
+                    label = { Text("Latitude") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("safe_zone_lat_input"),
+                    shape = SafeBandShapes.medium
+                )
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                OutlinedTextField(
+                    value = lonInput,
+                    onValueChange = { lonInput = it },
+                    label = { Text("Longitude") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("safe_zone_lon_input"),
+                    shape = SafeBandShapes.medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Use Current Location Button
+            SafeBandSecondaryButton(
+                text = "Pin To My Current Location",
+                icon = Icons.Default.MyLocation,
+                onClick = {
+                    deviceLocation?.let { loc ->
+                        latInput = "%.5f".format(java.util.Locale.US, loc.latitude)
+                        lonInput = "%.5f".format(java.util.Locale.US, loc.longitude)
+                    } ?: run {
+                        latInput = "37.77490"
+                        lonInput = "-122.41940"
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("use_current_location_button")
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Radius Slider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "ZONE PARAMETERS",
+                    text = "Boundary Radius:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                SafeBandStatusBadge(
+                    text = "${radiusValue.toInt()} meters",
+                    color = SafeBandColor.Primary
+                )
+            }
+
+            Slider(
+                value = radiusValue,
+                onValueChange = { radiusValue = it },
+                valueRange = 50f..1000f,
+                steps = 18,
+                modifier = Modifier.testTag("radius_slider"),
+                colors = SliderDefaults.colors(
+                    thumbColor = SafeBandColor.Primary,
+                    activeTrackColor = SafeBandColor.Primary
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Save Changes Button
+            SafeBandPrimaryButton(
+                text = "Save Safe Zone",
+                icon = Icons.Default.Check,
+                onClick = {
+                    val lat = latInput.toDoubleOrNull() ?: currentSafeZone.latitude
+                    val lon = lonInput.toDoubleOrNull() ?: currentSafeZone.longitude
+                    viewModel.saveSafeZone(lat, lon, radiusValue, nameInput)
+                    saveMessage = "Safe Zone saved successfully!"
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("save_safe_zone_button")
+            )
+
+            saveMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SafeBandColor.Success,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 8.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Geofence Engine Status & Accuracy Card
+        SafeBandCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "GEOFENCE ENGINE TELEMETRY",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = SafeBandColor.Primary,
                     letterSpacing = 1.sp
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                val geofenceBadgeColor = when (geofenceState) {
+                    com.example.model.GeofenceState.SAFE -> SafeBandColor.Success
+                    com.example.model.GeofenceState.APPROACHING -> SafeBandColor.Warning
+                    com.example.model.GeofenceState.EXIT_PENDING -> SafeBandColor.WarningDark
+                    com.example.model.GeofenceState.OUTSIDE -> SafeBandColor.Emergency
+                    com.example.model.GeofenceState.REENTERED -> SafeBandColor.Success
+                }
 
-                OutlinedTextField(
-                    value = nameInput,
-                    onValueChange = { nameInput = it },
-                    label = { Text("Safe Zone Label") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("safe_zone_name_input"),
-                    shape = RoundedCornerShape(12.dp)
+                SafeBandStatusBadge(
+                    text = geofenceState.displayName,
+                    color = geofenceBadgeColor
                 )
+            }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val centerDistStr = distanceFromCenter?.let { "%.0f m".format(it) } ?: "Awaiting GPS fix"
+            val boundDistStr = distanceToBoundary?.let { dist ->
+                if (dist > 0) "+%.0f m (Outside)".format(dist) else "%.0f m (Inside)".format(dist)
+            } ?: "Awaiting GPS fix"
+
+            Text(
+                text = "• Distance from Safe Zone Center: $centerDistStr\n• Distance relative to boundary: $boundDistStr\n• GPS Accuracy: ±${verifiedLocation?.accuracyMeters?.toInt() ?: 15}m (${verifiedLocation?.confidence?.displayName ?: "Medium"})\n• Grace Period: 15s Confirmation Window active",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Trusted Route Corridor Card
+        SafeBandCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "TRUSTED ROUTE CORRIDOR",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = SafeBandColor.Primary,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Home → Bus Stop → School Safety Corridor",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                androidx.compose.material3.Switch(
+                    checked = isRouteEnabled,
+                    onCheckedChange = { isRouteEnabled = it }
+                )
+            }
+
+            if (isRouteEnabled) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = latInput,
-                        onValueChange = { latInput = it },
-                        label = { Text("Latitude") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("safe_zone_lat_input"),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    OutlinedTextField(
-                        value = lonInput,
-                        onValueChange = { lonInput = it },
-                        label = { Text("Longitude") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("safe_zone_lon_input"),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Use Current Location Button
-                OutlinedButton(
-                    onClick = {
-                        deviceLocation?.let { loc ->
-                            latInput = "%.5f".format(java.util.Locale.US, loc.latitude)
-                            lonInput = "%.5f".format(java.util.Locale.US, loc.longitude)
-                        } ?: run {
-                            // Default to San Francisco if GPS not yet fixed
-                            latInput = "37.77490"
-                            lonInput = "-122.41940"
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("use_current_location_button"),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pin To My Current Location")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Radius Slider
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Boundary Radius:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = "${radiusValue.toInt()} meters",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = "Corridor Radius: ${routeCorridorValue.toInt()} meters",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
 
                 Slider(
-                    value = radiusValue,
-                    onValueChange = { radiusValue = it },
-                    valueRange = 50f..1000f,
-                    steps = 18,
-                    modifier = Modifier.testTag("radius_slider"),
+                    value = routeCorridorValue,
+                    onValueChange = { routeCorridorValue = it },
+                    valueRange = 30f..150f,
+                    steps = 11,
+                    modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
+                        thumbColor = SafeBandColor.Primary,
+                        activeTrackColor = SafeBandColor.Primary
                     )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Save Changes Button
-                Button(
+                Text(
+                    text = "Current Route Status: ${routeState.displayName}" +
+                        (distanceToRouteCorridor?.let { " (%.0f m from center-line)".format(it) } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = when (routeState) {
+                        com.example.model.RouteState.ON_ROUTE -> SafeBandColor.Success
+                        com.example.model.RouteState.APPROACHING_EDGE -> SafeBandColor.Warning
+                        com.example.model.RouteState.ROUTE_DEVIATION -> SafeBandColor.Emergency
+                        com.example.model.RouteState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SafeBandSecondaryButton(
+                    text = "Save Route Corridor Settings",
                     onClick = {
-                        val lat = latInput.toDoubleOrNull() ?: currentSafeZone.latitude
-                        val lon = lonInput.toDoubleOrNull() ?: currentSafeZone.longitude
-                        viewModel.saveSafeZone(lat, lon, radiusValue, nameInput)
-                        saveMessage = "Safe Zone saved successfully!"
+                        val updatedRoute = trustedRoute.copy(
+                            isEnabled = isRouteEnabled,
+                            corridorRadiusMeters = routeCorridorValue
+                        )
+                        viewModel.saveTrustedRoute(updatedRoute)
+                        routeSavedMessage = "Trusted route corridor saved!"
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("save_safe_zone_button"),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Save Safe Zone",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                saveMessage?.let { msg ->
+                routeSavedMessage?.let { msg ->
                     Text(
                         text = msg,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF10B981),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SafeBandColor.Success,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
-                            .padding(top = 8.dp)
+                            .padding(top = 6.dp)
                     )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Geofence Engine Status & Accuracy Card (Phase 1 & Phase 6)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "GEOFENCE ENGINE TELEMETRY",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 1.sp
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = when (geofenceState) {
-                            com.example.model.GeofenceState.SAFE -> Color(0xFF065F46)
-                            com.example.model.GeofenceState.APPROACHING -> Color(0xFF92400E)
-                            com.example.model.GeofenceState.EXIT_PENDING -> Color(0xFFC2410C)
-                            com.example.model.GeofenceState.OUTSIDE -> Color(0xFF991B1B)
-                            com.example.model.GeofenceState.REENTERED -> Color(0xFF047857)
-                        }
-                    ) {
-                        Text(
-                            text = geofenceState.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                val centerDistStr = distanceFromCenter?.let { "%.0f m".format(it) } ?: "Awaiting GPS fix"
-                val boundDistStr = distanceToBoundary?.let { dist ->
-                    if (dist > 0) "+%.0f m (Outside)".format(dist) else "%.0f m (Inside)".format(dist)
-                } ?: "Awaiting GPS fix"
-
-                Text(
-                    text = "• Distance from Safe Zone Center: $centerDistStr\n• Distance relative to boundary: $boundDistStr\n• GPS Accuracy: ±${verifiedLocation?.accuracyMeters?.toInt() ?: 15}m (${verifiedLocation?.confidence?.displayName ?: "Medium"})\n• Grace Period: 15s Confirmation Window active",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 20.sp
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Trusted Route Corridor Card (Phase 2)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "TRUSTED ROUTE CORRIDOR",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Home → Bus Stop → School Safety Corridor",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    androidx.compose.material3.Switch(
-                        checked = isRouteEnabled,
-                        onCheckedChange = { isRouteEnabled = it }
-                    )
-                }
-
-                if (isRouteEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Corridor Radius: ${routeCorridorValue.toInt()} meters",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Slider(
-                        value = routeCorridorValue,
-                        onValueChange = { routeCorridorValue = it },
-                        valueRange = 30f..150f,
-                        steps = 11,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "Current Route Status: ${routeState.displayName}" +
-                            (distanceToRouteCorridor?.let { " (%.0f m from center-line)".format(it) } ?: ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = when (routeState) {
-                            com.example.model.RouteState.ON_ROUTE -> Color(0xFF10B981)
-                            com.example.model.RouteState.APPROACHING_EDGE -> Color(0xFFF59E0B)
-                            com.example.model.RouteState.ROUTE_DEVIATION -> Color(0xFFEF4444)
-                            com.example.model.RouteState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            val updatedRoute = trustedRoute.copy(
-                                isEnabled = isRouteEnabled,
-                                corridorRadiusMeters = routeCorridorValue
-                            )
-                            viewModel.saveTrustedRoute(updatedRoute)
-                            routeSavedMessage = "Trusted route corridor saved!"
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Save Route Corridor Settings")
-                    }
-
-                    routeSavedMessage?.let { msg ->
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF10B981),
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(top = 6.dp)
-                        )
-                    }
                 }
             }
         }
