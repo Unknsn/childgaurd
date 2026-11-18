@@ -372,6 +372,56 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
         emptyList()
     )
 
+    enum class DeviceHealthState {
+        CONNECTED,   // Beacon seen within last 30s
+        STALE,       // Beacon seen 30s to 5 minutes ago
+        OFFLINE      // No signal or > 5 minutes
+    }
+
+    data class ChildDeviceHealth(
+        val deviceId: String,
+        val state: DeviceHealthState,
+        val lastSeenMs: Long,
+        val ageLabel: String,
+        val rssi: Int,
+        val isProvisioned: Boolean,
+        val tamperStatus: String
+    )
+
+    fun getChildDeviceHealth(deviceId: String): ChildDeviceHealth {
+        val now = System.currentTimeMillis()
+        val node = discoveredSafetyNodes.value[deviceId]
+            ?: discoveredSafetyNodes.value.values.find { it.nodeId == deviceId || it.ephemeralId == deviceId }
+        val child = allPairedChildren.value.find { it.deviceId == deviceId }
+
+        val lastSeen = node?.lastSeenTimestamp ?: 0L
+        val ageMs = if (lastSeen > 0L) now - lastSeen else Long.MAX_VALUE
+
+        val healthState = when {
+            lastSeen == 0L -> DeviceHealthState.OFFLINE
+            ageMs < 30_000L -> DeviceHealthState.CONNECTED
+            ageMs < 300_000L -> DeviceHealthState.STALE
+            else -> DeviceHealthState.OFFLINE
+        }
+
+        val ageLabel = when {
+            lastSeen == 0L -> "No Signal"
+            ageMs < 60_000L -> "${ageMs / 1000}s ago"
+            ageMs < 3600_000L -> "${ageMs / 60_000L}m ago"
+            else -> "${ageMs / 3600_000L}h ago"
+        }
+
+        return ChildDeviceHealth(
+            deviceId = deviceId,
+            state = healthState,
+            lastSeenMs = lastSeen,
+            ageLabel = ageLabel,
+            rssi = node?.rssi ?: -100,
+            isProvisioned = child?.isProvisioned ?: false,
+            tamperStatus = child?.tamperStatus ?: "PROTECTED"
+        )
+    }
+
     fun updateChildBioProfileForDevice(deviceId: String, profile: ChildBioProfile) {
         AccessController.enforce(currentRole.value, Permission.MANAGE_CHILDREN, "Update child profile for device")
         viewModelScope.launch {

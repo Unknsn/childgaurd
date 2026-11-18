@@ -23,7 +23,7 @@ public:
     static const char* getStateName(TamperState state);
     static bool isTamperTriggered();
 
-    static bool authorizeMaintenance(uint32_t durationSeconds, const String& token);
+    static bool authorizeMaintenance(uint32_t durationSeconds, const String& token, uint32_t seq = 0);
     static void cancelMaintenance();
     static uint32_t getRemainingMaintenanceSeconds();
     static void clearTamper();
@@ -38,4 +38,5 @@ private:
     static uint8_t s_consecutiveFailures;
     static uint8_t s_consecutiveSuccesses;
     static uint32_t s_maintenanceExpiryMs;
+    static uint32_t s_lastMaintenanceSeq;
 };

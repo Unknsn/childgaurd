@@ -177,7 +177,8 @@ class BleSafetyManager(private val context: Context) {
                 val riskLevel: RiskLevel,
                 val timestamp: Long,
                 val lat: Double?,
-                val lon: Double?
+                val lon: Double?,
+                val alertType: String = "NORMAL"
             ) : DecodedPacket(deviceId)
 
             class BioCore(
@@ -268,12 +269,23 @@ class BleSafetyManager(private val context: Context) {
                             }
                         }
 
+                        val alertType = if (buffer.remaining() >= 1) {
+                            when (buffer.get().toInt() and 0xFF) {
+                                2, 4 -> "TAMPER"
+                                1, 3 -> "SOS"
+                                else -> if (riskLevel == RiskLevel.CRITICAL) "SOS" else "NORMAL"
+                            }
+                        } else {
+                            if (riskLevel == RiskLevel.CRITICAL) "SOS" else "NORMAL"
+                        }
+
                         DecodedPacket.Telemetry(
                             deviceId = deviceId,
                             riskLevel = riskLevel,
                             timestamp = timestamp,
                             lat = lat,
-                            lon = lon
+                            lon = lon,
+                            alertType = alertType
                         )
                     }
                 }

@@ -67,7 +67,7 @@ void SafeBandBleManager::buildManufacturerPayload(
     float lon,
     uint8_t alertType
 ) {
-    if (outSize < 24) return;
+    if (outSize < 25) return;
     memset(outBuffer, 0, outSize);
 
     // 1. Manufacturer Company ID: 0x5AFE (little-endian: 0xFE, 0x5A)
@@ -107,6 +107,9 @@ void SafeBandBleManager::buildManufacturerPayload(
     outBuffer[21] = lonBytes.b[2];
     outBuffer[22] = lonBytes.b[1];
     outBuffer[23] = lonBytes.b[0];
+
+    // 8. Alert Type byte (0x00 = NORMAL, 0x01/0x03 = SOS, 0x02/0x04 = TAMPER)
+    outBuffer[24] = alertType;
 }
 
 void SafeBandBleManager::init() {
@@ -224,6 +227,27 @@ void SafeBandBleManager::handleProvisionWrite(const String& value) {
     if (port <= 0) port = 8080;
     if (version <= 0) version = 1;
 
+    // SEC-01: Security verification for provisioning updates
+    if (NodeConfig::isProvisioned()) {
+        if (version <= NodeConfig::getConfigVersion()) {
+            Serial.printf("[BLE] ERR: Replay detected! Provisioning version %d <= current version %d\n",
+                version, NodeConfig::getConfigVersion());
+            if (s_pProvisionCharacteristic) {
+                s_pProvisionCharacteristic->setValue("ERR:VERSION_REPLAY_REJECTED");
+                s_pProvisionCharacteristic->notify();
+            }
+            return;
+        }
+        if (!NodeConfig::verifyAuthToken(authToken)) {
+            Serial.println("[BLE] ERR: Unauthorized provisioning overwrite! Auth token mismatch.");
+            if (s_pProvisionCharacteristic) {
+                s_pProvisionCharacteristic->setValue("ERR:UNAUTHORIZED");
+                s_pProvisionCharacteristic->notify();
+            }
+            return;
+        }
+    }
+
     bool saved = NodeConfig::saveProvisioning(
         childId, parentId, parentNodeIp, port, endpointId, authToken, version
     );
@@ -263,9 +287,21 @@ void SafeBandBleManager::handleMaintenanceWrite(const String& value) {
         }
 
         uint32_t durationSec = value.substring(firstColon, secondColon).toInt();
-        String token = value.substring(secondColon + 1);
+        String remainder = value.substring(secondColon + 1);
+        String token = remainder;
+        uint32_t seq = 0;
+        int thirdColon = remainder.indexOf(':');
+        if (thirdColon != -1) {
+            token = remainder.substring(0, thirdColon);
+            int fourthColon = remainder.indexOf(':', thirdColon + 1);
+            if (fourthColon != -1) {
+                seq = remainder.substring(thirdColon + 1, fourthColon).toInt();
+            } else {
+                seq = remainder.substring(thirdColon + 1).toInt();
+            }
+        }
 
-        bool ok = TamperMonitor::authorizeMaintenance(durationSec, token);
+        bool ok = TamperMonitor::authorizeMaintenance(durationSec, token, seq);
         if (ok) {
             String ack = "ACK:MAINT:OK:" + String(durationSec);
             if (s_pMaintenanceCharacteristic) {
@@ -309,10 +345,10 @@ void SafeBandBleManager::updateAdvertisement(NodeState state, uint32_t timestamp
     float lat = 0.0f; // No GPS hardware connected
     float lon = 0.0f; // No GPS hardware connected
 
-    uint8_t payloadBytes[24];
+    uint8_t payloadBytes[25];
     buildManufacturerPayload(payloadBytes, sizeof(payloadBytes), s_currentEphemeralId, risk, timeSeconds, lat, lon, alertType);
 
-    std::string mfString((char*)payloadBytes, 24);
+    std::string mfString((char*)payloadBytes, 25);
 
     // 1. Primary Advertising Packet: MUST stay <= 31 bytes!
     BLEAdvertisementData advData;

@@ -5,10 +5,12 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.device.BleProvisioningManager
 import com.example.core.device.BleTamperMaintenanceManager
+import com.example.core.security.SafeBandSecurityManager
 import com.example.data.local.PairedChild
 import com.example.data.local.RelayForwardingRecord
 import com.example.data.local.SafeBandDatabase
 import com.example.data.preferences.SafeBandPreferences
+import com.example.model.BleBeaconPayload
 import com.example.service.EmergencyRelayManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -54,6 +56,7 @@ class ParentChildRelayAndTamperTest {
 
     @Test
     fun testProvisioningPayloadSerializationAndDefaults() {
+        val fixedTimestamp = 1700000000L
         val payload = BleProvisioningManager.buildProvisioningPayload(
             childId = "CHLD-8812",
             parentId = "PRNT-5501",
@@ -61,10 +64,18 @@ class ParentChildRelayAndTamperTest {
             parentNodePort = 8080,
             endpointId = "PN-HUB-01",
             authToken = "AUTH-KEY-SECRET",
-            version = 2
+            version = 2,
+            timestampSeconds = fixedTimestamp
         )
 
-        assertEquals("PROV:CHLD-8812|PRNT-5501|192.168.1.150|8080|PN-HUB-01|AUTH-KEY-SECRET|2", payload)
+        val expectedHmac = SafeBandSecurityManager.computeHmac(
+            "CHLD-8812:PRNT-5501:192.168.1.150:8080:PN-HUB-01:2:$fixedTimestamp",
+            "AUTH-KEY-SECRET"
+        ).take(16)
+        assertEquals(
+            "PROV:CHLD-8812|PRNT-5501|192.168.1.150|8080|PN-HUB-01|AUTH-KEY-SECRET|2|$fixedTimestamp|$expectedHmac",
+            payload
+        )
 
         // Test default fallbacks
         val defaultPayload = BleProvisioningManager.buildProvisioningPayload(
@@ -74,9 +85,17 @@ class ParentChildRelayAndTamperTest {
             parentNodePort = 0,
             endpointId = "",
             authToken = "",
-            version = 1
+            version = 1,
+            timestampSeconds = fixedTimestamp
         )
-        assertEquals("PROV:CHLD-8812|PRNT-5501|127.0.0.1|8080|PN-DEFAULT|TOKEN-DEFAULT|1", defaultPayload)
+        val defaultHmac = SafeBandSecurityManager.computeHmac(
+            "CHLD-8812:PRNT-5501:127.0.0.1:8080:PN-DEFAULT:1:$fixedTimestamp",
+            "TOKEN-DEFAULT"
+        ).take(16)
+        assertEquals(
+            "PROV:CHLD-8812|PRNT-5501|127.0.0.1|8080|PN-DEFAULT|TOKEN-DEFAULT|1|$fixedTimestamp|$defaultHmac",
+            defaultPayload
+        )
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -153,17 +172,21 @@ class ParentChildRelayAndTamperTest {
 
     @Test
     fun testStrapMaintenanceCommandSerializationAndClamping() {
+        val seq = 1050L
+        val hmacStandard = SafeBandSecurityManager.computeHmac("300:$seq", "TOKEN-SEC-44").take(16)
         // Standard 5 minutes (300 seconds)
-        val cmd = BleTamperMaintenanceManager.buildMaintenanceCommand(300L, "TOKEN-SEC-44")
-        assertEquals("MAINT:AUTH:300:TOKEN-SEC-44", cmd)
+        val cmd = BleTamperMaintenanceManager.buildMaintenanceCommand(300L, "TOKEN-SEC-44", seq = seq)
+        assertEquals("MAINT:AUTH:300:TOKEN-SEC-44:$seq:$hmacStandard", cmd)
 
         // Below minimum duration (clamped to 10s)
-        val cmdMin = BleTamperMaintenanceManager.buildMaintenanceCommand(3L, "TOKEN")
-        assertEquals("MAINT:AUTH:10:TOKEN", cmdMin)
+        val hmacMin = SafeBandSecurityManager.computeHmac("10:$seq", "TOKEN").take(16)
+        val cmdMin = BleTamperMaintenanceManager.buildMaintenanceCommand(3L, "TOKEN", seq = seq)
+        assertEquals("MAINT:AUTH:10:TOKEN:$seq:$hmacMin", cmdMin)
 
         // Above maximum duration (clamped to 3600s / 1 hour)
-        val cmdMax = BleTamperMaintenanceManager.buildMaintenanceCommand(7200L, "TOKEN")
-        assertEquals("MAINT:AUTH:3600:TOKEN", cmdMax)
+        val hmacMax = SafeBandSecurityManager.computeHmac("3600:$seq", "TOKEN").take(16)
+        val cmdMax = BleTamperMaintenanceManager.buildMaintenanceCommand(7200L, "TOKEN", seq = seq)
+        assertEquals("MAINT:AUTH:3600:TOKEN:$seq:$hmacMax", cmdMax)
 
         // Cancel command
         assertEquals("MAINT:CANCEL", BleTamperMaintenanceManager.buildCancelCommand())
@@ -280,34 +303,170 @@ class ParentChildRelayAndTamperTest {
     @Test
     fun testEmergencyRelayManagerDeduplication() = runTest {
         val relayDao = database.relayForwardingDao()
-        preferences.setCommunityRelayEnabled(true)
+        preferences.setCommunityRelayEnabledDirect(true)
 
         val relayManager = EmergencyRelayManager(
             context = context,
             relayForwardingDao = relayDao,
             preferences = preferences,
-            coroutineScope = this
+            coroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+            autoDispatch = false
         )
 
-        // First broadcast ingested -> creates record and returns true
-        val firstHandled = relayManager.handleEmergencyBroadcast(
-            broadcastId = "EP-UNIQUE-99",
+        try {
+            // First broadcast ingested -> creates record and returns true
+            val firstHandled = relayManager.handleEmergencyBroadcast(
+                broadcastId = "EP-UNIQUE-99",
+                alertType = "SOS",
+                overrideLocation = Pair(28.6139, 77.2090)
+            )
+            assertTrue(firstHandled)
+
+            // Rapid duplicate broadcast within 60s -> suppressed, returns false
+            val secondHandled = relayManager.handleEmergencyBroadcast(
+                broadcastId = "EP-UNIQUE-99",
+                alertType = "SOS",
+                overrideLocation = Pair(28.6139, 77.2090)
+            )
+            assertFalse(secondHandled)
+
+            // Database should only have ONE record despite two calls
+            val records = relayDao.getAllRecords().first()
+            assertEquals(1, records.size)
+            assertEquals("EP-UNIQUE-99", records[0].deviceId)
+        } finally {
+            relayManager.unregisterNetworkCallback()
+        }
+    }
+
+    // =========================================================================
+    // Feature 4: v3.5.0 Security & Integrity Tests
+    // =========================================================================
+
+    @Test
+    fun testSafeBandSecurityManagerHmacAndEncryption() {
+        // 1. Test HMAC generation and verification
+        val payload = "CHLD-99:PRNT-01:192.168.1.50:8080:PN-01:1:1700000000"
+        val secretKey = "HIGHLY-CONFIDENTIAL-KEY"
+
+        val hmac = SafeBandSecurityManager.computeHmac(payload, secretKey)
+        assertNotNull(hmac)
+        assertEquals(64, hmac.length) // SHA-256 hex string is 64 chars
+
+        // Constant-time verification passes for valid MAC
+        assertTrue(SafeBandSecurityManager.verifyHmac(payload, secretKey, hmac))
+
+        // Fails if payload was tampered
+        assertFalse(SafeBandSecurityManager.verifyHmac(payload + "tamper", secretKey, hmac))
+
+        // Fails if wrong key is used
+        assertFalse(SafeBandSecurityManager.verifyHmac(payload, "WRONG-KEY", hmac))
+
+        // 2. Test Keystore AES-256-GCM encryption round-trip
+        val plaintextToken = "PARENT-NODE-SECRET-TOKEN-12345"
+        val ciphertext = SafeBandSecurityManager.encrypt(plaintextToken)
+        assertNotNull(ciphertext)
+        assertFalse(ciphertext.contains(plaintextToken))
+
+        val decrypted = SafeBandSecurityManager.decrypt(ciphertext)
+        assertEquals(plaintextToken, decrypted)
+    }
+
+    @Test
+    fun testRelayPayloadHonestNullLocationHandling() {
+        val json = EmergencyRelayManager.createRelayPayloadJson(
+            broadcastId = "EP-NULL-GPS",
             alertType = "SOS",
-            overrideLocation = Pair(28.6139, 77.2090)
+            lat = null,
+            lon = null,
+            accuracy = null,
+            detectedAt = 1700000000000L
         )
-        assertTrue(firstHandled)
 
-        // Rapid duplicate broadcast within 60s -> suppressed, returns false
-        val secondHandled = relayManager.handleEmergencyBroadcast(
-            broadcastId = "EP-UNIQUE-99",
-            alertType = "SOS",
-            overrideLocation = Pair(28.6139, 77.2090)
+        // Must encode honest null values when GPS fix is unavailable
+        assertTrue(json.contains("\"broadcastId\":\"EP-NULL-GPS\""))
+        assertTrue(json.contains("\"alertType\":\"SOS\""))
+        assertTrue(json.contains("\"relayLatitude\":null"))
+        assertTrue(json.contains("\"relayLongitude\":null"))
+        assertTrue(json.contains("\"accuracy\":null"))
+
+        // Strict verification: ZERO fake hardcoded GPS coordinates
+        assertFalse(json.contains("37.7749"))
+        assertFalse(json.contains("-122.4194"))
+    }
+
+    @Test
+    fun testDrainForwardingQueueExpiredIncidentHandling() = runTest {
+        val relayDao = database.relayForwardingDao()
+        preferences.setCommunityRelayEnabledDirect(true)
+
+        val relayManager = EmergencyRelayManager(
+            context = context,
+            relayForwardingDao = relayDao,
+            preferences = preferences,
+            coroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+            autoDispatch = false
         )
-        assertFalse(secondHandled)
 
-        // Database should only have ONE record despite two calls
-        val records = relayDao.getAllRecords().first()
-        assertEquals(1, records.size)
-        assertEquals("EP-UNIQUE-99", records[0].deviceId)
+        try {
+            // Insert record older than 24 hours (86,400,000 ms)
+            val now = System.currentTimeMillis()
+            val expiredRecord = RelayForwardingRecord(
+                incidentId = "INC-EXPIRED-99",
+                deviceId = "EP-EXP-01",
+                eventType = "TAMPER",
+                relayLatitude = null,
+                relayLongitude = null,
+                relayAccuracy = null,
+                targetEndpoint = "http://127.0.0.1:8080/api/relay/alert",
+                forwardStatus = "QUEUED",
+                detectionTimestamp = now - (25 * 3600 * 1000L) // 25 hours ago
+            )
+            relayDao.insertRecord(expiredRecord)
+
+            // Verify queued before draining
+            assertEquals(1, relayDao.getQueuedRecords().size)
+
+            // Run queue drain worker
+            relayManager.drainForwardingQueue()
+
+            // Expired record must be evicted from QUEUED pool
+            val queuedAfter = relayDao.getQueuedRecords()
+            assertEquals(0, queuedAfter.size)
+
+            // Record status in DB must now be EXPIRED
+            val recordInDb = relayDao.findByIncidentId("INC-EXPIRED-99")
+            assertNotNull(recordInDb)
+            assertEquals("EXPIRED", recordInDb?.forwardStatus)
+        } finally {
+            relayManager.unregisterNetworkCallback()
+        }
+    }
+
+    @Test
+    fun testBleBeaconPayloadAlertTypeField() {
+        val normalPayload = BleBeaconPayload(
+            deviceId = "EP-DEV1",
+            riskLevel = com.example.model.RiskLevel.LOW,
+            timestamp = 1700000000L,
+            alertType = "NORMAL"
+        )
+        assertEquals("NORMAL", normalPayload.alertType)
+
+        val tamperPayload = BleBeaconPayload(
+            deviceId = "EP-DEV2",
+            riskLevel = com.example.model.RiskLevel.CRITICAL,
+            timestamp = 1700000000L,
+            alertType = "TAMPER"
+        )
+        assertEquals("TAMPER", tamperPayload.alertType)
+
+        val sosPayload = BleBeaconPayload(
+            deviceId = "EP-DEV3",
+            riskLevel = com.example.model.RiskLevel.HIGH,
+            timestamp = 1700000000L,
+            alertType = "SOS"
+        )
+        assertEquals("SOS", sosPayload.alertType)
     }
 }

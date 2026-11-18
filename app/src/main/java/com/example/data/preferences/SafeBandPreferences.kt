@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.core.security.SafeBandSecurityManager
 import com.example.model.AppMode
 import com.example.model.SafeZone
 import kotlinx.coroutines.CoroutineScope
@@ -118,7 +119,8 @@ class SafeBandPreferences(private val context: Context) {
     }
 
     val parentNodeAuthToken: Flow<String> = context.dataStore.data.map { preferences ->
-        val token = preferences[KEY_PARENT_NODE_AUTH_TOKEN] ?: "SB-TOKEN-SECURE"
+        val raw = preferences[KEY_PARENT_NODE_AUTH_TOKEN] ?: "SB-TOKEN-SECURE"
+        val token = SafeBandSecurityManager.decrypt(raw).ifEmpty { raw }
         cachedParentNodeAuthToken = token
         token
     }
@@ -138,12 +140,13 @@ class SafeBandPreferences(private val context: Context) {
         cachedParentNodePort = port
         cachedParentNodeEndpointId = endpointId.trim()
         cachedParentNodeAuthToken = token.trim()
+        val encryptedToken = SafeBandSecurityManager.encrypt(token.trim())
         try {
             context.dataStore.edit { preferences ->
                 preferences[KEY_PARENT_NODE_IP] = ip.trim()
                 preferences[KEY_PARENT_NODE_PORT] = port
                 preferences[KEY_PARENT_NODE_ENDPOINT_ID] = endpointId.trim()
-                preferences[KEY_PARENT_NODE_AUTH_TOKEN] = token.trim()
+                preferences[KEY_PARENT_NODE_AUTH_TOKEN] = encryptedToken
             }
         } catch (_: Exception) {}
     }

@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.example.core.security.SafeBandSecurityManager
 import com.example.data.local.PairedChildDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +55,8 @@ class BleProvisioningManager(
             parentNodePort: Int,
             endpointId: String,
             authToken: String,
-            version: Int = 1
+            version: Int = 1,
+            timestampSeconds: Long = System.currentTimeMillis() / 1000L
         ): String {
             require(childId.isNotBlank()) { "Child ID cannot be blank" }
             require(parentId.isNotBlank()) { "Parent ID cannot be blank" }
@@ -62,7 +64,11 @@ class BleProvisioningManager(
             val cleanPort = if (parentNodePort in 1..65535) parentNodePort else 8080
             val cleanEndpointId = endpointId.trim().ifEmpty { "PN-DEFAULT" }
             val cleanToken = authToken.trim().ifEmpty { "TOKEN-DEFAULT" }
-            return "PROV:$childId|$parentId|$cleanIp|$cleanPort|$cleanEndpointId|$cleanToken|$version"
+            val hmac = SafeBandSecurityManager.computeHmac(
+                "$childId:$parentId:$cleanIp:$cleanPort:$cleanEndpointId:$version:$timestampSeconds",
+                cleanToken
+            ).take(16)
+            return "PROV:$childId|$parentId|$cleanIp|$cleanPort|$cleanEndpointId|$cleanToken|$version|$timestampSeconds|$hmac"
         }
 
         fun parseAckResponse(response: String): Boolean {

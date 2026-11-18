@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.example.core.security.SafeBandSecurityManager
 import com.example.data.local.PairedChildDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,10 +47,20 @@ class BleTamperMaintenanceManager(
         val MAINTENANCE_CHAR_UUID: UUID = UUID.fromString("00005afe-0003-1000-8000-00805f9b34fb")
         val TAMPER_CHAR_UUID: UUID = UUID.fromString("00005afe-0004-1000-8000-00805f9b34fb")
 
-        fun buildMaintenanceCommand(durationSeconds: Long, authToken: String): String {
+        @Volatile
+        private var sequenceCounter: Long = 1000L
+
+        fun getNextSequence(): Long = synchronized(this) { ++sequenceCounter }
+
+        fun buildMaintenanceCommand(
+            durationSeconds: Long,
+            authToken: String,
+            seq: Long = getNextSequence()
+        ): String {
             val cleanDuration = durationSeconds.coerceIn(10L, 3600L)
             val cleanToken = authToken.trim().ifEmpty { "DEFAULT" }
-            return "MAINT:AUTH:$cleanDuration:$cleanToken"
+            val hmac = SafeBandSecurityManager.computeHmac("$cleanDuration:$seq", cleanToken).take(16)
+            return "MAINT:AUTH:$cleanDuration:$cleanToken:$seq:$hmac"
         }
 
         fun buildCancelCommand(): String = "MAINT:CANCEL"

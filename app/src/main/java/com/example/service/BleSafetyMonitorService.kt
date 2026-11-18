@@ -650,7 +650,8 @@ class BleSafetyMonitorService : Service() {
                     ephemeralId = if (decoded.deviceId.startsWith("EP-")) decoded.deviceId else "",
                     isSimulation = false,
                     childBioProfile = cachedBio,
-                    emergencyContacts = cachedContacts
+                    emergencyContacts = cachedContacts,
+                    alertType = decoded.alertType
                 )
                 processBeacon(payload, result.rssi)
             }
@@ -798,7 +799,8 @@ class BleSafetyMonitorService : Service() {
 
                     // Feature 2: Community-Assisted Relay Propagation (Privacy-Preserving)
                     if (payload.riskLevel == RiskLevel.CRITICAL) {
-                        val alertType = if (payload.deviceId.contains("TAMPER", ignoreCase = true) ||
+                        val alertType = if (payload.alertType.contains("TAMPER", ignoreCase = true) ||
+                            payload.deviceId.contains("TAMPER", ignoreCase = true) ||
                             payload.ephemeralId.contains("TAMPER", ignoreCase = true)) "TAMPER" else "SOS"
                         val locPair = if (payload.latitude != null && payload.longitude != null &&
                             (payload.latitude != 0.0 || payload.longitude != 0.0)) {

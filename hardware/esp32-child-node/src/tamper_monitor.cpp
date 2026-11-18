@@ -7,6 +7,7 @@ uint32_t TamperMonitor::s_lastCheckMs = 0;
 uint8_t TamperMonitor::s_consecutiveFailures = 0;
 uint8_t TamperMonitor::s_consecutiveSuccesses = 0;
 uint32_t TamperMonitor::s_maintenanceExpiryMs = 0;
+uint32_t TamperMonitor::s_lastMaintenanceSeq = 0;
 
 void TamperMonitor::init(TamperStateCallback callback) {
     s_callback = callback;
@@ -201,10 +202,19 @@ const char* TamperMonitor::getStateName(TamperState state) {
     }
 }
 
-bool TamperMonitor::authorizeMaintenance(uint32_t durationSeconds, const String& token) {
+bool TamperMonitor::authorizeMaintenance(uint32_t durationSeconds, const String& token, uint32_t seq) {
     if (!NodeConfig::verifyAuthToken(token)) {
         Serial.println("[TAMPER] ERR: Unauthorized maintenance attempt! Invalid token.");
         return false;
+    }
+
+    if (seq > 0) {
+        if (seq <= s_lastMaintenanceSeq) {
+            Serial.printf("[TAMPER] ERR: Replay attack detected! Maintenance seq %u <= last seq %u\n",
+                seq, s_lastMaintenanceSeq);
+            return false;
+        }
+        s_lastMaintenanceSeq = seq;
     }
 
     if (durationSeconds < 10) durationSeconds = DEFAULT_MAINTENANCE_SEC;
@@ -213,7 +223,7 @@ bool TamperMonitor::authorizeMaintenance(uint32_t durationSeconds, const String&
     s_maintenanceExpiryMs = millis() + (durationSeconds * 1000UL);
     NodeConfig::setTamperAuthorizedUntil(s_maintenanceExpiryMs);
 
-    Serial.printf("[TAMPER] Guardian authorized maintenance granted for %u seconds.\n", durationSeconds);
+    Serial.printf("[TAMPER] Guardian authorized maintenance granted for %u seconds (Seq: %u).\n", durationSeconds, seq);
     transitionState(TAMPER_AUTHORIZED_DISCONNECTION);
     return true;
 }

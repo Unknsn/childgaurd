@@ -680,6 +680,27 @@ fun ParentMonitorTab(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    val health = viewModel.getChildDeviceHealth(child.deviceId)
+                                    val (healthDot, healthColor) = when (health.state) {
+                                        SafeBandViewModel.DeviceHealthState.CONNECTED -> Pair("●", Color(0xFF10B981))
+                                        SafeBandViewModel.DeviceHealthState.STALE -> Pair("●", Color(0xFFF59E0B))
+                                        SafeBandViewModel.DeviceHealthState.OFFLINE -> Pair("○", Color(0xFF9CA3AF))
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = healthColor.copy(alpha = 0.2f),
+                                        border = BorderStroke(0.5.dp, healthColor)
+                                    ) {
+                                        Text(
+                                            text = "$healthDot ${health.state.name} (${health.ageLabel})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = PhosphorWhite,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+
                                     val isProv = child.isProvisioned
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),

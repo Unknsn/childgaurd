@@ -1,3 +1,61 @@
+# SafeBand Guardian v3.5.0 Release Notes
+
+**Release Version:** v3.5.0  
+**Package:** `com.aistudio.safeband.xqmt`  
+**Target Platform:** Android 7.0 (API 24) through Android 15 (API 36)  
+**Hardware Node:** ESP32-S3 BLE Wearable Node  
+**Release Date:** November 2026  
+**Git Tag:** `v3.5.0`  
+
+---
+
+## 🚀 What's New & Hardened in v3.5.0
+
+### 🔐 1. Security & Cryptographic Hardening
+- **Android Keystore Credential Encryption:** Introduced `SafeBandSecurityManager.kt` providing hardware-backed AES-256-GCM encryption with 12-byte random IVs and 128-bit authentication tags. Parent node auth tokens are automatically encrypted before storing to `DataStore` at rest.
+- **Cryptographically Authenticated GATT Provisioning:** Provisioning payload includes timestamp, monotonic version, and HMAC-SHA256 signature calculated over all fields (`PROV:...|version|timestamp|hmac`). Wearables reject replayed packets and stale versions.
+- **Authenticated & Replay-Protected Strap Maintenance:** Maintenance authorizations use strictly monotonic sequence numbers and HMAC-SHA256 signatures (`MAINT:AUTH:dur:token:seq:hmac`). Wearables reject commands with sequence $\le s\_lastMaintenanceSeq$.
+- **Fail-Secure Boot Policy:** ESP32-S3 clears any active maintenance duration (`s_tamperAuthorizedUntil = 0`) on boot/reboot, preventing attackers from using power-cycles to bypass strap continuity alarms.
+- **Zero-PII Community Relay Mesh:** Public relay payloads and BLE advertisements contain strictly zero child PII (no names, medical records, or parent phone numbers). Public tracking is limited to ephemeral IDs.
+
+### 🌐 2. Community Emergency Relay Reliability
+- **Honest Location Telemetry:** Eliminated all hardcoded fake GPS coordinates (`37.7749, -122.4194`). When GPS fixes or location permissions are absent, the relay transmits honest `null` coordinates, protecting search-and-rescue integrity.
+- **Background Store-and-Forward Queue Draining:** Added `drainForwardingQueue()` with exponential backoff ($10s \times 2^{\text{attempts}}$ capped at 5m) and a 24-hour expiration policy (`INCIDENT_EXPIRY_MS = 86400000L`).
+- **Network State Restoration Callback:** Automatically triggers queue draining via `ConnectivityManager.NetworkCallback` when internet connectivity is re-established.
+- **Intelligent Location Enrichment:** Late-arriving GPS fixes enrich existing pending forwarding records without creating duplicate incidents.
+
+### ⚡ 3. End-to-End Alert Type & Health Integration
+- **BLE Advertisement Byte 24 Encoding:** Telemetry packets encode alert types directly in byte 24 of the manufacturer payload (`0x00` NORMAL, `0x01/0x03` SOS, `0x02/0x04` TAMPER), decoded by `BleSafetyManager` and routed to emergency responders.
+- **Tri-State Dynamic Device Health Model:** Parent dashboard child cards display real-time connection status (`CONNECTED` < 30s, `STALE` 30s-5m, `OFFLINE` > 5m) with formatted elapsed age ("2s ago", "1m ago").
+
+### 📋 4. Documentation & Validation Deliverables
+- `V3_5_0_TECHNICAL_AUDIT.md`: Baseline technical audit of v3.4.0.
+- `V3_5_0_IMPLEMENTATION_TRACKER.md`: Granular work tracking across all phases.
+- `FAILURE_RECOVERY_MATRIX.md`: Comprehensive recovery matrix across Wearable, Android, and Communication layers.
+- `HARDWARE_VALIDATION_V3_5_0.md`: Complete physical hardware testing procedure with wiring, serial logs, and acceptance criteria.
+- `SECURITY_REVIEW_V3_5_0.md`: Threat model, cryptographic audit, and privacy verification.
+
+---
+
+## 📦 Verified Build Artifacts
+
+| Component | Path | Size | SHA-256 Checksum |
+| :--- | :--- | :--- | :--- |
+| **Android Release APK** | `app/build/outputs/apk/release/app-release.apk` | **14.1 MB** | `9B4950C3E7F227BE8912126D8D5E862B3914AFD08BC6D0E0565E38D0E21FA531` |
+| **Android Debug APK** | `app/build/outputs/apk/debug/app-debug.apk` | **21.5 MB** | `05CD209B19BF78BF89F42C1EE26749C3A6AD693FAD9A271A4E5C24407EDEE726` |
+| **ESP32-S3 Firmware** | `hardware/esp32-child-node/.pio/build/esp32-s3-devkitc-1/firmware.bin` | **922 KB** | `9BBF7B8C247EDFE0BCFA78DE247678BDAFA61579D54A9E9E4915D56348076D0E` |
+
+---
+
+## 🧪 Automated Verification Summary
+
+- **Unit Tests:** 129 of 129 passed (`./gradlew testDebugUnitTest` - 100% success rate in 27.8s)
+- **Android Lint:** 0 errors, clean analysis (`./gradlew lintDebug` passed in 1m 40s)
+- **ESP32-S3 Build:** PlatformIO build completed successfully (`pio run -d hardware/esp32-child-node`)
+- **Git Release Tag:** `v3.5.0`
+
+---
+
 # SafeBand Guardian v3.4.0 Release Notes
 
 **Release Version:** v3.4.0  

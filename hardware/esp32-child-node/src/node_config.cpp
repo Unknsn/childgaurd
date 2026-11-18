@@ -22,7 +22,10 @@ void NodeConfig::init() {
         s_parentNodeEndpointId = s_prefs.getString("pn_ep_id", "");
         s_authToken = s_prefs.getString("auth_token", "");
         s_configVersion = s_prefs.getInt("config_ver", 0);
-        s_tamperAuthorizedUntil = s_prefs.getUInt("t_auth_until", 0);
+        // Fail-secure: On reboot, reset maintenance authorization window.
+        // Device must return to active PROTECTED state.
+        s_tamperAuthorizedUntil = 0;
+        s_prefs.putUInt("t_auth_until", 0);
         s_prefs.end();
 
         Serial.printf("[NVS] Config loaded: Provisioned=%s, ChildID=%s, Version=%d, ParentNode=%s:%d\n",

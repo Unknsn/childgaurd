@@ -343,7 +343,8 @@ data class BleBeaconPayload(
     val trustRole: TrustRole = TrustRole.ANONYMOUS_RELAY,
     val hopCount: Int = 0,
     val rssi: Int = 0,
-    val distanceMeters: Double? = null
+    val distanceMeters: Double? = null,
+    val alertType: String = "NORMAL"
 )
 
 data class ChildBioProfile(
