@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +57,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -131,6 +133,7 @@ fun ChildHomeScreen(
     var isDemoControlsExpanded by remember { mutableStateOf(false) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var holdState by remember { mutableStateOf(SosHoldState.IDLE) }
+    var showCancelSosDialog by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
     val context = LocalContext.current
 
@@ -456,9 +459,7 @@ fun ChildHomeScreen(
                                     detectTapGestures(
                                         onTap = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.cancelManualSos()
-                                            holdState = SosHoldState.IDLE
-                                            holdProgress = 0f
+                                            showCancelSosDialog = true
                                         }
                                     )
                                 } else {
@@ -526,7 +527,7 @@ fun ChildHomeScreen(
                 Spacer(modifier = Modifier.height(SafeBandSpacing.md))
 
                 Text(
-                    text = if (isSosActive) "Tap SOS button to cancel alarm" else "Press and hold for 2 seconds to alert parents",
+                    text = if (isSosActive) "Emergency broadcast active. Tap button to request cancellation." else "Press and hold for 2 seconds to alert parents",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -559,12 +560,58 @@ fun ChildHomeScreen(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
                     onClick = {
                         if (isSosActive) {
-                            viewModel.cancelManualSos()
+                            showCancelSosDialog = true
                         } else {
                             viewModel.triggerManualSos()
                         }
                     },
                     modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (showCancelSosDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCancelSosDialog = false },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = SafeBandColor.Emergency
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Cancel Emergency Alert?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Are you sure you want to cancel the emergency alert? Parents, emergency contacts, and community relays will be notified that this alert has ended.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showCancelSosDialog = false
+                                viewModel.cancelManualSos()
+                                holdState = SosHoldState.IDLE
+                                holdProgress = 0f
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SafeBandColor.Emergency)
+                        ) {
+                            Text("Yes, Cancel Alert", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(
+                            onClick = { showCancelSosDialog = false }
+                        ) {
+                            Text("Keep Alert Active")
+                        }
+                    }
                 )
             }
 

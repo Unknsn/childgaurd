@@ -1,3 +1,56 @@
+# SafeBand Guardian v3.6.1 Release Notes
+
+**Release Version:** v3.6.1 (Stabilization & Quality Hardening Patch)  
+**Package:** `com.aistudio.safeband.xqmt`  
+**Target Platform:** Android 7.0 (API 24) through Android 15 (API 36)  
+**Hardware Node:** ESP32-S3 BLE Wearable Node  
+**Release Date:** November 2026  
+**Git Tag:** `v3.6.1`  
+
+---
+
+## 🛠️ What's New & Stabilized in v3.6.1: Safety Hardening & Visual QA Evidence
+
+### 🚨 1. Safety-Critical Fix: Accidental SOS Cancellation Protection
+- **Root Cause Remediation:** In v3.6.0, an active SOS emergency broadcast could be cancelled by an inadvertent single tap on the 150dp central panic button or the "Cancel Siren" secondary button on `ChildHomeScreen.kt`. This violated child safety ergonomics during panics, struggles, or pocket friction.
+- **Remediation:** Added `showCancelSosDialog` with a mandatory confirmation modal dialog (`AlertDialog`). Tapping the button now presents a clear dialog:
+  - *"Cancel Emergency Alert? Are you sure you want to cancel the emergency alert? Parents, emergency contacts, and community relays will be notified that this alert has ended."*
+  - **"Keep Alert Active"**: Safe primary action dismissing the dialog while maintaining active beacon transmission.
+  - **"Yes, Cancel Alert"**: Deliberate action confirming resolution and cancelling alarms.
+- **Verification:** Unit tested in `ScreensVisualScreenshotTest.test_sos_cancellation_requires_confirmation_dialog` with 100% pass.
+
+### 📸 2. Automated Visual Regression Suite & Real PNG Screenshot Artifacts
+- **Roborazzi Native Graphics Integration:** Implemented automated screenshot test suite (`ScreensVisualScreenshotTest.kt`) using `@GraphicsMode(GraphicsMode.Mode.NATIVE)` on Google Pixel 8 form factor (`RobolectricDeviceQualifiers.Pixel8`, Android SDK 36).
+- **14 High-Resolution Screenshots Captured:** Generated 14 real PNG screenshots into `app/src/test/screenshots/` (1.8 MB total):
+  1. `01_mode_selection_screen.png`
+  2. `02_first_launch_screen.png`
+  3. `03_child_home_normal.png`
+  4. `04_parent_home_dashboard.png`
+  5. `05_child_provisioning_screen.png`
+  6. `06_settings_screen.png`
+  7. `07_child_settings_screen.png`
+  8. `08_alert_history_screen.png`
+  9. `09_trusted_contacts_screen.png`
+  10. `10_safe_zone_config_screen.png`
+  11. `11_emergency_alert_sheet.png`
+  12. `12_relay_emergency_alert_sheet.png`
+  13. `13_permission_rationale_dialog.png`
+  14. `14_child_home_emergency.png`
+- Every screenshot artifact is cataloged and hashed in `UI_VISUAL_QA_EVIDENCE_V3_6_0.md`.
+
+### 🧪 3. Expanded Test Suite: 144 / 144 Tests Passed
+- Test coverage expanded from 129 tests in v3.6.0 to **144 tests in v3.6.1** (15 new automated visual and UI interaction tests).
+- 100% pass rate across all 22 test suites (`./gradlew testDebugUnitTest`).
+
+### 🔒 4. Security & Privacy Audit Verification
+- Formally audited Android Keystore AES-256-GCM authenticated encryption (`SafeBandSecurityManager.kt`), 15-minute ephemeral ID rotation, Zero-PII BLE advertisement contract (`0x5AFE`), bystander relay isolation, and MAC address Logcat scrubbing. Documented in `SECURITY_PRIVACY_AUDIT_V3_6_0.md`.
+
+### ⚙️ 5. ESP32-S3 Firmware Byte-Level Compatibility Audit
+- Verified byte-level synchronization between ESP32-S3 firmware (`safeband_ble.cpp`) and Android BLE parser (`BleSafetyManager.kt`).
+- GPIO 3 (TX) and GPIO 4 (RX) dynamic 2-phase continuity tamper detection verified. Firmware compiled cleanly with PlatformIO (944 KB binary). Documented in `FIRMWARE_COMPATIBILITY_AUDIT_V3_6_0.md`.
+
+---
+
 # SafeBand Guardian v3.6.0 Release Notes
 
 **Release Version:** v3.6.0  
