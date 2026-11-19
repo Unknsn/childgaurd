@@ -187,7 +187,37 @@ void SafeBandBleManager::init() {
 }
 
 void SafeBandBleManager::handleProvisionWrite(const String& value) {
-    // Format: PROV:childId|parentId|parentNodeIp|parentNodePort|endpointId|authToken|version
+    // 1. Direct Child Profile Write: CHILD:name|age|bloodGroup|emergencyPhone
+    if (value.startsWith("CHILD:")) {
+        String payload = value.substring(6);
+        int t[3];
+        int tc = 0;
+        for (int i = 0; i < payload.length() && tc < 3; i++) {
+            if (payload[i] == '|') t[tc++] = i;
+        }
+        if (tc >= 3) {
+            String chName = payload.substring(0, t[0]);
+            int32_t chAge = payload.substring(t[0] + 1, t[1]).toInt();
+            String chBlood = payload.substring(t[1] + 1, t[2]);
+            String chPhone = payload.substring(t[2] + 1);
+            bool ok = NodeConfig::saveChildDetails(chName, chAge, chBlood, chPhone);
+            if (ok && s_pProvisionCharacteristic) {
+                s_pProvisionCharacteristic->setValue("ACK:CHILD:OK");
+                s_pProvisionCharacteristic->notify();
+            }
+            Serial.printf("[BLE] Child details updated via BLE: %s, %d, %s, %s\n",
+                chName.c_str(), chAge, chBlood.c_str(), chPhone.c_str());
+            return;
+        } else {
+            if (s_pProvisionCharacteristic) {
+                s_pProvisionCharacteristic->setValue("ERR:INVALID_CHILD_FIELDS");
+                s_pProvisionCharacteristic->notify();
+            }
+            return;
+        }
+    }
+
+    // 2. Full Provisioning Write: PROV:childId|parentId|parentNodeIp|parentNodePort|endpointId|authToken|version[|name|age|blood|phone]
     if (!value.startsWith("PROV:")) {
         if (s_pProvisionCharacteristic) {
             s_pProvisionCharacteristic->setValue("ERR:INVALID_PREFIX");
@@ -197,11 +227,10 @@ void SafeBandBleManager::handleProvisionWrite(const String& value) {
     }
 
     String payload = value.substring(5);
-    int tokens[7];
+    int tokens[11];
     int tokenCount = 0;
-    int lastPos = 0;
 
-    for (int i = 0; i < payload.length() && tokenCount < 6; i++) {
+    for (int i = 0; i < payload.length() && tokenCount < 10; i++) {
         if (payload[i] == '|') {
             tokens[tokenCount++] = i;
         }
@@ -222,7 +251,14 @@ void SafeBandBleManager::handleProvisionWrite(const String& value) {
     int32_t port = payload.substring(tokens[2] + 1, tokens[3]).toInt();
     String endpointId = payload.substring(tokens[3] + 1, tokens[4]);
     String authToken = payload.substring(tokens[4] + 1, tokens[5]);
-    int32_t version = payload.substring(tokens[5] + 1).toInt();
+    
+    // Version field might be followed by more tokens or be the end
+    int32_t version = 1;
+    if (tokenCount > 6) {
+        version = payload.substring(tokens[5] + 1, tokens[6]).toInt();
+    } else {
+        version = payload.substring(tokens[5] + 1).toInt();
+    }
 
     if (port <= 0) port = 8080;
     if (version <= 0) version = 1;
@@ -253,6 +289,15 @@ void SafeBandBleManager::handleProvisionWrite(const String& value) {
     );
 
     if (saved) {
+        // Optional child profile fields in PROV: payload
+        if (tokenCount >= 10) {
+            String chName = payload.substring(tokens[6] + 1, tokens[7]);
+            int32_t chAge = payload.substring(tokens[7] + 1, tokens[8]).toInt();
+            String chBlood = payload.substring(tokens[8] + 1, tokens[9]);
+            String chPhone = payload.substring(tokens[9] + 1);
+            NodeConfig::saveChildDetails(chName, chAge, chBlood, chPhone);
+        }
+
         // Update local child profile
         ChildProfile prof = SafeBandNodeIdentity::getLocalProfile();
         strncpy(prof.childId, childId.c_str(), sizeof(prof.childId) - 1);

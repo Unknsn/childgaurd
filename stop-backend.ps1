@@ -1,4 +1,4 @@
-# SafeBand Guardian v4.0.0 - Stop Backend Script (PowerShell)
+# SafeBand Guardian v4.0.1 - Stop Backend Script (PowerShell)
 Set-Location $PSScriptRoot
 
 Write-Host "============================================================" -ForegroundColor Cyan

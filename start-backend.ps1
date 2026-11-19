@@ -1,4 +1,4 @@
-# SafeBand Guardian v4.0.0 - Unified Backend Startup Script (PowerShell)
+# SafeBand Guardian v4.0.1 - Unified Backend Startup Script (PowerShell)
 [CmdletBinding()]
 param(
     [switch]$NoTunnel,
@@ -8,7 +8,7 @@ param(
 Set-Location $PSScriptRoot
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host " SafeBand Guardian v4.0.0 - Laptop Backend Starter" -ForegroundColor Cyan
+Write-Host " SafeBand Guardian v4.0.1 - Laptop Backend Starter" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Ensure tools and data directories exist
@@ -102,11 +102,15 @@ try {
 }
 
 # 5. Build executable bootJar if not present
-$jarPath = "$PSScriptRoot\backend\build\libs\backend-4.0.0.jar"
+$jarPath = "$PSScriptRoot\backend\build\libs\backend-4.0.1.jar"
 if (-not (Test-Path $jarPath)) {
-    Write-Host "[BUILD] Backend executable JAR not found. Packaging via Gradle..." -ForegroundColor Cyan
-    & "$PSScriptRoot\gradlew.bat" :backend:bootJar --no-daemon -q
-    if (-not (Test-Path $jarPath)) {
+    # Check for any valid backend jar
+    $candidates = Get-ChildItem "$PSScriptRoot\backend\build\libs\*.jar" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*plain*" }
+    if ($candidates) {
+        $jarPath = $candidates[0].FullName
+    } else {
+        Write-Host "[BUILD] Backend executable JAR not found. Packaging via Gradle..." -ForegroundColor Cyan
+        & "$PSScriptRoot\gradlew.bat" :backend:bootJar --no-daemon -q
         $candidates = Get-ChildItem "$PSScriptRoot\backend\build\libs\*.jar" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*plain*" }
         if ($candidates) {
             $jarPath = $candidates[0].FullName
@@ -134,7 +138,7 @@ if (Test-Path $backendLog) { Clear-Content $backendLog -ErrorAction SilentlyCont
 if (Test-Path $backendErr) { Clear-Content $backendErr -ErrorAction SilentlyContinue }
 
 # Launch using Win32_Process to decouple completely from the parent console / PowerShell session
-$backendCmd = "cmd.exe /c java -Dfile.encoding=UTF-8 -jar backend\build\libs\backend-4.0.0.jar > tools\backend.log 2> tools\backend_err.log"
+$backendCmd = "cmd.exe /c java -Dfile.encoding=UTF-8 -jar `"$jarPath`" > tools\backend.log 2> tools\backend_err.log"
 $createResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
     CommandLine = $backendCmd
     CurrentDirectory = $PSScriptRoot
@@ -142,17 +146,17 @@ $createResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Ar
 
 if ($createResult.ReturnValue -ne 0) {
     # Fallback to Start-Process if CIM is restricted
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "java -Dfile.encoding=UTF-8 -jar backend\build\libs\backend-4.0.0.jar > tools\backend.log 2> tools\backend_err.log" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "java -Dfile.encoding=UTF-8 -jar `"$jarPath`" > tools\backend.log 2> tools\backend_err.log" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 }
 
 Write-Host "[OK] Backend daemon spawned. Awaiting healthy response..." -ForegroundColor Green
 
 # 7. Health Check Polling
 $healthy = $false
-for ($i = 0; $i -lt 35; $i++) {
+for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 1
     try {
-        $resp = Invoke-RestMethod -Uri "http://localhost:$port/api/v1/health" -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
+        $resp = Invoke-RestMethod -Uri "http://localhost:$port/api/v1/health" -Method Get -TimeoutSec 3 -ErrorAction SilentlyContinue
         if ($resp -and $resp.status -eq "UP") {
             $healthy = $true
             break
@@ -237,7 +241,7 @@ $publicUrl | Out-File "$PSScriptRoot\.public-url" -Encoding ascii
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
-Write-Host " SafeBand Guardian Backend v4.0.0 is LIVE & READY!" -ForegroundColor Green
+Write-Host " SafeBand Guardian Backend v4.0.1 is LIVE & READY!" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host " Local API URL:       http://localhost:$port" -ForegroundColor White
 Write-Host " Public HTTPS URL:    $publicUrl" -ForegroundColor Cyan

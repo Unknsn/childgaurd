@@ -56,7 +56,11 @@ class BleProvisioningManager(
             endpointId: String,
             authToken: String,
             version: Int = 1,
-            timestampSeconds: Long = System.currentTimeMillis() / 1000L
+            timestampSeconds: Long = System.currentTimeMillis() / 1000L,
+            childName: String? = null,
+            childAge: Int? = null,
+            bloodGroup: String? = null,
+            emergencyPhone: String? = null
         ): String {
             require(childId.isNotBlank()) { "Child ID cannot be blank" }
             require(parentId.isNotBlank()) { "Parent ID cannot be blank" }
@@ -68,11 +72,33 @@ class BleProvisioningManager(
                 "$childId:$parentId:$cleanIp:$cleanPort:$cleanEndpointId:$version:$timestampSeconds",
                 cleanToken
             ).take(16)
-            return "PROV:$childId|$parentId|$cleanIp|$cleanPort|$cleanEndpointId|$cleanToken|$version|$timestampSeconds|$hmac"
+
+            val base = "PROV:$childId|$parentId|$cleanIp|$cleanPort|$cleanEndpointId|$cleanToken|$version|$timestampSeconds|$hmac"
+            return if (childName != null || childAge != null || bloodGroup != null || emergencyPhone != null) {
+                val cleanName = childName?.trim()?.ifEmpty { "Child" } ?: "Child"
+                val cleanAge = childAge ?: 8
+                val cleanBlood = bloodGroup?.trim()?.ifEmpty { "O+" } ?: "O+"
+                val cleanPhone = emergencyPhone?.trim()?.ifEmpty { "+91 98765 43210" } ?: "+91 98765 43210"
+                "$base|$cleanName|$cleanAge|$cleanBlood|$cleanPhone"
+            } else {
+                base
+            }
+        }
+
+        fun buildChildProfilePayload(
+            name: String,
+            age: Int,
+            bloodGroup: String,
+            emergencyPhone: String
+        ): String {
+            val cleanName = name.trim().ifEmpty { "Child" }
+            val cleanBlood = bloodGroup.trim().ifEmpty { "O+" }
+            val cleanPhone = emergencyPhone.trim().ifEmpty { "+91 98765 43210" }
+            return "CHILD:$cleanName|$age|$cleanBlood|$cleanPhone"
         }
 
         fun parseAckResponse(response: String): Boolean {
-            return response.trim().startsWith("ACK:PROV:OK")
+            return response.trim().startsWith("ACK:PROV:OK") || response.trim().startsWith("ACK:CHILD:OK")
         }
     }
 
@@ -93,7 +119,11 @@ class BleProvisioningManager(
         parentNodePort: Int,
         parentNodeEndpointId: String,
         authToken: String,
-        version: Int = 1
+        version: Int = 1,
+        childName: String = "Demo Child",
+        childAge: Int = 8,
+        bloodGroup: String = "O+",
+        emergencyPhone: String = "+91 98765 43210"
     ): Boolean {
         _state.value = BleProvisioningState.Connecting
         val payload = buildProvisioningPayload(
@@ -103,7 +133,11 @@ class BleProvisioningManager(
             parentNodePort = parentNodePort,
             endpointId = parentNodeEndpointId,
             authToken = authToken,
-            version = version
+            version = version,
+            childName = childName,
+            childAge = childAge,
+            bloodGroup = bloodGroup,
+            emergencyPhone = emergencyPhone
         )
 
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()

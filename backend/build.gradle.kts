@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.safeband"
-version = "4.0.0"
+version = "4.0.1"
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {

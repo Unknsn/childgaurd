@@ -1,8 +1,8 @@
-# SafeBand Guardian v4.0.0 - Backend Status Script (PowerShell)
+# SafeBand Guardian v4.0.1 - Backend Status Script (PowerShell)
 Set-Location $PSScriptRoot
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host " SafeBand Guardian Backend Status Check" -ForegroundColor Cyan
+Write-Host " SafeBand Guardian Backend Status Check (v4.0.1)" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Determine configured port

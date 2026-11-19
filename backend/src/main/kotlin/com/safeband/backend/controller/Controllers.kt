@@ -18,7 +18,7 @@ class HealthController {
             mapOf(
                 "status" to "UP",
                 "service" to "SafeBand Guardian Backend",
-                "version" to "4.0.0",
+                "version" to "4.0.1",
                 "timestamp" to Instant.now().toString()
             )
         )
