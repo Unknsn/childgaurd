@@ -55,6 +55,7 @@ interface GeofenceZoneRepository : JpaRepository<GeofenceZoneEntity, String> {
 interface IncidentRepository : JpaRepository<IncidentEntity, String> {
     fun findByChildId(childId: String): List<IncidentEntity>
     fun findByChildIdAndStatus(childId: String, status: String): List<IncidentEntity>
+    fun findByDeviceIdAndStatus(deviceId: String, status: String): List<IncidentEntity>
     fun findByStatusOrderByStartTimestampDesc(status: String): List<IncidentEntity>
 }
 

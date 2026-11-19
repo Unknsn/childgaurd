@@ -78,7 +78,8 @@ class EmergencyRelayManager(
             val latStr = lat?.toString() ?: "null"
             val lonStr = lon?.toString() ?: "null"
             val accStr = accuracy?.toString() ?: "null"
-            return """{"broadcastId":"$broadcastId","alertType":"$alertType","relayLatitude":$latStr,"relayLongitude":$lonStr,"accuracy":$accStr,"timestamp":$detectedAt}"""
+            val isoTime = java.time.Instant.ofEpochMilli(detectedAt).toString()
+            return """{"incidentId":"INC-$broadcastId-$detectedAt","deviceId":"$broadcastId","broadcastId":"$broadcastId","alertType":"$alertType","relayDeviceId":"RELAY-BYSTANDER","latitude":$latStr,"longitude":$lonStr,"relayLatitude":$latStr,"relayLongitude":$lonStr,"accuracyMeters":$accStr,"accuracy":$accStr,"timestamp":$detectedAt,"observedAt":"$isoTime"}"""
         }
 
         fun createRelayPayloadJson(
@@ -197,10 +198,15 @@ class EmergencyRelayManager(
         val lon = locationFix?.second
         val accuracy = locationFix?.third
 
-        // 2. Resolve parent node endpoint configuration
-        val parentIp = preferences.getParentNodeIpDirect().ifEmpty { "127.0.0.1" }
-        val parentPort = preferences.getParentNodePortDirect()
-        val endpointUrl = "http://$parentIp:$parentPort/api/relay/alert"
+        // 2. Resolve parent node / backend endpoint configuration
+        val baseUrl = preferences.getBackendBaseUrlDirect().trim().removeSuffix("/")
+        val endpointUrl = if (baseUrl.isNotBlank()) {
+            "$baseUrl/api/v1/relay/observations"
+        } else {
+            val parentIp = preferences.getParentNodeIpDirect().ifEmpty { "127.0.0.1" }
+            val parentPort = preferences.getParentNodePortDirect()
+            "http://$parentIp:$parentPort/api/relay/alert"
+        }
 
         // 3. Create persistent Room forwarding record (Strict Privacy: NO Child PII stored)
         val forwardingRecord = RelayForwardingRecord(

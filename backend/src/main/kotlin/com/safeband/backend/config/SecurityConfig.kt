@@ -33,7 +33,7 @@ class SecurityConfig(
                     // Public Auth Endpoints
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     // Public / Bystander Relay Mesh Observation submission
-                    .requestMatchers(HttpMethod.POST, "/api/v1/relay/observations").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/relay/observations", "/api/relay/alert").permitAll()
                     // Public Device Configuration Retrieval for initial BLE provisioning handshake
                     .requestMatchers(HttpMethod.GET, "/api/v1/devices/*/configuration").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/devices/*/configuration/ack").permitAll()

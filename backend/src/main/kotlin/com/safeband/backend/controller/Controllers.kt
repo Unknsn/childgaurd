@@ -158,7 +158,7 @@ class DeviceController(
 class PairingController(
     private val pairingService: PairingService
 ) {
-    @PostMapping("/sessions")
+    @PostMapping("/sessions", "/initiate")
     fun createSession(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestBody req: CreatePairingSessionRequest
@@ -166,7 +166,7 @@ class PairingController(
         return ResponseEntity.ok(pairingService.createSession(principal.id, req))
     }
 
-    @PostMapping("/{sessionId}/complete")
+    @PostMapping("/{sessionId}/complete", "/{sessionId}/confirm")
     fun completeSession(
         @AuthenticationPrincipal principal: UserPrincipal,
         @PathVariable sessionId: String,
@@ -316,11 +316,11 @@ class IncidentController(
 }
 
 @RestController
-@RequestMapping("/api/v1/relay")
+@RequestMapping("/api/v1/relay", "/api/relay")
 class RelayController(
     private val relayService: RelayService
 ) {
-    @PostMapping("/observations")
+    @PostMapping("/observations", "/alert")
     fun uploadObservation(
         @RequestBody req: RelayObservationRequest
     ): ResponseEntity<RelayObservationResponse> {

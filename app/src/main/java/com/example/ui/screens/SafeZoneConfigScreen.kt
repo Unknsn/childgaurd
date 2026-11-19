@@ -79,6 +79,7 @@ fun SafeZoneConfigScreen(
     val distanceToBoundary by viewModel.distanceToBoundary.collectAsState()
     val distanceFromCenter by viewModel.distanceFromCenter.collectAsState()
     val verifiedLocation by viewModel.verifiedLocation.collectAsState()
+    val remoteChildLoc by viewModel.remoteChildLocation.collectAsState()
     val routeState by viewModel.routeState.collectAsState()
     val trustedRoute by viewModel.trustedRoute.collectAsState()
     val distanceToRouteCorridor by viewModel.distanceToRouteCorridor.collectAsState()
@@ -159,8 +160,8 @@ fun SafeZoneConfigScreen(
         // Real Interactive OpenStreetMap Safe Zone View
         SafeZoneMapView(
             safeZone = previewZone,
-            childLat = deviceLocation?.latitude,
-            childLon = deviceLocation?.longitude,
+            childLat = remoteChildLoc?.latitude ?: deviceLocation?.latitude,
+            childLon = remoteChildLoc?.longitude ?: deviceLocation?.longitude,
             isChildOutside = isChildOutside,
             resolvedAddress = safeZoneAddress,
             verifiedLocation = verifiedLocation,

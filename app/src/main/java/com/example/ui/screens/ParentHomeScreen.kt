@@ -445,6 +445,7 @@ fun ParentMonitorTab(
     var isDemoExpanded by remember { mutableStateOf(false) }
 
     val verifiedLocation by viewModel.verifiedLocation.collectAsState()
+    val remoteChildLocation by viewModel.remoteChildLocation.collectAsState()
     val geofenceState by viewModel.geofenceState.collectAsState()
     val distanceToBoundary by viewModel.distanceToBoundary.collectAsState()
     val routeState by viewModel.routeState.collectAsState()
@@ -937,9 +938,11 @@ fun ParentMonitorTab(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                val loc = verifiedLocation
+                val loc = remoteChildLocation ?: verifiedLocation
                 val isPhysicalNode = lastBeacon != null && !lastBeacon.isSimulation
-                val locText = if (isPhysicalNode) {
+                val locText = if (remoteChildLocation != null) {
+                    remoteChildLocation?.resolvedAddress ?: "Remote Child • Active Telemetry"
+                } else if (isPhysicalNode) {
                     "Direct BLE Proximity (~14m) • Physical Node Active"
                 } else if (loc != null && !loc.resolvedAddress.isNullOrBlank()) {
                     loc.resolvedAddress!!

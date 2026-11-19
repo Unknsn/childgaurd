@@ -213,6 +213,18 @@ class SafeBandApiClient(
         return if (res.isSuccess) Result.success(true) else Result.failure(res.exceptionOrNull() ?: Exception("Upload location failed"))
     }
 
+    suspend fun getLatestChildLocation(childId: String): Result<JSONObject?> {
+        val res = executeRequest("/api/v1/locations/children/$childId/latest", "GET")
+        return if (res.isSuccess) {
+            try {
+                val body = res.getOrThrow()
+                if (body.isBlank()) Result.success(null) else Result.success(JSONObject(body))
+            } catch (e: Exception) { Result.failure(e) }
+        } else {
+            Result.failure(res.exceptionOrNull() ?: Exception("Get latest location failed"))
+        }
+    }
+
     // --- GEOFENCE ZONES ---
     suspend fun createGeofenceZone(
         childId: String,

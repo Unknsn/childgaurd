@@ -339,9 +339,22 @@ class PairingService(
 class LocationService(
     private val locationRepository: LocationRepository,
     private val childProfileRepository: ChildProfileRepository,
+    private val geofenceZoneRepository: GeofenceZoneRepository,
+    private val incidentRepository: IncidentRepository,
     private val webSocketHandler: SafeBandWebSocketHandler,
     private val objectMapper: ObjectMapper
 ) {
+    private fun calculateDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val earthRadius = 6371000.0 // Mean Earth radius in meters
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return earthRadius * c
+    }
+
     fun ingestLocation(req: LocationUploadRequest): LocationResponse {
         val entity = LocationEntity(
             id = UUID.randomUUID().toString(),
@@ -373,6 +386,47 @@ class LocationService(
                 "batteryPercentage" to req.batteryPercentage
             )
             webSocketHandler.broadcastToUser(child.parentUserId, objectMapper.writeValueAsString(event))
+
+            // Automatic Server-Side Geofence Breach Evaluation (Haversine + 15m Hysteresis)
+            val activeZones = geofenceZoneRepository.findByChildIdAndIsActiveTrue(req.childId)
+            for (zone in activeZones) {
+                val distance = calculateDistanceMeters(req.latitude, req.longitude, zone.latitude, zone.longitude)
+                val bufferRadius = zone.radiusMeters + 15.0 // 15-meter hysteresis threshold
+                if (distance > bufferRadius) {
+                    val hasActiveExit = incidentRepository.findByChildIdAndStatus(req.childId, "ACTIVE")
+                        .any { it.incidentType == "GEOFENCE_EXIT" }
+                    if (!hasActiveExit) {
+                        val incidentId = "INC-GEO-${req.childId}-${System.currentTimeMillis()}"
+                        val incident = IncidentEntity(
+                            incidentId = incidentId,
+                            childId = req.childId,
+                            deviceId = req.deviceId,
+                            incidentType = "GEOFENCE_EXIT",
+                            riskLevel = "WARNING",
+                            status = "ACTIVE",
+                            source = "SERVER_GEOFENCE_EVALUATOR",
+                            latitude = req.latitude,
+                            longitude = req.longitude,
+                            accuracyMeters = req.accuracyMeters,
+                            addressText = "Outside ${zone.name} boundary (Distance: ${distance.toInt()}m, Limit: ${zone.radiusMeters.toInt()}m)",
+                            startTimestamp = req.fixTimestamp,
+                            lastUpdatedTimestamp = Instant.now()
+                        )
+                        val savedInc = incidentRepository.save(incident)
+                        val geoEvent = mapOf(
+                            "type" to "GEOFENCE_EXIT_INCIDENT",
+                            "incidentId" to savedInc.incidentId,
+                            "childId" to child.id,
+                            "childName" to child.childName,
+                            "zoneName" to zone.name,
+                            "latitude" to req.latitude,
+                            "longitude" to req.longitude,
+                            "timestamp" to req.fixTimestamp.toEpochMilli()
+                        )
+                        webSocketHandler.broadcastToUser(child.parentUserId, objectMapper.writeValueAsString(geoEvent))
+                    }
+                }
+            }
         }
 
         return saved.toResponse()
@@ -622,42 +676,63 @@ class RelayService(
     private val objectMapper: ObjectMapper
 ) {
     fun recordObservation(req: RelayObservationRequest): RelayObservationResponse {
+        val incidentId = req.resolveIncidentId()
+        val relayDeviceId = req.resolveRelayDeviceId()
+        val lat = req.resolveLatitude()
+        val lon = req.resolveLongitude()
+        val acc = req.resolveAccuracy()
+        val obsAt = req.resolveObservedAt()
+
         // Deduplicate: same incident, same relay, same minute
         val isDuplicate = relayObservationRepository.existsByIncidentIdAndRelayDeviceIdAndObservedAt(
-            req.incidentId, req.relayDeviceId, req.observedAt
+            incidentId, relayDeviceId, obsAt
         )
         if (isDuplicate) {
-            val existing = relayObservationRepository.findByIncidentIdOrderByObservedAtDesc(req.incidentId).first()
-            return existing.toResponse()
+            val existing = relayObservationRepository.findByIncidentIdOrderByObservedAtDesc(incidentId).firstOrNull()
+            if (existing != null) return existing.toResponse()
         }
+
+        // Correlate with existing incident by ID or active device incident
+        val incidentOpt = incidentRepository.findById(incidentId)
+            .or { incidentRepository.findByDeviceIdAndStatus(incidentId, "ACTIVE").firstOrNull()?.let { java.util.Optional.of(it) } ?: java.util.Optional.empty() }
+
+        val resolvedIncidentId = incidentOpt.map { it.incidentId }.orElse(incidentId)
 
         val obsId = "RELAY-${UUID.randomUUID()}"
         val entity = RelayObservationEntity(
             observationId = obsId,
-            incidentId = req.incidentId,
-            relayDeviceId = req.relayDeviceId,
-            latitude = req.latitude,
-            longitude = req.longitude,
-            accuracyMeters = req.accuracyMeters,
+            incidentId = resolvedIncidentId,
+            relayDeviceId = relayDeviceId,
+            latitude = lat,
+            longitude = lon,
+            accuracyMeters = acc,
             rssi = req.rssi,
             hopCount = req.hopCount,
-            observedAt = req.observedAt,
+            observedAt = obsAt,
             uploadedAt = Instant.now()
         )
         val saved = relayObservationRepository.save(entity)
 
-        // Notify parent that a bystander smartphone has sighted the emergency beacon!
-        incidentRepository.findById(req.incidentId).ifPresent { inc ->
+        // Update incident location with bystander sightings and notify parent via WebSocket
+        incidentOpt.ifPresent { inc ->
+            if (lat != 0.0 && lon != 0.0) {
+                inc.latitude = lat
+                inc.longitude = lon
+                acc?.let { inc.accuracyMeters = it }
+                inc.lastUpdatedTimestamp = Instant.now()
+                incidentRepository.save(inc)
+            }
+
             childProfileRepository.findById(inc.childId).ifPresent { child ->
                 val event = mapOf(
                     "type" to "RELAY_OBSERVATION_RECEIVED",
                     "incidentId" to inc.incidentId,
                     "childId" to child.id,
                     "childName" to child.childName,
-                    "relayLatitude" to req.latitude,
-                    "relayLongitude" to req.longitude,
-                    "accuracyMeters" to req.accuracyMeters,
-                    "observedAt" to req.observedAt.toEpochMilli()
+                    "relayLatitude" to lat,
+                    "relayLongitude" to lon,
+                    "accuracyMeters" to acc,
+                    "observedAt" to obsAt.toEpochMilli()
                 )
                 webSocketHandler.broadcastToUser(child.parentUserId, objectMapper.writeValueAsString(event))
             }

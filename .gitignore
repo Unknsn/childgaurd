@@ -18,6 +18,10 @@ data/
 *.trace.db
 cloudflared.exe
 cloudflared
+tools/
+*.pid
+.*.pid
+.public-url
 /captures
 .externalNativeBuild
 .cxx

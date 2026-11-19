@@ -364,6 +364,39 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val routeState: StateFlow<RouteState> = locationHelper.routeState
     val distanceToRouteCorridor: StateFlow<Float?> = locationHelper.distanceToRouteCorridorMeters
 
+    private val _remoteChildLocation = MutableStateFlow<VerifiedLocation?>(null)
+    val remoteChildLocation: StateFlow<VerifiedLocation?> = _remoteChildLocation.asStateFlow()
+
+    fun refreshRemoteChildLocation() {
+        val childId = preferences.getAssociatedChildIdDirect() ?: return
+        viewModelScope.launch {
+            try {
+                val res = apiClient.getLatestChildLocation(childId)
+                if (res.isSuccess) {
+                    val json = res.getOrThrow()
+                    if (json != null) {
+                        val lat = json.optDouble("latitude", 0.0)
+                        val lon = json.optDouble("longitude", 0.0)
+                        val acc = json.optDouble("accuracyMeters", 10.0).toFloat()
+                        if (lat != 0.0 && lon != 0.0) {
+                            _remoteChildLocation.value = VerifiedLocation(
+                                latitude = lat,
+                                longitude = lon,
+                                accuracyMeters = acc,
+                                timestamp = System.currentTimeMillis(),
+                                confidence = com.example.model.LocationConfidence.HIGH,
+                                isSimulation = false,
+                                resolvedAddress = "Child Device • Cloud Telemetry"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("SafeBandViewModel", "Unable to refresh remote child location: ${e.message}")
+            }
+        }
+    }
+
     val monitoringServiceState: StateFlow<MonitoringServiceState> = BleSafetyMonitorService.serviceState
 
     val safetyMonitoringEnabled: StateFlow<Boolean> = repository.safetyMonitoringEnabled.stateIn(
@@ -816,6 +849,16 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        // Periodic background polling for remote child location when in Parent Mode
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(30_000L)
+                if (appMode.value == com.example.model.AppMode.PARENT) {
+                    refreshRemoteChildLocation()
+                }
+            }
+        }
+
         // Collect background monitor service state & incoming emergency events
         viewModelScope.launch {
             BleSafetyMonitorService.latestBeacon.collect { beacon ->
@@ -1193,10 +1236,40 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                     Log.w("SafeBandViewModel", "[INCIDENT] physical TAMPER incident created (ID: $incidentId, Device: ${payload.deviceId})")
                     viewModelScope.launch {
                         repository.updateTamperStatus(payload.deviceId, "TAMPER_CONFIRMED", 0L)
+                        try {
+                            val childId = preferences.getAssociatedChildIdDirect() ?: "CHLD-${payload.deviceId}"
+                            apiClient.reportEmergencyIncident(
+                                childId = childId,
+                                deviceId = payload.deviceId,
+                                incidentType = "TAMPER",
+                                riskLevel = "CRITICAL",
+                                lat = payload.latitude,
+                                lon = payload.longitude,
+                                acc = 15.0f
+                            )
+                        } catch (e: Exception) {
+                            Log.w("SafeBandViewModel", "Failed to upload tamper incident: ${e.message}")
+                        }
                     }
                 } else {
                     Log.w("SafeBandViewModel", "[RISK] MANUAL_SOS -> CRITICAL")
                     Log.w("SafeBandViewModel", "[INCIDENT] physical SOS incident created (ID: $incidentId, Device: ${payload.deviceId})")
+                    viewModelScope.launch {
+                        try {
+                            val childId = preferences.getAssociatedChildIdDirect() ?: "CHLD-${payload.deviceId}"
+                            apiClient.reportEmergencyIncident(
+                                childId = childId,
+                                deviceId = payload.deviceId,
+                                incidentType = "MANUAL_SOS",
+                                riskLevel = "CRITICAL",
+                                lat = payload.latitude,
+                                lon = payload.longitude,
+                                acc = 15.0f
+                            )
+                        } catch (e: Exception) {
+                            Log.w("SafeBandViewModel", "Failed to upload SOS incident: ${e.message}")
+                        }
+                    }
                 }
                 Log.w("SafeBandViewModel", "[UI] EmergencyAlertSheet requested")
             }
@@ -1488,6 +1561,22 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
                 deviceId = deviceId.value,
                 details = "Manual SOS emergency button triggered by child - immediate CRITICAL escalation without countdown"
             )
+            // Synchronize critical SOS incident to backend cloud
+            try {
+                val childId = preferences.getAssociatedChildIdDirect() ?: "CHLD-LOCAL"
+                apiClient.reportEmergencyIncident(
+                    childId = childId,
+                    deviceId = deviceId.value,
+                    incidentType = "MANUAL_SOS",
+                    riskLevel = "CRITICAL",
+                    lat = loc?.latitude ?: safeZone.value.latitude,
+                    lon = loc?.longitude ?: safeZone.value.longitude,
+                    acc = loc?.accuracy ?: 10.0f,
+                    addressText = _childAddress.value?.fullAddress
+                )
+            } catch (e: Exception) {
+                Log.w("SafeBandViewModel", "Failed to upload manual SOS to backend: ${e.message}")
+            }
         }
     }
 

@@ -58,7 +58,7 @@ SafeBand Guardian v4.0.0 underwent extensive multi-tier verification covering:
 
 | Artifact | Output Path | File Size | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **Android Release APK** | `app/build/outputs/apk/release/app-release.apk` | 14,180,754 bytes | `F8DBF9293BF4E7AB978B0D437E09EE8E3ABE83F4576473657C746549F3D50874` |
-| **Android Debug APK** | `app/build/outputs/apk/debug/app-debug.apk` | 20,984,835 bytes | `5780E5E12D9D845B176C205F3706CBF69B7A8D4CF219BEFFE43899E2FB92C9AA` |
-| **Spring Boot Executable JAR** | `backend/build/libs/backend-4.0.0.jar` | 121,449,255 bytes | `0591CD04EA7F2DE4911CA7178B8B74D524DA96706890545ACE7AAB962499AE5D` |
+| **Android Release APK** | `app/build/outputs/apk/release/app-release.apk` | 14,180,754 bytes | `3A7722791167CFCF3D3208B2EA462725299D9374E11AADEAE6C79E1E0D136618` |
+| **Android Debug APK** | `app/build/outputs/apk/debug/app-debug.apk` | 21,586,028 bytes | `6FE878F95D748DDC9C54826FD58EB2FC1E15E86D81E57CE5B034E2E586AE30C6` |
+| **Spring Boot Executable JAR** | `backend/build/libs/backend-4.0.0.jar` | 121,453,344 bytes | `3A768627DD724EF77126DC11C6A78EB0F51B993D8AF1641030DFF124F1E740D2` |
 | **ESP32-S3 Firmware Binary** | `hardware/esp32-child-node/.pio/build/esp32-s3-devkitc-1/firmware.bin` | 944,208 bytes | `3E8D822709A88941C7940E3FFD09DECD1299278815C7B2BB079DC35E5A1647DF` |

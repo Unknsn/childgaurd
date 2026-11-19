@@ -251,15 +251,28 @@ data class ResolveIncidentRequest(
 )
 
 data class RelayObservationRequest(
-    val incidentId: String,
-    val relayDeviceId: String,
-    val latitude: Double,
-    val longitude: Double,
+    val incidentId: String? = null,
+    val deviceId: String? = null,
+    val broadcastId: String? = null,
+    val alertType: String? = null,
+    val relayDeviceId: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val relayLatitude: Double? = null,
+    val relayLongitude: Double? = null,
     val accuracyMeters: Float? = null,
+    val accuracy: Float? = null,
     val rssi: Int? = null,
     val hopCount: Int = 1,
-    val observedAt: Instant = Instant.now()
-)
+    val observedAt: Instant? = null
+) {
+    fun resolveIncidentId(): String = incidentId ?: broadcastId ?: deviceId ?: "INC-OBSERVATION"
+    fun resolveRelayDeviceId(): String = relayDeviceId ?: "RELAY-BYSTANDER"
+    fun resolveLatitude(): Double = latitude ?: relayLatitude ?: 0.0
+    fun resolveLongitude(): Double = longitude ?: relayLongitude ?: 0.0
+    fun resolveAccuracy(): Float? = accuracyMeters ?: accuracy
+    fun resolveObservedAt(): Instant = observedAt ?: Instant.now()
+}
 
 data class RelayObservationResponse(
     val observationId: String,

@@ -48,9 +48,9 @@
 
 | Component | File Path | File Size | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **Android App (Release)** | `app/build/outputs/apk/release/app-release.apk` | 14,180,754 bytes (13.5 MB) | `F8DBF9293BF4E7AB978B0D437E09EE8E3ABE83F4576473657C746549F3D50874` |
-| **Android App (Debug)** | `app/build/outputs/apk/debug/app-debug.apk` | 20,984,835 bytes (20.0 MB) | `5780E5E12D9D845B176C205F3706CBF69B7A8D4CF219BEFFE43899E2FB92C9AA` |
-| **Spring Boot Backend** | `backend/build/libs/backend-4.0.0.jar` | 121,449,255 bytes (115.8 MB) | `0591CD04EA7F2DE4911CA7178B8B74D524DA96706890545ACE7AAB962499AE5D` |
+| **Android App (Release)** | `app/build/outputs/apk/release/app-release.apk` | 14,180,754 bytes (13.5 MB) | `3A7722791167CFCF3D3208B2EA462725299D9374E11AADEAE6C79E1E0D136618` |
+| **Android App (Debug)** | `app/build/outputs/apk/debug/app-debug.apk` | 21,586,028 bytes (20.6 MB) | `6FE878F95D748DDC9C54826FD58EB2FC1E15E86D81E57CE5B034E2E586AE30C6` |
+| **Spring Boot Backend** | `backend/build/libs/backend-4.0.0.jar` | 121,453,344 bytes (115.8 MB) | `3A768627DD724EF77126DC11C6A78EB0F51B993D8AF1641030DFF124F1E740D2` |
 | **ESP32-S3 Firmware** | `hardware/esp32-child-node/.pio/build/esp32-s3-devkitc-1/firmware.bin` | 944,208 bytes (922 KB) | `3E8D822709A88941C7940E3FFD09DECD1299278815C7B2BB079DC35E5A1647DF` |
 
 ---
