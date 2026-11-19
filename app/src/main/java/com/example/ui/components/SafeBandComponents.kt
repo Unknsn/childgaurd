@@ -178,7 +178,9 @@ fun SafeBandPrimaryButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -213,7 +215,9 @@ fun SafeBandSecondaryButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

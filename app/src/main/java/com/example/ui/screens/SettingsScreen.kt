@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Edit
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -854,6 +856,140 @@ fun SettingsScreen(
                     text = if (updateInfo.state == UpdateState.UPDATE_AVAILABLE) "View & Install Update" else "Check for Updates",
                     icon = Icons.Default.SystemUpdate,
                     onClick = onNavigateToUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(SafeBandSpacing.md))
+
+            // Section: Laptop Backend & Secure Tunnel (v4.0.0)
+            val backendBaseUrl by viewModel.backendBaseUrl.collectAsState()
+            val backendHealth by viewModel.backendHealth.collectAsState()
+            var editingUrl by remember(backendBaseUrl) { mutableStateOf(backendBaseUrl) }
+            var isEditingBackendUrl by remember { mutableStateOf(false) }
+
+            SafeBandCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_backend_card")
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = SafeBandShapes.medium,
+                            color = SafeBandColor.PrimaryLight,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudQueue,
+                                    contentDescription = null,
+                                    tint = SafeBandColor.Primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(SafeBandSpacing.md))
+                        Column {
+                            Text(
+                                text = "Backend & Cloud Tunnel",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Remote tracking & relay synchronization",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    val badgeColor = when {
+                        backendHealth.startsWith("HEALTHY") -> SafeBandColor.Success
+                        backendHealth == "CHECKING..." -> SafeBandColor.Warning
+                        backendHealth == "UNREACHABLE" -> SafeBandColor.Emergency
+                        else -> SafeBandColor.Slate400
+                    }
+                    SafeBandStatusBadge(
+                        text = backendHealth,
+                        color = badgeColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(SafeBandSpacing.md))
+
+                if (isEditingBackendUrl) {
+                    OutlinedTextField(
+                        value = editingUrl,
+                        onValueChange = { editingUrl = it },
+                        label = { Text("Backend / Cloudflare Tunnel URL") },
+                        placeholder = { Text("https://xxxx.trycloudflare.com or http://10.0.2.2:8080") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = SafeBandShapes.medium
+                    )
+                    Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OutlinedButton(onClick = {
+                            editingUrl = backendBaseUrl
+                            isEditingBackendUrl = false
+                        }) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(SafeBandSpacing.sm))
+                        Button(
+                            onClick = {
+                                viewModel.updateBackendBaseUrl(editingUrl)
+                                isEditingBackendUrl = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SafeBandColor.PrimaryBrand)
+                        ) {
+                            Text("Save & Connect")
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Active Endpoint:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = backendBaseUrl,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = { isEditingBackendUrl = true }) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit URL", tint = SafeBandColor.Primary)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(SafeBandSpacing.sm))
+
+                SafeBandSecondaryButton(
+                    text = "Test Backend Connectivity",
+                    icon = Icons.Default.Refresh,
+                    onClick = { viewModel.testBackendHealth() },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

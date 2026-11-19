@@ -1,0 +1,66 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: safeband-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:standalone}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+---
+# Standalone local profile: embedded H2 with PostgreSQL compatibility & persistent file storage
+spring:
+  config:
+    activate:
+      on-profile: standalone
+  datasource:
+    url: jdbc:h2:file:./data/safeband;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+
+---
+# Production profile: external PostgreSQL
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:safeband}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+---
+# Custom Security & External Service Configuration
+safeband:
+  jwt:
+    secret: ${JWT_SECRET:SafeBandGuardianMasterSecretKeyForHmacSha256MustBeAtLeast32BytesLong}
+    access-token-expiration-ms: ${JWT_ACCESS_EXPIRY:3600000} # 1 hour
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRY:2592000000} # 30 days
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:104192847120-safeband-guardian.apps.googleusercontent.com}
+  firebase:
+    enabled: ${FIREBASE_ENABLED:false}
+    credentials-path: ${FIREBASE_CONFIG_PATH:}
+  tunnel:
+    public-url: ${PUBLIC_TUNNEL_URL:http://localhost:8080}

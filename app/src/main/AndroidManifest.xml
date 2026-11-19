@@ -62,6 +62,12 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />
 
+        <!-- Mandatory 1-Minute Child Location Periodic Foreground Service (Section 8) -->
+        <service
+            android:name=".service.ChildLocationForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <!-- Restores Safety Monitoring after Device Reboot -->
         <receiver
             android:name=".service.BootCompletedReceiver"

@@ -150,6 +150,34 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
     val allRelayRecords: StateFlow<List<RelayForwardingRecord>> = repository.allRelayRecords
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val apiClient = com.example.network.SafeBandApiClient(preferences)
+
+    val backendBaseUrl: StateFlow<String> = preferences.backendBaseUrl
+        .stateIn(viewModelScope, SharingStarted.Eagerly, preferences.getBackendBaseUrlDirect())
+
+    private val _backendHealth = MutableStateFlow<String>("NOT_CHECKED")
+    val backendHealth: StateFlow<String> = _backendHealth.asStateFlow()
+
+    fun testBackendHealth() {
+        viewModelScope.launch {
+            _backendHealth.value = "CHECKING..."
+            val res = apiClient.checkHealth()
+            if (res.isSuccess) {
+                val h = res.getOrThrow()
+                _backendHealth.value = "HEALTHY (${h.latencyMs}ms)"
+            } else {
+                _backendHealth.value = "UNREACHABLE"
+            }
+        }
+    }
+
+    fun updateBackendBaseUrl(newUrl: String) {
+        viewModelScope.launch {
+            preferences.setBackendBaseUrl(newUrl)
+            testBackendHealth()
+        }
+    }
+
     val authRepository = AuthRepository(
         context = application,
         parentAccountDao = database.parentAccountDao(),
@@ -1152,15 +1180,24 @@ class SafeBandViewModel(application: Application) : AndroidViewModel(application
 
             val incidentId = if (isSameActiveIncident) currentInc.incidentId else "INC-${payload.deviceId}-${payload.timestamp}"
 
+            val isTamper = payload.alertType == "TAMPER"
             val triggerFlags = if (payload.riskLevel == RiskLevel.CRITICAL) {
-                setOf(AlertFlag.MANUAL_SOS)
+                if (isTamper) setOf(AlertFlag.TAMPER) else setOf(AlertFlag.MANUAL_SOS)
             } else if (isSameActiveIncident) {
                 currentInc.triggerFlags
             } else emptySet()
 
             if (!payload.isSimulation && payload.riskLevel == RiskLevel.CRITICAL) {
-                Log.w("SafeBandViewModel", "[RISK] MANUAL_SOS -> CRITICAL")
-                Log.w("SafeBandViewModel", "[INCIDENT] physical SOS incident created (ID: $incidentId, Device: ${payload.deviceId})")
+                if (isTamper) {
+                    Log.w("SafeBandViewModel", "[RISK] TAMPER -> CRITICAL (Strap severed / broken)")
+                    Log.w("SafeBandViewModel", "[INCIDENT] physical TAMPER incident created (ID: $incidentId, Device: ${payload.deviceId})")
+                    viewModelScope.launch {
+                        repository.updateTamperStatus(payload.deviceId, "TAMPER_CONFIRMED", 0L)
+                    }
+                } else {
+                    Log.w("SafeBandViewModel", "[RISK] MANUAL_SOS -> CRITICAL")
+                    Log.w("SafeBandViewModel", "[INCIDENT] physical SOS incident created (ID: $incidentId, Device: ${payload.deviceId})")
+                }
                 Log.w("SafeBandViewModel", "[UI] EmergencyAlertSheet requested")
             }
 

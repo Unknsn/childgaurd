@@ -1,3 +1,60 @@
+# SafeBand Guardian v4.0.0 Release Notes
+
+**Release Version:** v4.0.0 (Enterprise Cloud Backend, Google Auth, Automated Tunnel, and Real-Time Safety Ecosystem)  
+**Package:** `com.aistudio.safeband.xqmt`  
+**Target Platform:** Android 8.0 (API 26) through Android 15 (API 35)  
+**Hardware Node:** ESP32-S3 BLE Wearable Node  
+**Backend Platform:** Spring Boot 3.4.2 / Kotlin 2.2.10 (Embedded H2 / PostgreSQL 16)  
+**Release Date:** November 2026  
+**Git Tag:** `v4.0.0`  
+
+---
+
+## 🌟 What's New in v4.0.0: Public Cloud Backend, Mobile Mesh & Hardware Safety
+
+### 🌐 1. High-Performance Spring Boot Backend
+- **Kotlin 2.2.10 & Spring Boot 3.4.2**: Complete modern reactive backend service housed in `:backend` multi-project module.
+- **Dual Persistence Strategy**:
+  - `standalone` profile: Zero-dependency embedded H2 file database (`./data/safeband`) in PostgreSQL mode with Flyway schema compatibility for instant developer spins.
+  - `postgres` profile: Direct PostgreSQL connection via environment variables for cloud cluster scale.
+- **Flyway Database Migrations**: Automated V1 schema migration creating 10 relational tables: `users`, `child_profiles`, `wearable_devices`, `pairing_sessions`, `location_breadcrumbs`, `geofence_zones`, `incident_reports`, `relay_observations`, `notification_records`, and `audit_logs`.
+- **WebSocket Push Broker**: Real-time `/ws/parent` endpoint broadcasting instant `INCIDENT_CREATED` and `LOCATION_UPDATE` events directly to parent devices with sub-second latency.
+
+### 🚇 2. Zero-Configuration Public Cloudflare Tunnel
+- **Global Reachability**: Seamless connection between parents, children, and bystanders across disparate mobile carrier networks (4G/5G) and Wi-Fi networks without requiring router port-forwarding or public IP addresses.
+- **Windows Automation Scripts**:
+  - `start-backend.bat`: Verifies JDK 21, compiles backend, starts Spring Boot, polls health endpoint, auto-downloads `cloudflared.exe` if missing, starts public HTTPS tunnel, and prints the live public URL.
+  - `backend-status.bat`: Live health check of backend (PID/port) and tunnel daemon.
+  - `stop-backend.bat`: Graceful cleanup of backend and tunnel background tasks.
+
+### 🔑 3. Google Authentication & JWT Security
+- **OAuth2 Token Verification**: `GoogleTokenVerifierService` cryptographically validates Google ID tokens against Google public RSA certificates for verified parent sign-in.
+- **Stateless Bearer JWTs**: Signs and validates HMAC-SHA256 access tokens (1-hour expiry) and rotating refresh tokens (30-day expiry).
+- **Development Login Endpoint**: Public `/api/v1/auth/dev-login` endpoint for rapid offline testing without Google Play Services.
+
+### 📍 4. Continuous 1-Minute Child Location Tracking
+- **Foreground Location Service (`ChildLocationForegroundService`)**: High-accuracy periodic GPS tracking service operating in child mode, uploading coordinates every 60 seconds with offline breadcrumb buffer.
+- **Parent Settings Configuration**: `SettingsScreen` includes interactive "Backend & Cloud Tunnel" settings card allowing live URL entry and ping verification.
+
+### 🛡️ 5. GPIO 3 / GPIO 4 Hardware Tamper Loop Stabilization
+- **Physical Strap Continuity**: Dynamic continuity pulse settling window increased to 200µs (`delayMicroseconds(200)`) in ESP32-S3 firmware (`tamper_monitor.cpp`), eliminating false open-circuit cut detections caused by ribbon line capacitance on internal pull-downs.
+- **Android BLE Parsing**: Added `alertType` field propagation in `BleSafetyManager.kt` and mapped `AlertFlag.TAMPER` in `SafeBandViewModel.kt` to trigger database updates and instant parent alerts.
+
+### 🛰️ 6. Emergency-Only Community Relay Mesh Network
+- **Zero Child PII**: Anonymous bystander scanning ignores routine heartbeats and ingests only `ALERT_SOS` and `ALERT_TAMPER` beacons.
+- **Observer Privacy**: Ephemeral observer tokens prevent reverse tracking of helpful bystanders.
+
+### 📦 7. Verified Build Artifacts
+
+| Component | File Path | File Size | SHA-256 Checksum |
+| :--- | :--- | :--- | :--- |
+| **Android App (Release)** | `app/build/outputs/apk/release/app-release.apk` | 14,180,754 bytes (13.5 MB) | `F8DBF9293BF4E7AB978B0D437E09EE8E3ABE83F4576473657C746549F3D50874` |
+| **Android App (Debug)** | `app/build/outputs/apk/debug/app-debug.apk` | 20,984,835 bytes (20.0 MB) | `5780E5E12D9D845B176C205F3706CBF69B7A8D4CF219BEFFE43899E2FB92C9AA` |
+| **Spring Boot Backend** | `backend/build/libs/backend-4.0.0.jar` | 121,449,255 bytes (115.8 MB) | `0591CD04EA7F2DE4911CA7178B8B74D524DA96706890545ACE7AAB962499AE5D` |
+| **ESP32-S3 Firmware** | `hardware/esp32-child-node/.pio/build/esp32-s3-devkitc-1/firmware.bin` | 944,208 bytes (922 KB) | `3E8D822709A88941C7940E3FFD09DECD1299278815C7B2BB079DC35E5A1647DF` |
+
+---
+
 # SafeBand Guardian v3.6.1 Release Notes
 
 **Release Version:** v3.6.1 (Stabilization & Quality Hardening Patch)  

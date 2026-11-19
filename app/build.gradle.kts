@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.safeband.xqmt"
     minSdk = 24
     targetSdk = 36
-    versionCode = 13
-    versionName = "3.6.1"
+    versionCode = 14
+    versionName = "4.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -75,6 +75,19 @@ secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
+  ignoreList.add("PORT")
+  ignoreList.add("SPRING_PROFILES_ACTIVE")
+  ignoreList.add("DB_HOST")
+  ignoreList.add("DB_PORT")
+  ignoreList.add("DB_NAME")
+  ignoreList.add("DB_USER")
+  ignoreList.add("DB_PASSWORD")
+  ignoreList.add("JWT_SECRET")
+  ignoreList.add("JWT_ACCESS_EXPIRY")
+  ignoreList.add("JWT_REFRESH_EXPIRY")
+  ignoreList.add("FIREBASE_ENABLED")
+  ignoreList.add("FIREBASE_CONFIG_PATH")
+  ignoreList.add("PUBLIC_TUNNEL_URL")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }

@@ -44,14 +44,14 @@ void TamperMonitor::init(TamperStateCallback callback) {
 bool TamperMonitor::performContinuityTest(bool& isFault) {
     isFault = false;
 
-    // Phase 1: Dynamic TX HIGH test
+    // Phase 1: Dynamic TX HIGH test (200us pulse to allow physical strap capacitance to settle)
     digitalWrite(PIN_TAMPER_TX, HIGH);
-    delayMicroseconds(20);
+    delayMicroseconds(200);
     int readHigh = digitalRead(PIN_TAMPER_RX);
 
-    // Phase 2: Dynamic TX LOW test
+    // Phase 2: Dynamic TX LOW test (200us pulse to allow pulldown discharge)
     digitalWrite(PIN_TAMPER_TX, LOW);
-    delayMicroseconds(20);
+    delayMicroseconds(200);
     int readLow = digitalRead(PIN_TAMPER_RX);
 
     // Dynamic continuity check:

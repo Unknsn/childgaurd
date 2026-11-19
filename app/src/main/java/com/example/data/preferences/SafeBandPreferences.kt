@@ -60,6 +60,12 @@ class SafeBandPreferences(private val context: Context) {
         private val KEY_RELAY_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("community_relay_enabled")
         private val KEY_AUTO_FORWARD_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("auto_forward_enabled")
 
+        // Backend Cloud / Tunnel Endpoint
+        private val KEY_BACKEND_BASE_URL = stringPreferencesKey("backend_base_url")
+        private val KEY_BACKEND_ACCESS_TOKEN = stringPreferencesKey("backend_access_token")
+        private val KEY_BACKEND_REFRESH_TOKEN = stringPreferencesKey("backend_refresh_token")
+        private val KEY_ASSOCIATED_CHILD_ID = stringPreferencesKey("associated_child_id")
+
         // Guardian Master PIN for Child Mode Lockdown
         private val KEY_MASTER_PIN = stringPreferencesKey("master_guardian_pin")
         const val DEFAULT_CONFIGURED_MASTER_PIN = "998877"
@@ -84,6 +90,18 @@ class SafeBandPreferences(private val context: Context) {
 
         @Volatile
         private var cachedParentNodeAuthToken: String = "SB-TOKEN-SECURE"
+
+        @Volatile
+        private var cachedBackendBaseUrl: String = "http://10.0.2.2:8080"
+
+        @Volatile
+        private var cachedBackendAccessToken: String? = null
+
+        @Volatile
+        private var cachedBackendRefreshToken: String? = null
+
+        @Volatile
+        private var cachedAssociatedChildId: String? = null
     }
 
     fun isCommunityRelayEnabledDirect(): Boolean = cachedCommunityRelayEnabled
@@ -91,9 +109,41 @@ class SafeBandPreferences(private val context: Context) {
     fun getParentNodePortDirect(): Int = cachedParentNodePort
     fun getParentNodeEndpointIdDirect(): String = cachedParentNodeEndpointId
     fun getParentNodeAuthTokenDirect(): String = cachedParentNodeAuthToken
+    fun getBackendBaseUrlDirect(): String = cachedBackendBaseUrl
+    fun getBackendAccessTokenDirect(): String? = cachedBackendAccessToken
+    fun getBackendRefreshTokenDirect(): String? = cachedBackendRefreshToken
+    fun getAssociatedChildIdDirect(): String? = cachedAssociatedChildId
 
     fun setCommunityRelayEnabledDirect(enabled: Boolean) {
         cachedCommunityRelayEnabled = enabled
+    }
+
+    val backendBaseUrl: Flow<String> = context.dataStore.data.map { preferences ->
+        val url = preferences[KEY_BACKEND_BASE_URL] ?: "http://10.0.2.2:8080"
+        cachedBackendBaseUrl = url
+        url
+    }
+
+    suspend fun setBackendBaseUrl(url: String) {
+        val sanitized = url.trim().removeSuffix("/")
+        cachedBackendBaseUrl = sanitized
+        context.dataStore.edit { it[KEY_BACKEND_BASE_URL] = sanitized }
+    }
+
+    suspend fun setBackendTokens(accessToken: String?, refreshToken: String?) {
+        cachedBackendAccessToken = accessToken
+        cachedBackendRefreshToken = refreshToken
+        context.dataStore.edit { prefs ->
+            if (accessToken != null) prefs[KEY_BACKEND_ACCESS_TOKEN] = accessToken else prefs.remove(KEY_BACKEND_ACCESS_TOKEN)
+            if (refreshToken != null) prefs[KEY_BACKEND_REFRESH_TOKEN] = refreshToken else prefs.remove(KEY_BACKEND_REFRESH_TOKEN)
+        }
+    }
+
+    suspend fun setAssociatedChildId(childId: String?) {
+        cachedAssociatedChildId = childId
+        context.dataStore.edit { prefs ->
+            if (childId != null) prefs[KEY_ASSOCIATED_CHILD_ID] = childId else prefs.remove(KEY_ASSOCIATED_CHILD_ID)
+        }
     }
 
     val safetyMonitoringEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->

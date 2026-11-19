@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "SafeBand"
 
 include(":app")
+include(":backend")

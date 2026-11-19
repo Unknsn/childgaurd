@@ -39,6 +39,7 @@ import com.example.ui.theme.SafeBandColor
 import com.example.ui.theme.SafeBandShapes
 import com.example.ui.theme.SafeBandSpacing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -91,6 +92,23 @@ fun SafeZoneConfigScreen(
     var lonInput by remember(currentSafeZone) { mutableStateOf(currentSafeZone.longitude.toString()) }
     var radiusValue by remember(currentSafeZone) { mutableFloatStateOf(currentSafeZone.radiusMeters) }
     var saveMessage by remember { mutableStateOf<String?>(null) }
+    var hasUserEditedCoordinates by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.locationHelper.startLocationUpdates(currentSafeZone)
+    }
+
+    LaunchedEffect(deviceLocation) {
+        val loc = deviceLocation
+        if (loc != null && !hasUserEditedCoordinates) {
+            val currentLat = latInput.toDoubleOrNull() ?: 0.0
+            val currentLon = lonInput.toDoubleOrNull() ?: 0.0
+            if (currentLat == 0.0 && currentLon == 0.0) {
+                latInput = "%.5f".format(java.util.Locale.US, loc.latitude)
+                lonInput = "%.5f".format(java.util.Locale.US, loc.longitude)
+            }
+        }
+    }
 
     val previewZone = remember(latInput, lonInput, radiusValue, nameInput) {
         val lat = latInput.toDoubleOrNull() ?: currentSafeZone.latitude

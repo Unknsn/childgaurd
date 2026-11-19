@@ -742,7 +742,8 @@ class BleSafetyManager(private val context: Context) {
                     hopCount = 0,
                     isSimulation = false,
                     childBioProfile = cachedBio,
-                    emergencyContacts = cachedContacts.toList()
+                    emergencyContacts = cachedContacts.toList(),
+                    alertType = decoded.alertType
                 )
 
                 _lastReceivedBeacon.value = payload

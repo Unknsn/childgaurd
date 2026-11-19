@@ -64,6 +64,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -136,6 +137,14 @@ fun ChildHomeScreen(
     var showCancelSosDialog by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        try {
+            com.example.service.ChildLocationForegroundService.start(context)
+        } catch (e: Exception) {
+            android.util.Log.w("ChildHomeScreen", "Unable to start ChildLocationForegroundService: ${e.message}")
+        }
+    }
 
     // Reassurance state
     val isEmergency = currentRisk == RiskLevel.CRITICAL || currentRisk == RiskLevel.HIGH || currentRisk == RiskLevel.MEDIUM

@@ -10,6 +10,14 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+build/
+**/build/
+data/
+**/data/
+*.mv.db
+*.trace.db
+cloudflared.exe
+cloudflared
 /captures
 .externalNativeBuild
 .cxx
